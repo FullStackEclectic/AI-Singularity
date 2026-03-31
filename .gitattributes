@@ -1,0 +1,14 @@
+# 统一使用 LF 行尾符
+* text=auto eol=lf
+
+# 二进制文件不转换
+*.png binary
+*.ico binary
+*.icns binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ttf binary
+*.woff binary
+*.woff2 binary
