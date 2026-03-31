@@ -1,5 +1,6 @@
 use tauri::Manager;
 
+mod atomic_write;
 mod commands;
 mod db;
 mod error;
@@ -33,18 +34,21 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            // Key management
+            // Key 管理
             commands::keys::list_keys,
             commands::keys::add_key,
             commands::keys::delete_key,
             commands::keys::update_key,
             commands::keys::check_key,
-            // Balance & usage
+            // 余额 & 用量
             commands::balance::get_all_balances,
             commands::balance::get_platform_balance,
-            // Models
+            commands::balance::refresh_all_balances,
+            // 模型
             commands::models::list_models,
             commands::models::get_platform_models,
+            // 统计
+            commands::stats::get_dashboard_stats,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AI Singularity");

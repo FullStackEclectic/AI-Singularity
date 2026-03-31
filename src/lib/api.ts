@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApiKey, KeyStatus, Platform } from "../types";
+import type { ApiKey, Balance, DashboardStats, Platform } from "../types";
 
 export interface AddKeyRequest {
   name: string;
@@ -10,14 +10,17 @@ export interface AddKeyRequest {
 }
 
 export const api = {
+  stats: {
+    getDashboard: (): Promise<DashboardStats> => invoke("get_dashboard_stats"),
+  },
   keys: {
     list: (): Promise<ApiKey[]> => invoke("list_keys"),
     add: (req: AddKeyRequest): Promise<ApiKey> => invoke("add_key", { request: req }),
     delete: (id: string): Promise<void> => invoke("delete_key", { id }),
-    check: (id: string): Promise<KeyStatus> => invoke("check_key", { id }),
+    check: (id: string) => invoke("check_key", { id }),
   },
   balance: {
-    listAll: () => invoke("get_all_balances"),
+    listAll: (): Promise<Balance[]> => invoke("get_all_balances"),
   },
   models: {
     list: () => invoke("list_models"),

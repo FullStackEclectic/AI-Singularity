@@ -70,3 +70,12 @@ export const STATUS_LABELS: Record<KeyStatus, string> = {
   banned: "被封禁",
   rate_limit: "限速中",
 };
+
+export interface DashboardStats {
+  total_keys: number;
+  valid_keys: number;
+  invalid_keys: number;
+  unknown_keys: number;
+  total_platforms: number;
+  total_cost_usd: number;
+}
