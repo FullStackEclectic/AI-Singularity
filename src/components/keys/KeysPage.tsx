@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { ApiKey, Platform } from "../../types";
+import type { ApiKey, Balance, Platform } from "../../types";
 import { PLATFORM_LABELS, STATUS_LABELS } from "../../types";
 import "./KeysPage.css";
 
@@ -26,6 +26,14 @@ export default function KeysPage() {
     queryFn: api.keys.list,
   });
 
+  const { data: balances = [] } = useQuery({
+    queryKey: ["balances"],
+    queryFn: api.balance.listAll,
+    staleTime: 1000 * 60 * 5,
+  });
+
+  const balanceMap = Object.fromEntries(balances.map((b) => [b.key_id, b]));
+
   const deleteMut = useMutation({
     mutationFn: api.keys.delete,
     onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }),
@@ -33,19 +41,49 @@ export default function KeysPage() {
 
   const checkMut = useMutation({
     mutationFn: api.keys.check,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["keys"] });
+      qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
+    },
   });
+
+  const refreshBalanceMut = useMutation({
+    mutationFn: (id: string) => api.balance.refreshOne(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["balances"] }),
+  });
+
+  const validCount = keys.filter((k) => k.status === "valid").length;
+  const invalidCount = keys.filter(
+    (k) => k.status === "invalid" || k.status === "banned" || k.status === "expired"
+  ).length;
 
   return (
     <div className="keys-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">API Keys</h1>
-          <p className="page-subtitle">管理所有平台的 API Key，数据加密存储在本地 Keychain</p>
+          <p className="page-subtitle">
+            {keys.length} 个账号
+            {validCount > 0 && (
+              <> · <span className="text-success">{validCount} 有效</span></>
+            )}
+            {invalidCount > 0 && (
+              <> · <span className="text-danger">{invalidCount} 异常</span></>
+            )}
+          </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
-          ＋ 添加 Key
-        </button>
+        <div style={{ display: "flex", gap: "var(--space-3)" }}>
+          <button
+            className="btn btn-ghost"
+            onClick={() => keys.forEach((k) => checkMut.mutate(k.id))}
+            disabled={keys.length === 0 || checkMut.isPending}
+          >
+            ⟳ 全部检测
+          </button>
+          <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
+            ＋ 添加 Key
+          </button>
+        </div>
       </div>
 
       <div className="keys-body">
@@ -58,7 +96,7 @@ export default function KeysPage() {
           <div className="empty-state">
             <div className="empty-state-icon">🔑</div>
             <h3 style={{ color: "var(--color-text-secondary)" }}>还没有 API Key</h3>
-            <p>点击右上角「添加 Key」开始配置</p>
+            <p>点击「添加 Key」开始配置</p>
             <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
               ＋ 添加第一个 Key
             </button>
@@ -69,9 +107,15 @@ export default function KeysPage() {
               <KeyCard
                 key={key.id}
                 apiKey={key}
+                balance={balanceMap[key.id]}
                 onDelete={() => deleteMut.mutate(key.id)}
                 onCheck={() => checkMut.mutate(key.id)}
-                isChecking={checkMut.isPending && checkMut.variables === key.id}
+                onRefreshBalance={() => refreshBalanceMut.mutate(key.id)}
+                isChecking={checkMut.isPending}
+                isRefreshingBalance={
+                  refreshBalanceMut.isPending &&
+                  (refreshBalanceMut.variables as string) === key.id
+                }
               />
             ))}
           </div>
@@ -84,6 +128,7 @@ export default function KeysPage() {
           onSuccess={() => {
             setShowAdd(false);
             qc.invalidateQueries({ queryKey: ["keys"] });
+            qc.invalidateQueries({ queryKey: ["dashboard-stats"] });
           }}
         />
       )}
@@ -93,14 +138,20 @@ export default function KeysPage() {
 
 function KeyCard({
   apiKey,
+  balance,
   onDelete,
   onCheck,
+  onRefreshBalance,
   isChecking,
+  isRefreshingBalance,
 }: {
   apiKey: ApiKey;
+  balance?: Balance;
   onDelete: () => void;
   onCheck: () => void;
+  onRefreshBalance: () => void;
   isChecking: boolean;
+  isRefreshingBalance: boolean;
 }) {
   const statusClass =
     apiKey.status === "valid" ? "valid" :
@@ -110,9 +161,17 @@ function KeyCard({
 
   const badgeClass =
     apiKey.status === "valid" ? "badge-success" :
-    apiKey.status === "banned" || apiKey.status === "invalid" || apiKey.status === "expired" ? "badge-danger" :
-    apiKey.status === "rate_limit" ? "badge-warning" :
-    "badge-muted";
+    apiKey.status === "banned" || apiKey.status === "invalid" || apiKey.status === "expired"
+      ? "badge-danger"
+      : apiKey.status === "rate_limit" ? "badge-warning" : "badge-muted";
+
+  // 格式化余额显示
+  const balanceText = (() => {
+    if (!balance) return null;
+    if (balance.balance_usd != null) return `$${balance.balance_usd.toFixed(2)}`;
+    if (balance.balance_cny != null) return `¥${balance.balance_cny.toFixed(2)}`;
+    return null;
+  })();
 
   return (
     <div className="key-card card animate-fade-in">
@@ -126,18 +185,40 @@ function KeyCard({
             </div>
           </div>
         </div>
+
         <div className="key-card-actions">
+          {/* 余额显示 */}
+          {balanceText && (
+            <span className="balance-tag">
+              {balanceText}
+            </span>
+          )}
+
           <span className={`badge ${badgeClass}`}>
             {isChecking ? "检测中..." : STATUS_LABELS[apiKey.status]}
           </span>
+
+          {/* 刷新余额 */}
+          <button
+            className="btn btn-ghost btn-sm btn-icon"
+            onClick={onRefreshBalance}
+            disabled={isRefreshingBalance}
+            title="刷新余额"
+          >
+            {isRefreshingBalance ? <span className="animate-spin">⟳</span> : "💰"}
+          </button>
+
+          {/* 检测有效性 */}
           <button
             className="btn btn-ghost btn-sm btn-icon"
             onClick={onCheck}
             disabled={isChecking}
             title="检测有效性"
           >
-            {isChecking ? "⟳" : "⟳"}
+            {isChecking ? <span className="animate-spin">⟳</span> : "⟳"}
           </button>
+
+          {/* 删除 */}
           <button
             className="btn btn-danger btn-sm btn-icon"
             onClick={onDelete}
@@ -147,11 +228,18 @@ function KeyCard({
           </button>
         </div>
       </div>
+
       <div className="key-card-preview font-mono text-muted">
         {apiKey.key_preview}
       </div>
+
       {apiKey.base_url && (
         <div className="key-card-url text-muted">{apiKey.base_url}</div>
+      )}
+
+      {/* 备注 */}
+      {apiKey.notes && (
+        <div className="key-card-notes text-muted">{apiKey.notes}</div>
       )}
     </div>
   );
@@ -176,7 +264,7 @@ function AddKeyModal({
   const addMut = useMutation({
     mutationFn: api.keys.add,
     onSuccess: () => onSuccess(),
-    onError: (e: any) => setError(String(e)),
+    onError: (e: unknown) => setError(String(e)),
   });
 
   const showBaseUrl = form.platform === "custom";
@@ -250,7 +338,7 @@ function AddKeyModal({
               onChange={(e) => setForm({ ...form, secret: e.target.value })}
               autoComplete="off"
             />
-            <p className="form-hint">Key 将加密存储在系统 Keychain 中，不会以明文保存</p>
+            <p className="form-hint">🔒 Key 将加密存储在系统 Keychain 中，不会以明文保存</p>
           </div>
 
           <div className="form-row">
@@ -263,9 +351,7 @@ function AddKeyModal({
             />
           </div>
 
-          {error && (
-            <div className="form-error">{error}</div>
-          )}
+          {error && <div className="form-error">{error}</div>}
 
           <div className="modal-footer">
             <button type="button" className="btn btn-ghost" onClick={onClose}>取消</button>

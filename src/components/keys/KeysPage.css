@@ -56,6 +56,24 @@
   font-size: 12px;
 }
 
+.key-card-notes {
+  margin-top: var(--space-2);
+  font-size: 12px;
+  font-style: italic;
+}
+
+/* 余额标签 */
+.balance-tag {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-success);
+  background: var(--color-success-dim);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-full);
+  font-family: var(--font-mono);
+}
+
 /* 弹窗 */
 .modal-overlay {
   position: fixed;

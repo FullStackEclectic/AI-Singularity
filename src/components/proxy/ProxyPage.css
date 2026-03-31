@@ -1,0 +1,132 @@
+.proxy-page { height: 100%; display: flex; flex-direction: column; }
+
+.proxy-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.proxy-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+}
+
+/* 控制卡片 */
+.proxy-control-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.proxy-control-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.proxy-control-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: var(--space-1);
+}
+
+.proxy-control-sub {
+  font-size: 13px;
+}
+
+.proxy-toggle-btn {
+  flex-shrink: 0;
+  padding: var(--space-2) var(--space-5);
+}
+
+/* 端点地址 */
+.proxy-endpoint {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.proxy-endpoint-label {
+  font-size: 12px;
+  margin-bottom: var(--space-2);
+}
+
+.proxy-endpoint-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+
+.proxy-endpoint-url {
+  font-size: 14px;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  user-select: text;
+}
+
+/* 端口设置 */
+.proxy-port-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.proxy-port-input {
+  width: 100px;
+  text-align: center;
+  font-family: var(--font-mono);
+}
+
+/* 使用说明 */
+.proxy-usage-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-4);
+}
+
+.proxy-usage-item {
+  background: var(--color-bg-primary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.proxy-usage-icon { font-size: 20px; margin-bottom: var(--space-2); }
+
+.proxy-usage-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-2);
+}
+
+.proxy-usage-code {
+  display: block;
+  font-size: 11px;
+  color: var(--color-accent);
+  background: var(--color-bg-active);
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+  user-select: text;
+}
+
+/* 协议列表 */
+.protocol-list { display: flex; flex-direction: column; gap: var(--space-2); }
+
+.protocol-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  transition: background var(--transition-fast);
+}
+
+.protocol-item:hover { background: var(--color-bg-hover); }

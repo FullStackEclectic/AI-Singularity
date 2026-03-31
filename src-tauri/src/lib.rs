@@ -5,6 +5,7 @@ mod commands;
 mod db;
 mod error;
 mod models;
+mod proxy;
 mod services;
 mod store;
 
@@ -49,6 +50,9 @@ pub fn run() {
             commands::models::get_platform_models,
             // 统计
             commands::stats::get_dashboard_stats,
+            // 代理
+            commands::proxy::start_proxy,
+            commands::proxy::get_proxy_status,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AI Singularity");

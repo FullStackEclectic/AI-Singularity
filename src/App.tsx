@@ -3,6 +3,7 @@ import Sidebar from "./components/layout/Sidebar";
 import KeysPage from "./components/keys/KeysPage";
 import DashboardPage from "./components/dashboard/DashboardPage";
 import ModelsPage from "./components/models/ModelsPage";
+import ProxyPage from "./components/proxy/ProxyPage";
 import SettingsPage from "./components/settings/SettingsPage";
 import "./App.css";
 
@@ -16,6 +17,7 @@ export default function App() {
       case "dashboard": return <DashboardPage />;
       case "keys":      return <KeysPage />;
       case "models":    return <ModelsPage />;
+      case "proxy":     return <ProxyPage />;
       case "settings":  return <SettingsPage />;
       default:          return <ComingSoonPage name={activePage} />;
     }

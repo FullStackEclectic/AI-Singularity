@@ -21,6 +21,9 @@ export const api = {
   },
   balance: {
     listAll: (): Promise<Balance[]> => invoke("get_all_balances"),
+    refreshOne: (key_id: string): Promise<Balance> =>
+      invoke("get_platform_balance", { key_id }),
+    refreshAll: (): Promise<Balance[]> => invoke("refresh_all_balances"),
   },
   models: {
     list: () => invoke("list_models"),
