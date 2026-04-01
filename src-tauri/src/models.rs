@@ -1,6 +1,10 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
+// ============================================================
+// Platform（API 供应商平台）
+// ============================================================
+
 /// AI 平台枚举
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -9,48 +13,196 @@ pub enum Platform {
     Anthropic,
     Gemini,
     DeepSeek,
-    Aliyun,    // 阿里云百炼
-    Bytedance, // 字节豆包
-    Moonshot,  // Kimi
-    Zhipu,     // 智谱 GLM
+    Aliyun,      // 阿里云百炼
+    Bytedance,   // 字节豆包
+    Moonshot,    // Kimi
+    Zhipu,       // 智谱 GLM
+    MiniMax,
+    StepFun,
     AwsBedrock,
     NvidiaNim,
-    Custom, // 自定义 OpenAI 兼容
+    AzureOpenAI,
+    SiliconFlow,
+    OpenRouter,
+    Copilot,     // GitHub Copilot OAuth
+    Custom,      // 自定义 OpenAI 兼容
 }
 
 impl Platform {
     pub fn display_name(&self) -> &str {
         match self {
-            Platform::OpenAI => "OpenAI",
-            Platform::Anthropic => "Anthropic (Claude)",
-            Platform::Gemini => "Google Gemini",
-            Platform::DeepSeek => "DeepSeek",
-            Platform::Aliyun => "阿里云百炼",
-            Platform::Bytedance => "字节豆包",
-            Platform::Moonshot => "Moonshot (Kimi)",
-            Platform::Zhipu => "智谱 GLM",
+            Platform::OpenAI     => "OpenAI",
+            Platform::Anthropic  => "Anthropic",
+            Platform::Gemini     => "Google Gemini",
+            Platform::DeepSeek   => "DeepSeek",
+            Platform::Aliyun     => "阿里云百炼",
+            Platform::Bytedance  => "字节豆包 (DouBao)",
+            Platform::Moonshot   => "Moonshot (Kimi)",
+            Platform::Zhipu      => "智谱 GLM / Z.ai",
+            Platform::MiniMax    => "MiniMax",
+            Platform::StepFun    => "StepFun",
             Platform::AwsBedrock => "AWS Bedrock",
-            Platform::NvidiaNim => "NVIDIA NIM",
-            Platform::Custom => "自定义接口",
+            Platform::NvidiaNim  => "NVIDIA NIM",
+            Platform::AzureOpenAI => "Azure OpenAI",
+            Platform::SiliconFlow => "SiliconFlow",
+            Platform::OpenRouter  => "OpenRouter",
+            Platform::Copilot    => "GitHub Copilot",
+            Platform::Custom     => "自定义接口",
         }
     }
 }
 
-/// API Key 条目
+// ============================================================
+// ToolTarget（目标 AI 编码工具，用于多工具同步）
+// ============================================================
+
+/// 支持同步配置的 AI 编码工具
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum ToolTarget {
+    ClaudeCode,
+    Codex,
+    GeminiCli,
+    OpenCode,
+    OpenClaw,
+    Aider,
+}
+
+impl ToolTarget {
+    pub fn display_name(&self) -> &str {
+        match self {
+            ToolTarget::ClaudeCode => "Claude Code",
+            ToolTarget::Codex      => "OpenAI Codex",
+            ToolTarget::GeminiCli  => "Gemini CLI",
+            ToolTarget::OpenCode   => "OpenCode",
+            ToolTarget::OpenClaw   => "OpenClaw",
+            ToolTarget::Aider      => "Aider",
+        }
+    }
+
+    /// 配置文件路径描述（用于 UI 提示）
+    pub fn config_path_hint(&self) -> &str {
+        match self {
+            ToolTarget::ClaudeCode => "~/.claude.json",
+            ToolTarget::Codex      => "~/.codex/config.toml",
+            ToolTarget::GeminiCli  => "~/.gemini/settings.json",
+            ToolTarget::OpenCode   => "~/.config/opencode/opencode.json",
+            ToolTarget::OpenClaw   => "~/.openclaw/config.json",
+            ToolTarget::Aider      => "~/.aider.conf.yml",
+        }
+    }
+
+    pub fn all() -> Vec<ToolTarget> {
+        vec![
+            ToolTarget::ClaudeCode,
+            ToolTarget::Codex,
+            ToolTarget::GeminiCli,
+            ToolTarget::OpenCode,
+            ToolTarget::OpenClaw,
+            ToolTarget::Aider,
+        ]
+    }
+}
+
+// ============================================================
+// Provider 配置（核心模型）
+// ============================================================
+
+/// Provider 预设分类
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProviderCategory {
+    Official,       // 官方（Anthropic、OpenAI、Google）
+    CnOfficial,     // 国内大模型官方
+    CloudProvider,  // 云厂商（AWS、Azure、NVIDIA）
+    Aggregator,     // 聚合平台（OpenRouter、SiliconFlow）
+    ThirdParty,     // 第三方中继
+    Custom,         // 用户自定义
+}
+
+impl ProviderCategory {
+    pub fn display_name(&self) -> &str {
+        match self {
+            ProviderCategory::Official      => "官方",
+            ProviderCategory::CnOfficial    => "国内大模型",
+            ProviderCategory::CloudProvider => "云厂商",
+            ProviderCategory::Aggregator    => "聚合平台",
+            ProviderCategory::ThirdParty    => "第三方中继",
+            ProviderCategory::Custom        => "自定义",
+        }
+    }
+}
+
+/// Provider 配置（支持多工具同步）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    pub id: String,
+    pub name: String,
+    /// 平台类型（供应商身份）
+    pub platform: Platform,
+    /// 分类（用于 UI 展示分组）
+    #[serde(default)]
+    pub category: Option<ProviderCategory>,
+    /// API Base URL
+    pub base_url: Option<String>,
+    /// 加密存储的 API Key ID（关联 api_keys 表）
+    pub api_key_id: Option<String>,
+    /// 默认模型名称
+    pub model_name: String,
+    /// 是否启用（当前激活的 provider）
+    pub is_active: bool,
+    /// 同步到哪些工具（JSON 数组，如 ["claude_code","codex"]）
+    /// 空数组 = 不同步到任何工具；None = 仅 claude_code（向后兼容）
+    pub tool_targets: Option<String>,
+    /// 图标标识符（对应前端 BrandIcon 组件）
+    pub icon: Option<String>,
+    /// 图标颜色（Hex）
+    pub icon_color: Option<String>,
+    /// 网站链接
+    pub website_url: Option<String>,
+    /// API Key 申请链接
+    pub api_key_url: Option<String>,
+    /// 备注
+    pub notes: Option<String>,
+    /// 扩展配置（JSON，存储各工具特定参数）
+    pub extra_config: Option<String>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+impl ProviderConfig {
+    /// 解析 tool_targets 字段为枚举列表
+    pub fn parsed_tool_targets(&self) -> Vec<ToolTarget> {
+        match &self.tool_targets {
+            None => vec![ToolTarget::ClaudeCode], // 向后兼容
+            Some(s) if s.is_empty() || s == "[]" => vec![],
+            Some(s) => serde_json::from_str(s).unwrap_or_default(),
+        }
+    }
+
+    /// 判断是否同步到指定工具
+    pub fn syncs_to(&self, tool: &ToolTarget) -> bool {
+        self.parsed_tool_targets().contains(tool)
+    }
+}
+
+// ============================================================
+// API Key
+// ============================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiKey {
     pub id: String,
     pub name: String,
     pub platform: Platform,
-    pub base_url: Option<String>, // 自定义接口 URL
-    pub key_preview: String,      // 仅展示前8位 + "..."
+    pub base_url: Option<String>,
+    pub key_preview: String, // 仅展示前8位 + "..."
     pub status: KeyStatus,
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub last_checked_at: Option<DateTime<Utc>>,
 }
 
-/// API Key 状态
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum KeyStatus {
@@ -62,98 +214,87 @@ pub enum KeyStatus {
     RateLimit, // 429
 }
 
-/// 余额信息
+// ============================================================
+// 余额快照（Balance Tracker）
+// ============================================================
+
+/// 余额快照，用于时序趋势
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Balance {
-    pub key_id: String,
-    pub platform: Platform,
+pub struct BalanceSnapshot {
+    pub id: String,
+    pub provider_id: String,
+    pub provider_name: String,
     pub balance_usd: Option<f64>,
     pub balance_cny: Option<f64>,
-    pub total_usage_usd: Option<f64>,
-    pub quota_remaining: Option<f64>, // 剩余配额（tokens 或 美元）
+    pub quota_remaining: Option<f64>,
+    pub quota_unit: Option<String>, // "tokens" | "usd" | "requests"
     pub quota_reset_at: Option<DateTime<Utc>>,
-    pub synced_at: DateTime<Utc>,
+    pub snapped_at: DateTime<Utc>,
 }
 
-/// 模型信息
+/// 余额汇总（Dashboard 展示）
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Model {
-    pub id: String,
-    pub name: String,
-    pub platform: Platform,
-    pub context_length: Option<u64>,
-    pub supports_vision: bool,
-    pub supports_tools: bool,
-    pub input_price_per_1m: Option<f64>, // 每百万 token 价格（USD）
-    pub output_price_per_1m: Option<f64>,
-    pub is_available: bool,
+pub struct BalanceSummary {
+    pub provider_id: String,
+    pub provider_name: String,
+    pub platform: String,
+    pub latest_balance_usd: Option<f64>,
+    pub latest_balance_cny: Option<f64>,
+    pub quota_remaining: Option<f64>,
+    pub quota_unit: Option<String>,
+    pub quota_reset_at: Option<DateTime<Utc>>,
+    pub last_updated: Option<DateTime<Utc>>,
+    pub low_balance_alert: bool,
 }
 
-/// AI 辅助工具枚举
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
-pub enum AiTool {
-    ClaudeCode,
-    Aider,
-    Codex,
-    GeminiCli,
-    OpenCode,
-}
+// ============================================================
+// MCP Server
+// ============================================================
 
-impl AiTool {
-    pub fn display_name(&self) -> &str {
-        match self {
-            AiTool::ClaudeCode => "Claude Code",
-            AiTool::Aider => "Aider",
-            AiTool::Codex => "Codex",
-            AiTool::GeminiCli => "Gemini CLI",
-            AiTool::OpenCode => "OpenCode",
-        }
-    }
-}
-
-/// Provider 配置
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProviderConfig {
-    pub id: String,
-    pub name: String,
-    pub ai_tool: AiTool,
-    pub platform: Platform,
-    pub base_url: Option<String>,
-    pub api_key_id: Option<String>,
-    pub model_name: String,
-    pub custom_config: Option<String>, // JSON string map
-    pub is_active: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// MCP Server 配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct McpServer {
     pub id: String,
     pub name: String,
     pub command: String,
-    pub args: Option<String>, // JSON array
-    pub env: Option<String>,  // JSON map
+    pub args: Option<String>,  // JSON array
+    pub env: Option<String>,   // JSON map
+    pub description: Option<String>,
     pub is_active: bool,
+    /// 同步到哪些工具（JSON 数组）
+    pub tool_targets: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// Prompt 配置
+impl McpServer {
+    pub fn parsed_tool_targets(&self) -> Vec<ToolTarget> {
+        match &self.tool_targets {
+            None => vec![ToolTarget::ClaudeCode],
+            Some(s) if s.is_empty() || s == "[]" => vec![],
+            Some(s) => serde_json::from_str(s).unwrap_or_default(),
+        }
+    }
+}
+
+// ============================================================
+// Prompt
+// ============================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PromptConfig {
     pub id: String,
     pub name: String,
-    pub target_file: String, // e.g., CLAUDE.md
+    pub target_file: String, // e.g., CLAUDE.md / GEMINI.md
     pub content: String,
     pub is_active: bool,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// 告警等级
+// ============================================================
+// Alert
+// ============================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum AlertLevel {
@@ -162,7 +303,6 @@ pub enum AlertLevel {
     Critical,
 }
 
-/// 告警条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AlertItem {
     pub id: String,
@@ -173,11 +313,14 @@ pub struct AlertItem {
     pub key_id: Option<String>,
 }
 
-/// 延迟测速结果
+// ============================================================
+// SpeedTest
+// ============================================================
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpeedTestResult {
     pub platform: String,
     pub endpoint: String,
     pub latency_ms: Option<u64>,
-    pub status: String, // "ok", "timeout", "error"
+    pub status: String, // "ok" | "timeout" | "error"
 }

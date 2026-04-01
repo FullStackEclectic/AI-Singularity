@@ -22,105 +22,131 @@ impl Database {
         conn.execute_batch("PRAGMA journal_mode=WAL;")?;
         conn.execute_batch("PRAGMA foreign_keys=ON;")?;
 
+        // schema_version 表：追踪迁移版本
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS api_keys (
-                id              TEXT PRIMARY KEY,
-                name            TEXT NOT NULL,
-                platform        TEXT NOT NULL,
-                base_url        TEXT,
-                key_hash        TEXT NOT NULL,
-                key_preview     TEXT NOT NULL,
-                status          TEXT NOT NULL DEFAULT 'unknown',
-                notes           TEXT,
-                created_at      TEXT NOT NULL,
-                last_checked_at TEXT
+            "CREATE TABLE IF NOT EXISTS schema_version (
+                version     INTEGER PRIMARY KEY,
+                applied_at  TEXT NOT NULL
             );",
         )?;
 
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS balances (
-                key_id          TEXT PRIMARY KEY,
-                platform        TEXT NOT NULL,
-                balance_usd     REAL,
-                balance_cny     REAL,
-                total_usage_usd REAL,
-                quota_remaining REAL,
-                quota_reset_at  TEXT,
-                synced_at       TEXT NOT NULL,
-                FOREIGN KEY (key_id) REFERENCES api_keys(id) ON DELETE CASCADE
-            );",
-        )?;
+        let current_version: i64 = conn
+            .query_row(
+                "SELECT COALESCE(MAX(version), 0) FROM schema_version",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap_or(0);
 
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS models (
-                id                    TEXT NOT NULL,
-                platform              TEXT NOT NULL,
-                name                  TEXT NOT NULL,
-                context_length        INTEGER,
-                supports_vision       INTEGER NOT NULL DEFAULT 0,
-                supports_tools        INTEGER NOT NULL DEFAULT 0,
-                input_price_per_1m    REAL,
-                output_price_per_1m   REAL,
-                is_available          INTEGER NOT NULL DEFAULT 1,
-                PRIMARY KEY (id, platform)
-            );",
-        )?;
+        // ── Migration 1: 基础表结构 ──────────────────────────────────────
+        if current_version < 1 {
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS api_keys (
+                    id              TEXT PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    platform        TEXT NOT NULL,
+                    base_url        TEXT,
+                    key_hash        TEXT NOT NULL,
+                    key_preview     TEXT NOT NULL,
+                    status          TEXT NOT NULL DEFAULT 'unknown',
+                    notes           TEXT,
+                    created_at      TEXT NOT NULL,
+                    last_checked_at TEXT
+                );
 
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS usage_logs (
-                id              TEXT PRIMARY KEY,
-                key_id          TEXT NOT NULL,
-                model_id        TEXT NOT NULL,
-                platform        TEXT NOT NULL,
-                prompt_tokens   INTEGER NOT NULL DEFAULT 0,
-                output_tokens   INTEGER NOT NULL DEFAULT 0,
-                cost_usd        REAL,
-                recorded_at     TEXT NOT NULL,
-                FOREIGN KEY (key_id) REFERENCES api_keys(id) ON DELETE CASCADE
-            );",
-        )?;
+                CREATE TABLE IF NOT EXISTS providers (
+                    id              TEXT PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    platform        TEXT NOT NULL DEFAULT 'custom',
+                    category        TEXT,
+                    base_url        TEXT,
+                    api_key_id      TEXT,
+                    model_name      TEXT NOT NULL DEFAULT '',
+                    is_active       INTEGER NOT NULL DEFAULT 0,
+                    tool_targets    TEXT,
+                    icon            TEXT,
+                    icon_color      TEXT,
+                    website_url     TEXT,
+                    api_key_url     TEXT,
+                    notes           TEXT,
+                    extra_config    TEXT,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL,
+                    FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL
+                );
 
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS providers (
-                id              TEXT PRIMARY KEY,
-                name            TEXT NOT NULL,
-                ai_tool         TEXT NOT NULL,
-                platform        TEXT NOT NULL,
-                base_url        TEXT,
-                api_key_id      TEXT,
-                model_name      TEXT NOT NULL,
-                custom_config   TEXT,
-                is_active       INTEGER NOT NULL DEFAULT 0,
-                created_at      TEXT NOT NULL,
-                updated_at      TEXT NOT NULL,
-                FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL
-            );",
-        )?;
+                CREATE TABLE IF NOT EXISTS mcp_servers (
+                    id              TEXT PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    command         TEXT NOT NULL,
+                    args            TEXT,
+                    env             TEXT,
+                    description     TEXT,
+                    is_active       INTEGER NOT NULL DEFAULT 1,
+                    tool_targets    TEXT,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                );
 
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS mcp_servers (
-                id              TEXT PRIMARY KEY,
-                name            TEXT NOT NULL,
-                command         TEXT NOT NULL,
-                args            TEXT,
-                env             TEXT,
-                is_active       INTEGER NOT NULL DEFAULT 1,
-                created_at      TEXT NOT NULL,
-                updated_at      TEXT NOT NULL
-            );",
-        )?;
+                CREATE TABLE IF NOT EXISTS prompts (
+                    id              TEXT PRIMARY KEY,
+                    name            TEXT NOT NULL,
+                    target_file     TEXT NOT NULL,
+                    content         TEXT NOT NULL,
+                    is_active       INTEGER NOT NULL DEFAULT 1,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                );
 
-        conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS prompts (
-                id              TEXT PRIMARY KEY,
-                name            TEXT NOT NULL,
-                target_file     TEXT NOT NULL,
-                content         TEXT NOT NULL,
-                is_active       INTEGER NOT NULL DEFAULT 1,
-                created_at      TEXT NOT NULL,
-                updated_at      TEXT NOT NULL
-            );",
-        )?;
+                CREATE TABLE IF NOT EXISTS balance_snapshots (
+                    id              TEXT PRIMARY KEY,
+                    provider_id     TEXT NOT NULL,
+                    provider_name   TEXT NOT NULL,
+                    balance_usd     REAL,
+                    balance_cny     REAL,
+                    quota_remaining REAL,
+                    quota_unit      TEXT,
+                    quota_reset_at  TEXT,
+                    snapped_at      TEXT NOT NULL
+                );
+
+                INSERT INTO schema_version (version, applied_at) VALUES (1, datetime('now'));",
+            )?;
+        }
+
+        // ── Migration 2: providers 旧字段兼容（若已有旧表则迁移字段）───────
+        if current_version < 2 {
+            // ALTER TABLE 忽略"已存在"错误（rusqlite 会 Err，用 ignore）
+            let _ = conn.execute_batch(
+                "ALTER TABLE providers ADD COLUMN category TEXT;
+                 ALTER TABLE providers ADD COLUMN tool_targets TEXT;
+                 ALTER TABLE providers ADD COLUMN icon TEXT;
+                 ALTER TABLE providers ADD COLUMN icon_color TEXT;
+                 ALTER TABLE providers ADD COLUMN website_url TEXT;
+                 ALTER TABLE providers ADD COLUMN api_key_url TEXT;
+                 ALTER TABLE providers ADD COLUMN extra_config TEXT;",
+            );
+            let _ = conn.execute_batch(
+                "ALTER TABLE mcp_servers ADD COLUMN description TEXT;
+                 ALTER TABLE mcp_servers ADD COLUMN tool_targets TEXT;",
+            );
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS balance_snapshots (
+                    id              TEXT PRIMARY KEY,
+                    provider_id     TEXT NOT NULL,
+                    provider_name   TEXT NOT NULL,
+                    balance_usd     REAL,
+                    balance_cny     REAL,
+                    quota_remaining REAL,
+                    quota_unit      TEXT,
+                    quota_reset_at  TEXT,
+                    snapped_at      TEXT NOT NULL
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (2, datetime('now'));",
+            )?;
+        }
 
         Ok(())
     }
