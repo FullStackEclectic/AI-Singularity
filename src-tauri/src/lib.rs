@@ -76,6 +76,11 @@ pub fn run() {
             commands::balance::get_all_balances,
             commands::balance::get_platform_balance,
             commands::balance::refresh_all_balances,
+            // Provider 余额追踪器
+            commands::balance_tracker::get_balance_summaries,
+            commands::balance_tracker::refresh_provider_balances,
+            commands::balance_tracker::refresh_provider_balance,
+            commands::balance_tracker::get_balance_history,
             // 模型
             commands::models::list_models,
             commands::models::get_platform_models,

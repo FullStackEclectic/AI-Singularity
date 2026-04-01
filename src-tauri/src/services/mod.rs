@@ -1,4 +1,5 @@
 pub mod balance;
+pub mod balance_tracker;
 pub mod validator;
 pub mod provider;
 pub mod mcp;

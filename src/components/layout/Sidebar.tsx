@@ -37,9 +37,10 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     title: "信息",
     items: [
+      { id: "analytics", icon: "📊", label: "余额看板" },
       { id: "speedtest", icon: "⚡", label: "延迟测速" },
-      { id: "models", icon: "🤖", label: "模型目录" },
-      { id: "settings", icon: "⚙", label: "设置" },
+      { id: "models",    icon: "🤖", label: "模型目录" },
+      { id: "settings",  icon: "⚙", label: "设置" },
     ],
   },
 ];

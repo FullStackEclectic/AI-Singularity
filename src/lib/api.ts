@@ -22,10 +22,14 @@ export const api = {
   },
 
   balance: {
-    listAll:    (): Promise<Balance[]>          => invoke("get_all_balances"),
-    refreshOne: (key_id: string): Promise<Balance> => invoke("get_platform_balance", { key_id }),
-    refreshAll: (): Promise<Balance[]>          => invoke("refresh_all_balances"),
-    summaries:  (): Promise<BalanceSummary[]>   => invoke("get_balance_summaries"),
+    listAll:         (): Promise<Balance[]>          => invoke("get_all_balances"),
+    refreshOne:      (key_id: string): Promise<Balance> => invoke("get_platform_balance", { key_id }),
+    refreshAll:      (): Promise<Balance[]>          => invoke("refresh_all_balances"),
+    summaries:       (): Promise<BalanceSummary[]>   => invoke("get_balance_summaries"),
+    refreshProviders:(): Promise<any[]>              => invoke("refresh_provider_balances"),
+    refreshProvider: (providerId: string): Promise<any> => invoke("refresh_provider_balance", { providerId }),
+    history:         (providerId: string, limit?: number): Promise<any[]> =>
+      invoke("get_balance_history", { providerId, limit: limit ?? 30 }),
   },
 
   models: {

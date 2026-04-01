@@ -9,25 +9,27 @@ import ProvidersPage from "./components/providers/ProvidersPage";
 import McpPage from "./components/mcp/McpPage";
 import PromptsPage from "./components/prompts/PromptsPage";
 import SpeedTestPage from "./components/speedtest/SpeedTestPage";
+import AnalyticsPage from "./components/analytics/AnalyticsPage";
 import "./App.css";
 
-export type NavPage = "dashboard" | "keys" | "models" | "proxy" | "providers" | "mcp" | "prompts" | "speedtest" | "settings";
+export type NavPage = "dashboard" | "keys" | "models" | "proxy" | "providers" | "mcp" | "prompts" | "speedtest" | "analytics" | "settings";
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
 
   const renderPage = () => {
     switch (activePage) {
-      case "dashboard": return <DashboardPage />;
-      case "keys":      return <KeysPage />;
-      case "models":    return <ModelsPage />;
-      case "proxy":     return <ProxyPage />;
-      case "providers": return <ProvidersPage />;
-      case "mcp":       return <McpPage />;
-      case "prompts":   return <PromptsPage />;
-      case "speedtest": return <SpeedTestPage />;
-      case "settings":  return <SettingsPage />;
-      default:          return <ComingSoonPage name={activePage} />;
+      case "dashboard":  return <DashboardPage />;
+      case "keys":       return <KeysPage />;
+      case "models":     return <ModelsPage />;
+      case "proxy":      return <ProxyPage />;
+      case "providers":  return <ProvidersPage />;
+      case "mcp":        return <McpPage />;
+      case "prompts":    return <PromptsPage />;
+      case "speedtest":  return <SpeedTestPage />;
+      case "analytics":  return <AnalyticsPage />;
+      case "settings":   return <SettingsPage />;
+      default:           return <ComingSoonPage name={activePage} />;
     }
   };
 
