@@ -87,6 +87,7 @@ pub fn run() {
             // Providers & MCP
             commands::provider::get_providers,
             commands::provider::add_provider,
+            commands::provider::update_provider,
             commands::provider::switch_provider,
             commands::provider::delete_provider,
             commands::mcp::get_mcps,

@@ -1,3 +1,7 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Platform（API 供应商平台 — 与 Rust models.rs 保持同步）
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type Platform =
   | "open_ai"
   | "anthropic"
@@ -7,11 +11,136 @@ export type Platform =
   | "bytedance"
   | "moonshot"
   | "zhipu"
+  | "mini_max"
+  | "step_fun"
   | "aws_bedrock"
   | "nvidia_nim"
+  | "azure_open_a_i"
+  | "silicon_flow"
+  | "open_router"
+  | "copilot"
   | "custom";
 
+export const PLATFORM_LABELS: Record<Platform, string> = {
+  open_ai:        "OpenAI",
+  anthropic:      "Anthropic",
+  gemini:         "Google Gemini",
+  deep_seek:      "DeepSeek",
+  aliyun:         "阿里云百炼",
+  bytedance:      "字节豆包",
+  moonshot:       "Moonshot (Kimi)",
+  zhipu:          "智谱 GLM / Z.ai",
+  mini_max:       "MiniMax",
+  step_fun:       "StepFun",
+  aws_bedrock:    "AWS Bedrock",
+  nvidia_nim:     "NVIDIA NIM",
+  azure_open_a_i: "Azure OpenAI",
+  silicon_flow:   "SiliconFlow",
+  open_router:    "OpenRouter",
+  copilot:        "GitHub Copilot",
+  custom:         "自定义接口",
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ToolTarget（同步目标工具 — 与 Rust models.rs 保持同步）
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ToolTarget =
+  | "claude_code"
+  | "codex"
+  | "gemini_cli"
+  | "open_code"
+  | "open_claw"
+  | "aider";
+
+export const TOOL_TARGET_LABELS: Record<ToolTarget, string> = {
+  claude_code: "Claude Code",
+  codex:       "OpenAI Codex",
+  gemini_cli:  "Gemini CLI",
+  open_code:   "OpenCode",
+  open_claw:   "OpenClaw",
+  aider:       "Aider",
+};
+
+export const TOOL_TARGET_CONFIG_PATH: Record<ToolTarget, string> = {
+  claude_code: "~/.claude.json",
+  codex:       "~/.codex/config.toml",
+  gemini_cli:  "~/.gemini/settings.json",
+  open_code:   "~/.config/opencode/opencode.json",
+  open_claw:   "~/.openclaw/config.json",
+  aider:       "~/.aider.conf.yml",
+};
+
+/** 向后兼容：旧 AiTool 类型别名 */
+export type AiTool = ToolTarget;
+export const AI_TOOL_LABELS = TOOL_TARGET_LABELS;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ProviderConfig
+// ─────────────────────────────────────────────────────────────────────────────
+
+export type ProviderCategory =
+  | "official"
+  | "cn_official"
+  | "cloud_provider"
+  | "aggregator"
+  | "third_party"
+  | "custom";
+
+export const PROVIDER_CATEGORY_LABELS: Record<ProviderCategory, string> = {
+  official:       "官方",
+  cn_official:    "国内大模型",
+  cloud_provider: "云厂商",
+  aggregator:     "聚合平台",
+  third_party:    "第三方中继",
+  custom:         "自定义",
+};
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  platform: Platform;
+  category?: ProviderCategory;
+  base_url?: string;
+  api_key_id?: string;
+  model_name: string;
+  is_active: boolean;
+  /** JSON 数组字符串，如 '["claude_code","codex"]' */
+  tool_targets?: string;
+  icon?: string;
+  icon_color?: string;
+  website_url?: string;
+  api_key_url?: string;
+  notes?: string;
+  extra_config?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/** 解析 tool_targets JSON 字符串为数组 */
+export function parseToolTargets(provider: ProviderConfig): ToolTarget[] {
+  try {
+    if (!provider.tool_targets) return ["claude_code"];
+    return JSON.parse(provider.tool_targets) as ToolTarget[];
+  } catch {
+    return ["claude_code"];
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// API Key
+// ─────────────────────────────────────────────────────────────────────────────
+
 export type KeyStatus = "unknown" | "valid" | "invalid" | "expired" | "banned" | "rate_limit";
+
+export const STATUS_LABELS: Record<KeyStatus, string> = {
+  unknown:    "未检测",
+  valid:      "正常",
+  invalid:    "无效",
+  expired:    "已过期",
+  banned:     "被封禁",
+  rate_limit: "限速中",
+};
 
 export interface ApiKey {
   id: string;
@@ -25,6 +154,10 @@ export interface ApiKey {
   last_checked_at?: string;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Balance / BalanceSummary
+// ─────────────────────────────────────────────────────────────────────────────
+
 export interface Balance {
   key_id: string;
   platform: Platform;
@@ -36,40 +169,39 @@ export interface Balance {
   synced_at: string;
 }
 
-export interface Model {
-  id: string;
-  name: string;
-  platform: Platform;
-  context_length?: number;
-  supports_vision: boolean;
-  supports_tools: boolean;
-  input_price_per_1m?: number;
-  output_price_per_1m?: number;
-  is_available: boolean;
+export interface BalanceSummary {
+  provider_id: string;
+  provider_name: string;
+  platform: string;
+  latest_balance_usd?: number;
+  latest_balance_cny?: number;
+  quota_remaining?: number;
+  quota_unit?: string;
+  quota_reset_at?: string;
+  last_updated?: string;
+  low_balance_alert: boolean;
 }
 
-export const PLATFORM_LABELS: Record<Platform, string> = {
-  open_ai: "OpenAI",
-  anthropic: "Anthropic",
-  gemini: "Google Gemini",
-  deep_seek: "DeepSeek",
-  aliyun: "阿里云百炼",
-  bytedance: "字节豆包",
-  moonshot: "Moonshot (Kimi)",
-  zhipu: "智谱 GLM",
-  aws_bedrock: "AWS Bedrock",
-  nvidia_nim: "NVIDIA NIM",
-  custom: "自定义接口",
-};
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP Server
+// ─────────────────────────────────────────────────────────────────────────────
 
-export const STATUS_LABELS: Record<KeyStatus, string> = {
-  unknown: "未检测",
-  valid: "正常",
-  invalid: "无效",
-  expired: "已过期",
-  banned: "被封禁",
-  rate_limit: "限速中",
-};
+export interface McpServer {
+  id: string;
+  name: string;
+  command: string;
+  args?: string;        // JSON array string
+  env?: string;         // JSON map string
+  description?: string;
+  is_active: boolean;
+  tool_targets?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dashboard
+// ─────────────────────────────────────────────────────────────────────────────
 
 export interface DashboardStats {
   total_keys: number;
@@ -80,37 +212,18 @@ export interface DashboardStats {
   total_cost_usd: number;
 }
 
-export type AiTool = "claude_code" | "aider" | "codex" | "gemini_cli" | "open_code";
+// ─────────────────────────────────────────────────────────────────────────────
+// Misc
+// ─────────────────────────────────────────────────────────────────────────────
 
-export const AI_TOOL_LABELS: Record<AiTool, string> = {
-  claude_code: "Claude Code",
-  aider: "Aider",
-  codex: "Codex",
-  gemini_cli: "Gemini CLI",
-  open_code: "OpenCode",
-};
-
-export interface ProviderConfig {
+export interface Model {
   id: string;
   name: string;
-  ai_tool: AiTool;
   platform: Platform;
-  base_url?: string;
-  api_key_id?: string;
-  model_name: string;
-  custom_config?: string; // JSON string
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface McpServer {
-  id: string;
-  name: string;
-  command: string;
-  args?: string; // JSON Array string "[arg1, arg2]"
-  env?: string;  // JSON map string "{}"
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
+  context_length?: number;
+  supports_vision: boolean;
+  supports_tools: boolean;
+  input_price_per_1m?: number;
+  output_price_per_1m?: number;
+  is_available: boolean;
 }

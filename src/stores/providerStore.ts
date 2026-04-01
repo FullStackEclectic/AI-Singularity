@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { ProviderConfig, AiTool } from "../types";
+import type { ProviderConfig } from "../types";
 import { api } from "../lib/api";
 
 interface ProviderState {
@@ -7,8 +7,9 @@ interface ProviderState {
   isLoading: boolean;
   error: string | null;
   fetch: () => Promise<void>;
-  add: (provider: ProviderConfig) => Promise<void>;
-  switchProvider: (id: string, aiTool: AiTool) => Promise<void>;
+  add: (provider: Omit<ProviderConfig, "id" | "created_at" | "updated_at"> & { id?: string }) => Promise<void>;
+  update: (provider: ProviderConfig) => Promise<void>;
+  switchProvider: (id: string) => Promise<void>;
   deleteProvider: (id: string) => Promise<void>;
 }
 
@@ -28,7 +29,7 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     }
   },
 
-  add: async (provider: ProviderConfig) => {
+  add: async (provider) => {
     try {
       await api.providers.add(provider);
       await get().fetch();
@@ -38,9 +39,19 @@ export const useProviderStore = create<ProviderState>((set, get) => ({
     }
   },
 
-  switchProvider: async (id: string, aiTool: AiTool) => {
+  update: async (provider: ProviderConfig) => {
     try {
-      await api.providers.switch(id, aiTool);
+      await api.providers.update(provider);
+      await get().fetch();
+    } catch (e) {
+      set({ error: String(e) });
+      throw e;
+    }
+  },
+
+  switchProvider: async (id: string) => {
+    try {
+      await api.providers.switch(id);
       await get().fetch();
     } catch (e) {
       set({ error: String(e) });
