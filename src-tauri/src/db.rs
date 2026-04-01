@@ -80,6 +80,48 @@ impl Database {
             );",
         )?;
 
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS providers (
+                id              TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                ai_tool         TEXT NOT NULL,
+                platform        TEXT NOT NULL,
+                base_url        TEXT,
+                api_key_id      TEXT,
+                model_name      TEXT NOT NULL,
+                custom_config   TEXT,
+                is_active       INTEGER NOT NULL DEFAULT 0,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL,
+                FOREIGN KEY (api_key_id) REFERENCES api_keys(id) ON DELETE SET NULL
+            );",
+        )?;
+
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS mcp_servers (
+                id              TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                command         TEXT NOT NULL,
+                args            TEXT,
+                env             TEXT,
+                is_active       INTEGER NOT NULL DEFAULT 1,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL
+            );",
+        )?;
+
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS prompts (
+                id              TEXT PRIMARY KEY,
+                name            TEXT NOT NULL,
+                target_file     TEXT NOT NULL,
+                content         TEXT NOT NULL,
+                is_active       INTEGER NOT NULL DEFAULT 1,
+                created_at      TEXT NOT NULL,
+                updated_at      TEXT NOT NULL
+            );",
+        )?;
+
         Ok(())
     }
 

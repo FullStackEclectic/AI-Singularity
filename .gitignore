@@ -37,3 +37,9 @@ src-tauri/gen/
 *.db
 *.db-shm
 *.db-wal
+
+# Reference projects (local only)
+refs/
+
+# Local planning documents
+TODO.md

@@ -79,3 +79,38 @@ export interface DashboardStats {
   total_platforms: number;
   total_cost_usd: number;
 }
+
+export type AiTool = "claude_code" | "aider" | "codex" | "gemini_cli" | "open_code";
+
+export const AI_TOOL_LABELS: Record<AiTool, string> = {
+  claude_code: "Claude Code",
+  aider: "Aider",
+  codex: "Codex",
+  gemini_cli: "Gemini CLI",
+  open_code: "OpenCode",
+};
+
+export interface ProviderConfig {
+  id: string;
+  name: string;
+  ai_tool: AiTool;
+  platform: Platform;
+  base_url?: string;
+  api_key_id?: string;
+  model_name: string;
+  custom_config?: string; // JSON string
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface McpServer {
+  id: string;
+  name: string;
+  command: string;
+  args?: string; // JSON Array string "[arg1, arg2]"
+  env?: string;  // JSON map string "{}"
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}

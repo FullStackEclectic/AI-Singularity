@@ -5,9 +5,13 @@ import DashboardPage from "./components/dashboard/DashboardPage";
 import ModelsPage from "./components/models/ModelsPage";
 import ProxyPage from "./components/proxy/ProxyPage";
 import SettingsPage from "./components/settings/SettingsPage";
+import ProvidersPage from "./components/providers/ProvidersPage";
+import McpPage from "./components/mcp/McpPage";
+import PromptsPage from "./components/prompts/PromptsPage";
+import SpeedTestPage from "./components/speedtest/SpeedTestPage";
 import "./App.css";
 
-export type NavPage = "dashboard" | "keys" | "models" | "proxy" | "providers" | "mcp" | "settings";
+export type NavPage = "dashboard" | "keys" | "models" | "proxy" | "providers" | "mcp" | "prompts" | "speedtest" | "settings";
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
@@ -18,6 +22,10 @@ export default function App() {
       case "keys":      return <KeysPage />;
       case "models":    return <ModelsPage />;
       case "proxy":     return <ProxyPage />;
+      case "providers": return <ProvidersPage />;
+      case "mcp":       return <McpPage />;
+      case "prompts":   return <PromptsPage />;
+      case "speedtest": return <SpeedTestPage />;
       case "settings":  return <SettingsPage />;
       default:          return <ComingSoonPage name={activePage} />;
     }

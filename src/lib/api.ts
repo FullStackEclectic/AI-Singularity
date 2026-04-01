@@ -29,4 +29,28 @@ export const api = {
     list: () => invoke("list_models"),
     byPlatform: (platform: string) => invoke("get_platform_models", { platform }),
   },
+  providers: {
+    list: (): Promise<any[]> => invoke("get_providers"),
+    add: (provider: any): Promise<void> => invoke("add_provider", { provider }),
+    switch: (id: string, aiTool: string): Promise<void> => invoke("switch_provider", { id, aiTool }),
+    delete: (id: string): Promise<void> => invoke("delete_provider", { id }),
+  },
+  mcp: {
+    list: (): Promise<any[]> => invoke("get_mcps"),
+    add: (mcp: any): Promise<void> => invoke("add_mcp", { mcp }),
+    toggle: (id: string, isActive: boolean): Promise<void> => invoke("toggle_mcp", { id, isActive }),
+    delete: (id: string): Promise<void> => invoke("delete_mcp", { id }),
+  },
+  prompts: {
+    list: (): Promise<any[]> => invoke("get_prompts"),
+    save: (prompt: any): Promise<void> => invoke("save_prompt", { prompt }),
+    delete: (id: string): Promise<void> => invoke("delete_prompt", { id }),
+    sync: (id: string, workspaceDir: string): Promise<void> => invoke("sync_prompt", { id, workspaceDir }),
+  },
+  alerts: {
+    get: (): Promise<any[]> => invoke("get_alerts"),
+  },
+  speedtest: {
+    run: (): Promise<any[]> => invoke("run_speedtest"),
+  },
 };

@@ -1,4 +1,6 @@
 use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 
 mod atomic_write;
 mod commands;
@@ -32,6 +34,35 @@ pub fn run() {
             let db = db::Database::new(&db_path).expect("Failed to initialize database");
             app.manage(db);
 
+            // 系统托盘
+            let open_item = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+
+            let _tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .on_menu_event(|app, event| match event.id.as_ref() {
+                    "open" => {
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                    "quit" => {
+                        app.exit(0);
+                    }
+                    _ => {}
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { .. } = event {
+                        if let Some(window) = tray.app_handle().get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -53,6 +84,23 @@ pub fn run() {
             // 代理
             commands::proxy::start_proxy,
             commands::proxy::get_proxy_status,
+            // Providers & MCP
+            commands::provider::get_providers,
+            commands::provider::add_provider,
+            commands::provider::switch_provider,
+            commands::provider::delete_provider,
+            commands::mcp::get_mcps,
+            commands::mcp::add_mcp,
+            commands::mcp::toggle_mcp,
+            commands::mcp::delete_mcp,
+            // Prompts
+            commands::prompts::get_prompts,
+            commands::prompts::save_prompt,
+            commands::prompts::delete_prompt,
+            commands::prompts::sync_prompt,
+            // 告警 & 测速
+            commands::alert::get_alerts,
+            commands::speedtest::run_speedtest,
         ])
         .run(tauri::generate_context!())
         .expect("error while running AI Singularity");

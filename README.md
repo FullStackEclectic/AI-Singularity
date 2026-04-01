@@ -254,52 +254,6 @@ AI Singularity/
 └── README.md
 ```
 
----
-
-## 🚀 开发路线图
-
-### Phase 1 — MVP：Core 账号管理（2~3 周）
-- [ ] 项目脚手架：Tauri v2 + React + Rust
-- [ ] 加密 Key 存储（系统 Keychain + AES 降级）
-- [ ] OAuth 2.0 浏览器授权流程（Google / Anthropic）
-- [ ] OpenAI / Anthropic / DeepSeek 平台接入
-- [ ] 账号健康看板（配额、余额、用量）
-- [ ] CLI `key` / `balance` / `model` 基础命令
-- [ ] 原子写入 + 自动备份轮换基础设施
-
-### Phase 2 — 智能代理网关（2 周）
-- [ ] 本地 axum 代理服务（OpenAI 兼容）
-- [ ] OpenAI / Anthropic / Gemini 协议互转
-- [ ] 配额感知路由引擎（配额剩余 + 账号等级 + 重置周期）
-- [ ] 后台任务自动降级（识别低优先级请求）
-- [ ] 熔断器 + 自动重试 + 健康监控
-- [ ] 请求日志 + 实时 Token 统计
-
-### Phase 3 — AI 工具生态（2 周）
-- [ ] CLI Tool Hub（Claude Code / Codex / Gemini CLI / Aider 配置管理）
-- [ ] 50+ Provider 预设库
-- [ ] MCP Server 统一管理 + 跨工具双向同步
-- [ ] Prompts 管理（CLAUDE.md / AGENTS.md 同步 + 回填保护）
-- [ ] Skills 一键安装（GitHub / ZIP）
-- [ ] 会话历史浏览器
-- [ ] Deep Link 协议 `ais://`
-
-### Phase 4 — 完整体验（2 周）
-- [ ] 所有平台适配器（百炼、豆包、Kimi、GLM、Bedrock、NIM 等）
-- [ ] API 端点延迟测速
-- [ ] 告警系统（余额 / 用量 / Key 过期）
-- [ ] 系统托盘常驻 + 桌面通知
-- [ ] 云端同步（WebDAV / OneDrive / Dropbox）
-
-### Phase 5 — 发布准备（1 周）
-- [ ] 安装包制作（Windows MSI / macOS dmg / Linux AppImage + deb）
-- [ ] Homebrew Cask 发布
-- [ ] 一键安装脚本（curl/PowerShell）
-- [ ] Docker 镜像（Headless 无头模式，支持 NAS 部署）
-- [ ] 完整 CLI 文档 + Shell 自动补全（Bash/Zsh/PowerShell）
-- [ ] 配置文件导入导出 + 版本迁移
-
----
 
 ## 🏗️ 核心架构
 

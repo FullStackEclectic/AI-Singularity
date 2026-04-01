@@ -25,6 +25,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
     items: [
       { id: "providers", icon: "⚡", label: "Provider" },
       { id: "mcp", icon: "🔌", label: "MCP Server" },
+      { id: "prompts", icon: "📝", label: "系统配置" },
     ],
   },
   {
@@ -36,6 +37,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     title: "信息",
     items: [
+      { id: "speedtest", icon: "⚡", label: "延迟测速" },
       { id: "models", icon: "🤖", label: "模型目录" },
       { id: "settings", icon: "⚙", label: "设置" },
     ],
