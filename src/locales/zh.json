@@ -1,0 +1,39 @@
+{
+  "sidebar": {
+    "dashboard": "总览",
+    "keys": "API Keys",
+    "providers": "Provider",
+    "mcp": "MCP Server",
+    "skills": "Skills 技能",
+    "prompts": "系统配置",
+    "proxy": "本地代理",
+    "analytics": "余额看板",
+    "speedtest": "延迟测速",
+    "models": "模型目录",
+    "settings": "设置",
+    "groups": {
+      "account": "账号管理",
+      "tools": "AI 工具",
+      "proxy": "代理网关",
+      "info": "信息"
+    }
+  },
+  "settings": {
+    "title": "全局与偏好设置",
+    "subtitle": "调整 AI Singularity 的系统运行行为和核心配置",
+    "language": "界面语言",
+    "language_desc": "选择应用程序的显示语言",
+    "auto_update": "检查更新",
+    "auto_update_desc": "自动拉取远端的应用程序版本发布",
+    "check_now": "立即检查"
+  },
+  "common": {
+    "refresh": "刷新",
+    "add": "添加",
+    "cancel": "取消",
+    "save": "保存",
+    "edit": "编辑",
+    "delete": "删除",
+    "status_loading": "加载中..."
+  }
+}

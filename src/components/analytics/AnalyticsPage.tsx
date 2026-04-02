@@ -189,7 +189,7 @@ export default function AnalyticsPage() {
                     余额趋势（最近 30 次）
                   </div>
                   {history.length > 0 ? (
-                    <BalanceTrendChart history={history} summary={selectedSummary} />
+                    <BalanceTrendChart history={history} />
                   ) : (
                     <div className="empty-chart">
                       <span className="text-muted">暂无历史数据，点击行旁的🔄刷新即可记录第一条</span>
@@ -334,10 +334,8 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 
 function BalanceTrendChart({
   history,
-  summary,
 }: {
   history: HistoryPoint[];
-  summary: BalanceSummary;
 }) {
   if (history.length === 0) return null;
 

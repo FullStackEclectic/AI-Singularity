@@ -1,5 +1,5 @@
-pub mod balance;
 pub mod balance_tracker;
+pub mod backup;
 pub mod validator;
 pub mod provider;
 pub mod mcp;
@@ -7,3 +7,6 @@ pub mod sync;
 pub mod prompts;
 pub mod alert;
 pub mod speedtest;
+pub mod skill;
+pub mod session_manager;
+pub mod oauth;

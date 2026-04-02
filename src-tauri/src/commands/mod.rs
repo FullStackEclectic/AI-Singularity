@@ -1,7 +1,6 @@
-pub mod balance;
 pub mod balance_tracker;
+pub mod backup;
 pub mod keys;
-pub mod models;
 pub mod proxy;
 pub mod stats;
 pub mod provider;
@@ -9,3 +8,6 @@ pub mod mcp;
 pub mod prompts;
 pub mod alert;
 pub mod speedtest;
+pub mod skill;
+pub mod session;
+pub mod oauth;

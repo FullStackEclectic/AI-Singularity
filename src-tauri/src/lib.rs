@@ -1,6 +1,4 @@
 use tauri::Manager;
-use tauri::menu::{Menu, MenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 
 mod atomic_write;
 mod commands;
@@ -10,6 +8,7 @@ mod models;
 mod proxy;
 mod services;
 mod store;
+pub mod tray;
 
 pub use error::{AppError, AppResult};
 
@@ -22,6 +21,8 @@ pub fn run() {
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // 初始化数据库
             let app_data_dir = app
@@ -34,34 +35,26 @@ pub fn run() {
             let db = db::Database::new(&db_path).expect("Failed to initialize database");
             app.manage(db);
 
-            // 系统托盘
-            let open_item = MenuItem::with_id(app, "open", "打开主界面", true, None::<&str>)?;
-            let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&open_item, &quit_item])?;
+            let _ = crate::tray::setup_tray(app.app_handle());
 
-            let _tray = TrayIconBuilder::new()
-                .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
-                    "open" => {
-                        if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                    "quit" => {
-                        app.exit(0);
-                    }
-                    _ => {}
-                })
-                .on_tray_icon_event(|tray, event| {
-                    if let TrayIconEvent::Click { .. } = event {
-                        if let Some(window) = tray.app_handle().get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
-                        }
-                    }
-                })
-                .build(app)?;
+            // --- V2.0 系统级守护任务 ---
+            let app_handle = app.app_handle().clone();
+            tokio::spawn(async move {
+                // 每 2 小时轮询一次平台余额快照
+                let mut interval = tokio::time::interval(std::time::Duration::from_secs(7200));
+                use tauri::Manager;
+                loop {
+                    interval.tick().await;
+                    
+                    let db_state = app_handle.state::<crate::db::Database>();
+                    let tracker = crate::services::balance_tracker::BalanceTracker::new(&*db_state);
+                    let _ = tracker.refresh_all().await;
+                    
+                    let alert_service = crate::services::alert::AlertService::new(&*db_state);
+                    let alerts = alert_service.get_alerts();
+                    alert_service.notify_os_throttle(&app_handle, alerts);
+                }
+            });
 
             Ok(())
         })
@@ -72,18 +65,12 @@ pub fn run() {
             commands::keys::delete_key,
             commands::keys::update_key,
             commands::keys::check_key,
-            // 余额 & 用量
-            commands::balance::get_all_balances,
-            commands::balance::get_platform_balance,
-            commands::balance::refresh_all_balances,
             // Provider 余额追踪器
             commands::balance_tracker::get_balance_summaries,
             commands::balance_tracker::refresh_provider_balances,
             commands::balance_tracker::refresh_provider_balance,
             commands::balance_tracker::get_balance_history,
-            // 模型
-            commands::models::list_models,
-            commands::models::get_platform_models,
+            commands::balance_tracker::get_burn_rate_forecast,
             // 统计
             commands::stats::get_dashboard_stats,
             // 代理
@@ -106,8 +93,28 @@ pub fn run() {
             commands::prompts::sync_prompt,
             // 告警 & 测速
             commands::alert::get_alerts,
-            commands::speedtest::run_speedtest,
+            // 配置备份
+            commands::backup::export_config,
+            commands::backup::import_config,
+            // Skills
+            commands::skill::list_skills,
+            commands::skill::install_skill,
+            commands::skill::update_skill,
+            commands::skill::uninstall_skill,
+            // Sessions
+            commands::session::list_sessions,
+            commands::session::get_session_details,
+            // OAuth
+            commands::oauth::start_oauth_flow,
         ])
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                // 防止默认的完全关闭行为
+                api.prevent_close();
+                // 仅隐藏窗口
+                let _ = window.hide();
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running AI Singularity");
 }

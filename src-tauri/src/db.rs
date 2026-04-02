@@ -1,9 +1,10 @@
 use anyhow::Result;
 use rusqlite::{Connection, Result as SqlResult};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 pub struct Database {
+    pub path: PathBuf,
     conn: Mutex<Connection>,
 }
 
@@ -11,6 +12,7 @@ impl Database {
     pub fn new(path: &Path) -> SqlResult<Self> {
         let conn = Connection::open(path)?;
         let db = Self {
+            path: path.to_path_buf(),
             conn: Mutex::new(conn),
         };
         db.run_migrations()?;
@@ -52,6 +54,11 @@ impl Database {
                     notes           TEXT,
                     created_at      TEXT NOT NULL,
                     last_checked_at TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS alert_history (
+                    alert_id        TEXT PRIMARY KEY,
+                    last_sent_at    TEXT NOT NULL
                 );
 
                 CREATE TABLE IF NOT EXISTS providers (
@@ -131,6 +138,9 @@ impl Database {
                  ALTER TABLE mcp_servers ADD COLUMN tool_targets TEXT;",
             );
             let _ = conn.execute_batch(
+                "ALTER TABLE prompts ADD COLUMN description TEXT;",
+            );
+            let _ = conn.execute_batch(
                 "CREATE TABLE IF NOT EXISTS balance_snapshots (
                     id              TEXT PRIMARY KEY,
                     provider_id     TEXT NOT NULL,
@@ -155,6 +165,15 @@ impl Database {
     pub fn execute(&self, sql: &str, params: &[&dyn rusqlite::ToSql]) -> SqlResult<usize> {
         let conn = self.conn.lock().unwrap();
         conn.execute(sql, params)
+    }
+
+    /// 执行查询并返回单行数据
+    pub fn query_row<T, F>(&self, sql: &str, params: &[&dyn rusqlite::ToSql], f: F) -> SqlResult<T>
+    where
+        F: FnOnce(&rusqlite::Row<'_>) -> SqlResult<T>,
+    {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(sql, params, f)
     }
 
     /// 执行查询并返回多行数据（通过回调提取每行）

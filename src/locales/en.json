@@ -1,0 +1,39 @@
+{
+  "sidebar": {
+    "dashboard": "Dashboard",
+    "keys": "API Keys",
+    "providers": "Provider",
+    "mcp": "MCP Server",
+    "skills": "Skills",
+    "prompts": "System Prompts",
+    "proxy": "Local Proxy",
+    "analytics": "Balance Analytics",
+    "speedtest": "Speed Test",
+    "models": "Models Directory",
+    "settings": "Settings",
+    "groups": {
+      "account": "Account",
+      "tools": "AI Tools",
+      "proxy": "Proxy Gateway",
+      "info": "Information"
+    }
+  },
+  "settings": {
+    "title": "Global Settings",
+    "subtitle": "Adjust global behavior and preferences for AI Singularity",
+    "language": "Interface Language",
+    "language_desc": "Select the application display language",
+    "auto_update": "Software Updates",
+    "auto_update_desc": "Automatically check for application updates",
+    "check_now": "Check Now"
+  },
+  "common": {
+    "refresh": "Refresh",
+    "add": "Add",
+    "cancel": "Cancel",
+    "save": "Save",
+    "edit": "Edit",
+    "delete": "Delete",
+    "status_loading": "Loading..."
+  }
+}

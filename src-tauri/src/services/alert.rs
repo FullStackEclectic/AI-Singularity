@@ -130,4 +130,52 @@ impl<'a> AlertService<'a> {
             }
         }
     }
+
+    /// 发送 OS 原生通知（带频率控制，同一条 Alert 24 小时内只推一次）
+    pub fn notify_os_throttle(&self, app: &tauri::AppHandle, alerts: Vec<AlertItem>) {
+        use tauri_plugin_notification::NotificationExt;
+        
+        for alert in alerts {
+            let should_notify = match alert.level {
+                AlertLevel::Critical | AlertLevel::Warning => true,
+                _ => false,
+            };
+
+            if should_notify {
+                // 生成一个不基于 UUID 而是基于内容/Key的确定性 ID，防止每次刷新 UUID 都变导致风暴轰炸
+                let stable_id = if let Some(k) = &alert.key_id {
+                    format!("{}_{}", k, alert.title.replace(" ", "_"))
+                } else {
+                    continue; // 无法确定身份的告警跳过自动推送
+                };
+                
+                // 检查最后发送时间过滤
+                let sql = "SELECT last_sent_at FROM alert_history WHERE alert_id = ?1";
+                if let Ok(ts_str) = self.db.query_row(sql, rusqlite::params![&stable_id], |r: &rusqlite::Row| r.get::<_, String>(0)) {
+                    if let Ok(last_sent) = ts_str.parse::<chrono::DateTime<Utc>>() {
+                        if Utc::now() - last_sent < Duration::hours(24) {
+                            continue; // 24小时内不重复轰炸
+                        }
+                    }
+                }
+
+                // 发送 OS 通知
+                let title = alert.title.clone();
+                let msg = alert.message.clone();
+                let _ = app.notification()
+                    .builder()
+                    .title(&title)
+                    .body(&msg)
+                    .show();
+                    
+                tracing::warn!("📳 OS 高危弹窗已推送: {} - {}", title, msg);
+
+                // 记录已发送
+                let _ = self.db.execute(
+                    "INSERT OR REPLACE INTO alert_history (alert_id, last_sent_at) VALUES (?1, ?2)",
+                    rusqlite::params![&stable_id, &Utc::now().to_rfc3339()]
+                );
+            }
+        }
+    }
 }

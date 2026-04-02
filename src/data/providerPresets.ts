@@ -28,6 +28,8 @@ export interface ProviderPreset {
   name: string
   /** 分类 */
   category: ProviderCategory
+  /** 目标平台（对应后端的 Platform 结构，默认 Custom） */
+  platform?: 'OpenAI' | 'Anthropic' | 'Gemini' | 'Custom' | 'Ollama' | 'AzureOpenAI' | 'AWSBedrock'
   /** 图标标识（对应 BrandIcon 组件） */
   icon?: string
   /** 图标颜色（Hex） */
@@ -62,6 +64,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     presetId: 'anthropic-official',
     name: 'Anthropic (官方)',
     category: 'official',
+    platform: 'Anthropic',
     icon: 'anthropic',
     iconColor: '#D97757',
     websiteUrl: 'https://www.anthropic.com/claude-code',
@@ -74,6 +77,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     presetId: 'openai-official',
     name: 'OpenAI (官方)',
     category: 'official',
+    platform: 'OpenAI',
     icon: 'openai',
     iconColor: '#000000',
     websiteUrl: 'https://platform.openai.com',
@@ -85,6 +89,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     presetId: 'google-gemini-official',
     name: 'Google Gemini (官方)',
     category: 'official',
+    platform: 'Gemini',
     icon: 'gemini',
     iconColor: '#4285F4',
     websiteUrl: 'https://aistudio.google.com',
@@ -240,6 +245,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     presetId: 'aws-bedrock-aksk',
     name: 'AWS Bedrock (AKSK)',
     category: 'cloud_provider',
+    platform: 'AWSBedrock',
     icon: 'aws',
     iconColor: '#FF9900',
     websiteUrl: 'https://aws.amazon.com/bedrock/',
@@ -256,6 +262,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     presetId: 'aws-bedrock-apikey',
     name: 'AWS Bedrock (API Key)',
     category: 'cloud_provider',
+    platform: 'AWSBedrock',
     icon: 'aws',
     iconColor: '#FF9900',
     websiteUrl: 'https://aws.amazon.com/bedrock/',
@@ -269,6 +276,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
     presetId: 'azure-openai',
     name: 'Azure OpenAI',
     category: 'cloud_provider',
+    platform: 'AzureOpenAI',
     icon: 'azure',
     iconColor: '#0078D4',
     websiteUrl: 'https://azure.microsoft.com/products/ai-services/openai-service',

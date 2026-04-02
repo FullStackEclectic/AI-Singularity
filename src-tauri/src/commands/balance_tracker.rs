@@ -38,3 +38,12 @@ pub async fn get_balance_history(
 ) -> Result<Vec<BalanceSnapshot>, AppError> {
     BalanceTracker::new(&*db).get_history(&provider_id, limit.unwrap_or(30))
 }
+
+/// 计算并获取某 Provider 的账单预测（烧钱速率与预计耗尽时间）
+#[tauri::command]
+pub async fn get_burn_rate_forecast(
+    provider_id: String,
+    db: State<'_, Database>,
+) -> Result<crate::models::BurnRateForecast, AppError> {
+    BalanceTracker::new(&*db).get_burn_rate_forecast(&provider_id)
+}

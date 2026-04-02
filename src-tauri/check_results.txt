@@ -1,0 +1,22 @@
+    Checking ai-singularity v0.1.0 (C:\Code\tarui\AI-Singularity\src-tauri)
+src\db.rs:7:15: error[E0425]: cannot find type `PathBuf` in this scope: not found in this scope
+src\db.rs:1:5: warning: unused import: `anyhow::Result`
+src\proxy\server.rs:11:5: warning: unused imports: `Request`, `Response`, and `body::Body`
+src\services\balance_tracker.rs:1:5: warning: unused import: `std::sync::Arc`
+src\services\balance_tracker.rs:5:15: warning: unused imports: `error`, `info`, and `warn`
+src\services\balance_tracker.rs:9:20: warning: unused import: `AppError`
+src\services\provider.rs:2:47: warning: unused import: `ProviderCategory`
+src\services\mcp.rs:6:5: warning: unused import: `std::sync::Arc`
+src\services\prompts.rs:5:5: warning: unused import: `std::sync::Arc`
+src\services\alert.rs:2:44: warning: unused import: `KeyStatus`
+src\services\alert.rs:4:5: warning: unused import: `rusqlite::params`
+src\store.rs:1:13: warning: unused import: `models::ApiKey`
+src\store.rs:3:12: warning: unused imports: `AeadCore`, `Aead`, `Aes256Gcm`, `Nonce`, and `OsRng`
+src\store.rs:6:14: warning: unused imports: `Engine` and `engine::general_purpose::STANDARD`
+src\services\sync.rs:32:62: error[E0282]: type annotations needed: cannot infer type
+src\services\sync.rs:53:62: error[E0282]: type annotations needed: cannot infer type
+src\store.rs:3:28: warning: unused import: `KeyInit`
+src\commands\proxy.rs:21:5: warning: unused variable: `db`: help: if this is intentional, prefix it with an underscore: `_db`
+src\proxy\server.rs:187:35: warning: unused variable: `state`: help: if this is intentional, prefix it with an underscore: `_state`
+warning: `ai-singularity` (lib) generated 16 warnings
+error: could not compile `ai-singularity` (lib) due to 3 previous errors; 16 warnings emitted

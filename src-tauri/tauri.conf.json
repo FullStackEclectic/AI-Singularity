@@ -36,5 +36,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://api.github.com/repos/tarui/AI-Singularity/releases/latest"
+      ],
+      "pubkey": "YOUR_UPDATER_PUBLIC_KEY"
+    }
   }
 }

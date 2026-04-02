@@ -1,11 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useProviderStore } from "../../stores/providerStore";
 import type { ProviderConfig, ToolTarget, Platform } from "../../types";
 import {
   TOOL_TARGET_LABELS,
   TOOL_TARGET_CONFIG_PATH,
   PLATFORM_LABELS,
-  PROVIDER_CATEGORY_LABELS,
   parseToolTargets,
 } from "../../types";
 import {
@@ -135,6 +134,27 @@ function ProviderCard({
 }) {
   const targets = parseToolTargets(provider);
 
+  const handleShare = () => {
+    const payload = {
+      name: provider.name,
+      platform: provider.platform,
+      category: provider.category,
+      base_url: provider.base_url,
+      model_name: provider.model_name,
+      tool_targets: provider.tool_targets,
+      icon: provider.icon,
+      icon_color: provider.icon_color,
+      website_url: provider.website_url,
+      api_key_url: provider.api_key_url,
+      notes: provider.notes,
+    };
+    const b64 = btoa(encodeURIComponent(JSON.stringify(payload)));
+    const url = `ais://provider?data=${b64}`;
+    navigator.clipboard.writeText(url)
+      .then(() => alert("分享链接已复制指剪贴板：\n\n" + url))
+      .catch(e => console.error(e));
+  };
+
   return (
     <div className={`card provider-card ${provider.is_active ? "active-card" : ""} animate-fade-in`}>
       {/* Header */}
@@ -211,6 +231,7 @@ function ProviderCard({
             官网 ↗
           </a>
         )}
+        <button className="btn btn-ghost btn-xs" onClick={handleShare} title="生成Deep Link安装链接">🔗 分享</button>
         <button className="btn btn-ghost btn-xs" onClick={onEdit}>编辑</button>
         <button className="btn btn-danger-ghost btn-xs" onClick={onDelete}>删除</button>
       </div>
@@ -295,7 +316,7 @@ function ProviderModal({
     setForm(f => ({
       ...f,
       name:       preset.name,
-      platform:   presetIdToPlatform(preset.presetId),
+      platform:   preset.platform as Platform,
       base_url:   preset.defaultBaseUrl ?? "",
       model_name: preset.defaultModel ?? "",
       website_url: preset.websiteUrl ?? "",
@@ -528,26 +549,3 @@ function ProviderModal({
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 工具函数：presetId → Platform
-// ─────────────────────────────────────────────────────────────────────────────
-
-function presetIdToPlatform(presetId: string): Platform {
-  if (presetId.startsWith("anthropic"))  return "anthropic";
-  if (presetId.startsWith("openai"))     return "open_ai";
-  if (presetId.startsWith("google"))     return "gemini";
-  if (presetId.startsWith("deepseek"))   return "deep_seek";
-  if (presetId.startsWith("zhipu") || presetId.startsWith("zai")) return "zhipu";
-  if (presetId.startsWith("kimi"))       return "moonshot";
-  if (presetId.startsWith("minimax"))    return "mini_max";
-  if (presetId.startsWith("stepfun"))    return "step_fun";
-  if (presetId.startsWith("doubao"))     return "bytedance";
-  if (presetId.startsWith("bailian"))    return "aliyun";
-  if (presetId.startsWith("aws"))        return "aws_bedrock";
-  if (presetId.startsWith("azure"))      return "azure_open_a_i";
-  if (presetId.startsWith("nvidia"))     return "nvidia_nim";
-  if (presetId.startsWith("openrouter")) return "open_router";
-  if (presetId.startsWith("siliconflow"))return "silicon_flow";
-  if (presetId.startsWith("github"))     return "copilot";
-  return "custom";
-}

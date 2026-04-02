@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMcpStore } from "../../stores/mcpStore";
 import type { McpServer } from "../../types";
+import { MCP_PRESETS, MCP_CATEGORIES, type McpPreset } from "../../data/mcpPresets";
 import "./McpPage.css";
 
 export default function McpPage() {
@@ -129,6 +130,19 @@ function AddMcpModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showPresets, setShowPresets] = useState(false);
+
+  const applyPreset = (preset: McpPreset) => {
+    setForm({
+      name: preset.name,
+      command: preset.command,
+      args: preset.args.join(" "),
+      envKey: preset.id === "github" ? "GITHUB_PERSONAL_ACCESS_TOKEN" : 
+              preset.id === "brave-search" ? "BRAVE_API_KEY" : "",
+      envVal: ""
+    });
+    setShowPresets(false);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,10 +185,15 @@ function AddMcpModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal modal-lg" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h2>添加 MCP Server</h2>
-          <button className="btn btn-icon" onClick={onClose}>✕</button>
+          <div style={{ display: "flex", gap: "var(--space-2)" }}>
+            <button className="btn btn-ghost" onClick={() => setShowPresets(true)}>
+              ✨ 从预设选择
+            </button>
+            <button className="btn btn-icon" onClick={onClose}>✕</button>
+          </div>
         </div>
 
         <form className="modal-body" onSubmit={handleSubmit}>
@@ -243,6 +262,85 @@ function AddMcpModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
             </button>
           </div>
         </form>
+      </div>
+
+      {showPresets && (
+        <McpPresetModal 
+          onClose={() => setShowPresets(false)} 
+          onSelect={applyPreset} 
+        />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MCP Preset Modal
+// ─────────────────────────────────────────────────────────────────────────────
+
+function McpPresetModal({ onClose, onSelect }: { onClose: () => void; onSelect: (p: McpPreset) => void }) {
+  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<typeof MCP_CATEGORIES[number] | "All">("All");
+
+  const filtered = useMemo(() => {
+    return MCP_PRESETS.filter(p => {
+      if (activeTab !== "All" && p.category !== activeTab) return false;
+      if (search) {
+        const query = search.toLowerCase();
+        return p.name.toLowerCase().includes(query) || p.description.toLowerCase().includes(query);
+      }
+      return true;
+    });
+  }, [search, activeTab]);
+
+  return (
+    <div className="modal-overlay preset-overlay" onClick={onClose} style={{ zIndex: 1000 }}>
+      <div className="modal preset-modal" onClick={e => e.stopPropagation()} style={{ width: 680, maxWidth: "90vw" }}>
+        <div className="modal-header">
+          <h3>选择 MCP Template</h3>
+          <button className="btn btn-icon" onClick={onClose}>✕</button>
+        </div>
+        
+        <div className="preset-search-bar" style={{ padding: "0 var(--space-6)" }}>
+          <input 
+            type="text" 
+            className="form-input" 
+            placeholder="搜索 MCP ..." 
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+
+        <div className="preset-tabs" style={{ padding: "var(--space-3) var(--space-6) 0", display: "flex", gap: "var(--space-2)", borderBottom: "1px solid var(--color-border)" }}>
+          <button className={`tab-btn ${activeTab === "All" ? "active" : ""}`} onClick={() => setActiveTab("All")}>全部</button>
+          {MCP_CATEGORIES.map(cat => (
+             <button key={cat} className={`tab-btn ${activeTab === cat ? "active" : ""}`} onClick={() => setActiveTab(cat)}>
+               {cat}
+             </button>
+          ))}
+        </div>
+
+        <div className="preset-grid" style={{ padding: "var(--space-6)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", maxHeight: "60vh", overflowY: "auto" }}>
+          {filtered.length === 0 ? (
+            <div className="text-muted" style={{ gridColumn: "1 / -1", textAlign: "center", padding: "var(--space-8) 0" }}>没有找到相关的 MCP 预设</div>
+          ) : (
+            filtered.map(p => (
+              <div key={p.id} className="preset-card card" onClick={() => onSelect(p)} style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: 8 }}>
+                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                     <span style={{ fontSize: 20 }}>{p.icon}</span>
+                     <span style={{ fontWeight: 600, fontSize: 14 }}>{p.name}</span>
+                   </div>
+                   {p.recommended && <span style={{ fontSize: 10, background: "var(--color-success)", color: "#000", padding: "2px 6px", borderRadius: 4, fontWeight: "bold" }}>推荐</span>}
+                 </div>
+                 <p className="text-muted" style={{ fontSize: 12, lineHeight: 1.4, flex: 1 }}>{p.description}</p>
+                 <div style={{ fontSize: 11, background: "var(--bg-inset)", padding: "4px 6px", borderRadius: 4, fontFamily: "monospace", color: "var(--color-accent)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                   {p.command} {p.args.join(" ")}
+                 </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

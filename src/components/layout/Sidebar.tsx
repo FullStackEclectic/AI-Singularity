@@ -1,4 +1,5 @@
 import type { NavPage } from "../../App";
+import { useTranslation } from "react-i18next";
 import "./Sidebar.css";
 
 interface NavItem {
@@ -24,6 +25,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
     title: "AI 工具",
     items: [
       { id: "providers", icon: "⚡", label: "Provider" },
+      { id: "skills", icon: "🛠️", label: "Skills 技能" },
       { id: "mcp", icon: "🔌", label: "MCP Server" },
       { id: "prompts", icon: "📝", label: "系统配置" },
     ],
@@ -38,6 +40,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
     title: "信息",
     items: [
       { id: "analytics", icon: "📊", label: "余额看板" },
+      { id: "sessions", icon: "💬", label: "会话历史" },
       { id: "speedtest", icon: "⚡", label: "延迟测速" },
       { id: "models",    icon: "🤖", label: "模型目录" },
       { id: "settings",  icon: "⚙", label: "设置" },
@@ -51,6 +54,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
+  const { t } = useTranslation();
+
   return (
     <aside className="sidebar">
       {/* Logo */}
@@ -69,7 +74,12 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         {NAV_GROUPS.map((group, gi) => (
           <div key={gi} className="sidebar-group">
             {group.title && (
-              <div className="sidebar-group-title">{group.title}</div>
+              <div className="sidebar-group-title">
+                {group.title === "账号管理" ? t("sidebar.groups.account") :
+                 group.title === "AI 工具" ? t("sidebar.groups.tools") :
+                 group.title === "代理网关" ? t("sidebar.groups.proxy") :
+                 group.title === "信息" ? t("sidebar.groups.info") : group.title}
+              </div>
             )}
             {group.items.map((item) => (
               <button
@@ -78,7 +88,9 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
                 onClick={() => onNavigate(item.id)}
               >
                 <span className="sidebar-nav-icon">{item.icon}</span>
-                <span className="sidebar-nav-label">{item.label}</span>
+                <span className="sidebar-nav-label">
+                  {t(`sidebar.${item.id}`)}
+                </span>
                 {item.badge && (
                   <span className="sidebar-nav-badge">{item.badge}</span>
                 )}

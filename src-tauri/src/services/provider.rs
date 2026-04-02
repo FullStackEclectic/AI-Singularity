@@ -97,7 +97,7 @@ impl<'a> ProviderService<'a> {
     /// 切换激活 Provider（仅同步目标工具相关的 provider 互斥）
     pub fn switch_provider(&self, id: &str) -> AppResult<()> {
         // 获取目标 provider 的 tool_targets
-        let target = self.db.query_one(
+        let _target = self.db.query_one(
             "SELECT tool_targets FROM providers WHERE id = ?1",
             &[&id],
             |row| row.get::<_, Option<String>>(0),

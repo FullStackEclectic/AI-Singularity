@@ -17,16 +17,20 @@ impl<'a> PromptService<'a> {
     }
 
     pub fn list_prompts(&self) -> AppResult<Vec<PromptConfig>> {
-        let sql = "SELECT id, name, target_file, content, is_active, created_at, updated_at FROM prompts";
+        let sql = "SELECT id, name, description, target_file, content, is_active, tool_targets, created_at, updated_at FROM prompts";
         self.db.query_rows(sql, &[], |row| {
-            let created_at_str: String = row.get(5)?;
-            let updated_at_str: String = row.get(6)?;
+            let desc: Option<String> = row.get(2)?;
+            let tool_targets: Option<String> = row.get(6)?;
+            let created_at_str: String = row.get(7)?;
+            let updated_at_str: String = row.get(8)?;
             Ok(PromptConfig {
                 id: row.get(0)?,
                 name: row.get(1)?,
-                target_file: row.get(2)?,
-                content: row.get(3)?,
-                is_active: row.get::<_, i32>(4)? != 0,
+                description: desc,
+                target_file: row.get(3)?,
+                content: row.get(4)?,
+                is_active: row.get::<_, i32>(5)? != 0,
+                tool_targets,
                 created_at: created_at_str.parse().unwrap_or_default(),
                 updated_at: updated_at_str.parse().unwrap_or_default(),
             })
@@ -34,13 +38,15 @@ impl<'a> PromptService<'a> {
     }
 
     pub fn save_prompt(&self, prompt: PromptConfig) -> AppResult<()> {
-        let sql = "INSERT OR REPLACE INTO prompts (id, name, target_file, content, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
-        self.db.execute(sql, params![
+        let sql = "INSERT OR REPLACE INTO prompts (id, name, description, target_file, content, is_active, tool_targets, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
+        self.db.execute(sql, rusqlite::params![
             prompt.id,
             prompt.name,
+            prompt.description,
             prompt.target_file,
             prompt.content,
             if prompt.is_active { 1 } else { 0 },
+            prompt.tool_targets,
             prompt.created_at.to_rfc3339(),
             prompt.updated_at.to_rfc3339()
         ])?;

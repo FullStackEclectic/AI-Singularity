@@ -15,7 +15,7 @@ impl<'a> McpService<'a> {
     }
 
     pub fn list_mcps(&self) -> AppResult<Vec<McpServer>> {
-        let sql = "SELECT id, name, command, args, env, is_active, created_at, updated_at FROM mcp_servers";
+        let sql = "SELECT id, name, command, args, env, is_active, created_at, updated_at, description, tool_targets FROM mcp_servers";
         self.db.query_rows(sql, &[], |row| {
             let created_at_str: String = row.get(6)?;
             let updated_at_str: String = row.get(7)?;
@@ -28,12 +28,14 @@ impl<'a> McpService<'a> {
                 is_active: row.get::<_, i32>(5)? != 0,
                 created_at: created_at_str.parse().unwrap_or_default(),
                 updated_at: updated_at_str.parse().unwrap_or_default(),
+                description: row.get(8).unwrap_or(None),
+                tool_targets: row.get(9).unwrap_or(None),
             })
         }).map_err(Into::into)
     }
 
     pub fn add_mcp(&self, mcp: McpServer) -> AppResult<()> {
-        let sql = "INSERT INTO mcp_servers (id, name, command, args, env, is_active, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)";
+        let sql = "INSERT INTO mcp_servers (id, name, command, args, env, is_active, created_at, updated_at, description, tool_targets) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)";
         self.db.execute(sql, params![
             mcp.id,
             mcp.name,
@@ -42,7 +44,9 @@ impl<'a> McpService<'a> {
             mcp.env,
             if mcp.is_active { 1 } else { 0 },
             mcp.created_at.to_rfc3339(),
-            mcp.updated_at.to_rfc3339()
+            mcp.updated_at.to_rfc3339(),
+            mcp.description,
+            mcp.tool_targets
         ])?;
         Ok(())
     }

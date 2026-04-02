@@ -248,6 +248,21 @@ pub struct BalanceSummary {
 }
 
 // ============================================================
+// 余额预测 (Burn Rate Forecast)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BurnRateForecast {
+    pub provider_id: String,
+    pub daily_burn_rate_usd: Option<f64>,
+    pub daily_burn_rate_cny: Option<f64>,
+    pub estimated_depletion_date: Option<DateTime<Utc>>,
+    pub is_at_risk: bool,
+    pub next_reset_at: Option<DateTime<Utc>>,
+    pub reset_cycle: String, // "monthly", "daily", "prepaid_none", "unknown"
+}
+
+// ============================================================
 // MCP Server
 // ============================================================
 
@@ -284,11 +299,24 @@ impl McpServer {
 pub struct PromptConfig {
     pub id: String,
     pub name: String,
-    pub target_file: String, // e.g., CLAUDE.md / GEMINI.md
+    pub description: Option<String>,
+    pub target_file: String, // e.g., CLAUDE.md / .aider.conf.yml / system_prompt
     pub content: String,
     pub is_active: bool,
+    /// 同步到哪些工具（JSON 数组）
+    pub tool_targets: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl PromptConfig {
+    pub fn parsed_tool_targets(&self) -> Vec<ToolTarget> {
+        match &self.tool_targets {
+            None => vec![], // 默认不覆盖所有工具
+            Some(s) if s.is_empty() || s == "[]" => vec![],
+            Some(s) => serde_json::from_str(s).unwrap_or_default(),
+        }
+    }
 }
 
 // ============================================================

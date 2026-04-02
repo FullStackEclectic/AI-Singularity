@@ -7,6 +7,7 @@ use crate::models::{ToolTarget, ProviderConfig, McpServer};
 use crate::db::Database;
 use crate::services::provider::ProviderService;
 use crate::services::mcp::McpService;
+use crate::services::backup::BackupService;
 
 pub struct SyncService<'a> {
     db: &'a Database,
@@ -26,29 +27,51 @@ impl<'a> SyncService<'a> {
     // ─────────────────────────────────────────────────────────
 
     pub fn sync_all(&self) {
+        // === 执行写操作前自动备份 ===
+        let path = std::path::Path::new(&self.db.path);
+        if let Some(parent) = path.parent() {
+            let app_data_dir = parent.to_path_buf();
+            let backup_service = BackupService::new(self.db, app_data_dir);
+            if let Err(e) = backup_service.create_auto_backup() {
+                warn!("SyncService: 自动备份失败: {}", e);
+            }
+        }
+
         let providers = ProviderService::new(self.db).list_providers().unwrap_or_default();
         let mcps      = McpService::new(self.db).list_mcps().unwrap_or_default();
+        let prompts   = crate::services::prompts::PromptService::new(self.db).list_prompts().unwrap_or_default();
 
-        self.sync_claude_code(&providers, &mcps);
+        self.sync_claude_code(&providers, &mcps, &prompts);
         self.sync_codex(&providers);
         self.sync_gemini_cli(&providers);
         self.sync_opencode(&providers);
         self.sync_openclaw(&providers);
-        self.sync_aider(&providers);
+        self.sync_aider(&providers, &prompts);
     }
 
     /// 仅同步单个工具（切换 Provider 时调用）
     pub fn sync_tool(&self, tool: &ToolTarget) {
+        // === 执行写操作前自动备份 ===
+        let path = std::path::Path::new(&self.db.path);
+        if let Some(parent) = path.parent() {
+            let app_data_dir = parent.to_path_buf();
+            let backup_service = BackupService::new(self.db, app_data_dir);
+            if let Err(e) = backup_service.create_auto_backup() {
+                warn!("SyncService: 自动备份失败: {}", e);
+            }
+        }
+
         let providers = ProviderService::new(self.db).list_providers().unwrap_or_default();
         let mcps      = McpService::new(self.db).list_mcps().unwrap_or_default();
+        let prompts   = crate::services::prompts::PromptService::new(self.db).list_prompts().unwrap_or_default();
 
         match tool {
-            ToolTarget::ClaudeCode => self.sync_claude_code(&providers, &mcps),
+            ToolTarget::ClaudeCode => self.sync_claude_code(&providers, &mcps, &prompts),
             ToolTarget::Codex      => self.sync_codex(&providers),
             ToolTarget::GeminiCli  => self.sync_gemini_cli(&providers),
             ToolTarget::OpenCode   => self.sync_opencode(&providers),
             ToolTarget::OpenClaw   => self.sync_openclaw(&providers),
-            ToolTarget::Aider      => self.sync_aider(&providers),
+            ToolTarget::Aider      => self.sync_aider(&providers, &prompts),
         }
     }
 
@@ -56,7 +79,7 @@ impl<'a> SyncService<'a> {
     // Claude Code  →  ~/.claude.json
     // ─────────────────────────────────────────────────────────
 
-    fn sync_claude_code(&self, providers: &[ProviderConfig], mcps: &[McpServer]) {
+    fn sync_claude_code(&self, providers: &[ProviderConfig], mcps: &[McpServer], prompts: &[crate::models::PromptConfig]) {
         let path = Self::home_dir().join(".claude.json");
 
         let mut config: Value = if path.exists() {
@@ -100,6 +123,20 @@ impl<'a> SyncService<'a> {
                 env_obj["ANTHROPIC_MODEL"] = json!(p.model_name);
             }
             config["env"] = env_obj;
+        }
+
+        // 3. 注入 Prompt Templates (customInstructions)
+        let claude_prompts: Vec<String> = prompts.iter()
+            .filter(|p| p.is_active && p.parsed_tool_targets().contains(&ToolTarget::ClaudeCode))
+            .map(|p| p.content.clone())
+            .collect();
+            
+        if !claude_prompts.is_empty() {
+            let combined_prompt = claude_prompts.join("\n\n---\n\n");
+            config["customInstructions"] = json!(combined_prompt);
+        } else {
+            // 如果 AI Singularity 中没有启用 Claude Code 相关的 Prompt，清除该键（交回给官方默认）
+            config.as_object_mut().map(|m| m.remove("customInstructions"));
         }
 
         self.write_json(&path, &config, "~/.claude.json");
@@ -296,7 +333,7 @@ requires_openai_auth = true
     // Aider  →  ~/.aider.conf.yml
     // ─────────────────────────────────────────────────────────
 
-    fn sync_aider(&self, providers: &[ProviderConfig]) {
+    fn sync_aider(&self, providers: &[ProviderConfig], prompts: &[crate::models::PromptConfig]) {
         let Some(p) = providers.iter().find(|p| p.is_active && p.syncs_to(&ToolTarget::Aider)) else {
             return;
         };
@@ -306,10 +343,10 @@ requires_openai_auth = true
 
         if path.exists() {
             content = fs::read_to_string(&path).unwrap_or_default();
-            // 移除旧的 model / openai-api-base 行
+            // 移除旧的 model / openai-api-base / architect-system-prompt 行
             content = content
                 .lines()
-                .filter(|l| !l.starts_with("model:") && !l.starts_with("openai-api-base:"))
+                .filter(|l| !l.starts_with("model:") && !l.starts_with("openai-api-base:") && !l.starts_with("architect-system-prompt:"))
                 .collect::<Vec<&str>>()
                 .join("\n");
             if !content.is_empty() && !content.ends_with('\n') {
@@ -320,6 +357,19 @@ requires_openai_auth = true
         content.push_str(&format!("model: {}\n", p.model_name));
         if let Some(ref base) = p.base_url {
             content.push_str(&format!("openai-api-base: {}\n", base));
+        }
+
+        // 注入 Prompt Template (作为 architect_system_prompt 或 read)
+        let aider_prompts: Vec<String> = prompts.iter()
+            .filter(|p| p.is_active && p.parsed_tool_targets().contains(&ToolTarget::Aider))
+            .map(|p| p.content.clone())
+            .collect();
+
+        if !aider_prompts.is_empty() {
+            let combined = aider_prompts.join("\n\n---\n\n");
+            // 将换行进行缩进处理，以便写入 YAML
+            let indented: String = combined.lines().map(|line| format!("  {}", line)).collect::<Vec<_>>().join("\n");
+            content.push_str(&format!("architect-system-prompt: |-\n{}\n", indented));
         }
 
         match fs::write(&path, content) {

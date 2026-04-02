@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { api } from "../../lib/api";
 import type { ApiKey, Balance, Platform } from "../../types";
 import { PLATFORM_LABELS, STATUS_LABELS } from "../../types";
@@ -10,6 +12,7 @@ const PLATFORMS: { value: Platform; label: string }[] = [
   { value: "anthropic", label: "Anthropic (Claude)" },
   { value: "gemini", label: "Google Gemini" },
   { value: "deep_seek", label: "DeepSeek" },
+  { value: "copilot", label: "GitHub Copilot" },
   { value: "aliyun", label: "阿里云百炼" },
   { value: "bytedance", label: "字节豆包" },
   { value: "moonshot", label: "Moonshot (Kimi)" },
@@ -267,6 +270,27 @@ function AddKeyModal({
     onError: (e: unknown) => setError(String(e)),
   });
 
+  const [oauthLoading, setOauthLoading] = useState(false);
+  const startOAuth = async () => {
+    setOauthLoading(true);
+    try {
+      // 告诉后端启动本地服务并返回认证URL
+      const url = await invoke<string>("start_oauth_flow", { provider: form.platform });
+      // 唤起系统浏览器
+      await invoke("plugin:opener|open_url", { url });
+      
+      // 等待后端抛出的 oauth_success 事件
+      const unlisten = await listen<string>("oauth_success", (event) => {
+        setForm(f => ({ ...f, secret: event.payload }));
+        setOauthLoading(false);
+        unlisten(); // 收到一次解绑
+      });
+    } catch (e) {
+      setError("OAuth 启动失败: " + String(e));
+      setOauthLoading(false);
+    }
+  };
+
   const showBaseUrl = form.platform === "custom";
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -330,14 +354,35 @@ function AddKeyModal({
 
           <div className="form-row">
             <label className="form-label">API Key *</label>
-            <input
-              className="form-input font-mono"
-              type="password"
-              placeholder="sk-..."
-              value={form.secret}
-              onChange={(e) => setForm({ ...form, secret: e.target.value })}
-              autoComplete="off"
-            />
+            {form.platform === 'copilot' ? (
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  className="form-input font-mono"
+                  type="password"
+                  placeholder="等待授权..."
+                  value={form.secret}
+                  readOnly
+                />
+                <button
+                  type="button"
+                  className="btn btn-primary-outline"
+                  onClick={startOAuth}
+                  disabled={oauthLoading}
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {oauthLoading ? "等待回调..." : "获取授权"}
+                </button>
+              </div>
+            ) : (
+              <input
+                className="form-input font-mono"
+                type="password"
+                placeholder="sk-..."
+                value={form.secret}
+                onChange={(e) => setForm({ ...form, secret: e.target.value })}
+                autoComplete="off"
+              />
+            )}
             <p className="form-hint">🔒 Key 将加密存储在系统 Keychain 中，不会以明文保存</p>
           </div>
 
