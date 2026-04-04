@@ -18,9 +18,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
   {
     title: "账号管理",
     items: [
-      { id: "keys", icon: "🔑", label: "API Keys" },
-      { id: "ideAccounts", icon: "☢️", label: "代理兵工厂" },
-      { id: "userTokens", icon: "🛡️", label: "下发管控" },
+      { id: "accounts", icon: "👤", label: "账号与资产" },
     ],
   },
   {

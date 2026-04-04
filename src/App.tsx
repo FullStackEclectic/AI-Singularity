@@ -1,6 +1,5 @@
 import { useState } from "react";
 import Sidebar from "./components/layout/Sidebar";
-import KeysPage from "./components/keys/KeysPage";
 import DashboardPage from "./components/dashboard/DashboardPage";
 import ModelsPage from "./components/models/ModelsPage";
 import ProxyPage from "./components/proxy/ProxyPage";
@@ -12,17 +11,16 @@ import PromptsPage from "./components/prompts/PromptsPage";
 import SpeedTestPage from "./components/speedtest/SpeedTestPage";
 import AnalyticsPage from "./components/analytics/AnalyticsPage";
 import SessionsPage from "./components/sessions/SessionsPage";
-import IdeAccountsPage from "./components/ideAccounts/IdeAccountsPage";
+import AccountsContainerPage from "./components/accounts/AccountsContainerPage";
 import ToolDepotPage from "./components/tools/ToolDepotPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import "./App.css";
 
-export type NavPage = "dashboard" | "keys" | "ideAccounts" | "userTokens" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings";
+export type NavPage = "dashboard" | "accounts" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings";
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useProviderStore } from "./stores/providerStore";
-import UserTokenPage from "./components/userTokens/UserTokenPage";
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
@@ -82,9 +80,7 @@ export default function App() {
   const renderPage = () => {
     switch (activePage) {
       case "dashboard":  return <DashboardPage />;
-      case "keys":       return <KeysPage />;
-      case "ideAccounts":return <IdeAccountsPage />;
-      case "userTokens": return <UserTokenPage />;
+      case "accounts":   return <AccountsContainerPage />;
       case "models":     return <ModelsPage />;
       case "proxy":      return <ProxyPage />;
       case "providers":  return <ProvidersPage />;
