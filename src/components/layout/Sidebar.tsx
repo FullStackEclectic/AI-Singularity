@@ -19,6 +19,8 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
     title: "账号管理",
     items: [
       { id: "keys", icon: "🔑", label: "API Keys" },
+      { id: "ideAccounts", icon: "☢️", label: "代理兵工厂" },
+      { id: "userTokens", icon: "🛡️", label: "下发管控" },
     ],
   },
   {
@@ -27,6 +29,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
       { id: "providers", icon: "⚡", label: "Provider" },
       { id: "skills", icon: "🛠️", label: "Skills 技能" },
       { id: "mcp", icon: "🔌", label: "MCP Server" },
+      { id: "tools", icon: "⏬", label: "大模型局域兵工厂" },
       { id: "prompts", icon: "📝", label: "系统配置" },
     ],
   },

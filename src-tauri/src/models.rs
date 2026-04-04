@@ -25,6 +25,7 @@ pub enum Platform {
     SiliconFlow,
     OpenRouter,
     Copilot,     // GitHub Copilot OAuth
+    Auth0IDE,    // 高阶白嫖设备指纹伪装池
     Custom,      // 自定义 OpenAI 兼容
 }
 
@@ -47,6 +48,7 @@ impl Platform {
             Platform::SiliconFlow => "SiliconFlow",
             Platform::OpenRouter  => "OpenRouter",
             Platform::Copilot    => "GitHub Copilot",
+            Platform::Auth0IDE   => "超级白嫖指纹池",
             Platform::Custom     => "自定义接口",
         }
     }
@@ -201,7 +203,12 @@ pub struct ApiKey {
     pub notes: Option<String>,
     pub created_at: DateTime<Utc>,
     pub last_checked_at: Option<DateTime<Utc>>,
+    /// 轮询优先级：数值越大越优先（默认 100）
+    #[serde(default = "default_priority")]
+    pub priority: i64,
 }
+
+fn default_priority() -> i64 { 100 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -351,4 +358,135 @@ pub struct SpeedTestResult {
     pub endpoint: String,
     pub latency_ms: Option<u64>,
     pub status: String, // "ok" | "timeout" | "error"
+}
+
+// ============================================================
+// Token 审计 (Usage Stats)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenUsageRecord {
+    pub id: String,
+    pub key_id: String,
+    pub platform: String,
+    pub model_name: String,
+    /// 客户端请求头标识 (如 Claude Code, Aider 等)
+    pub client_app: String,
+    pub prompt_tokens: i64,
+    pub completion_tokens: i64,
+    pub total_tokens: i64,
+    pub created_at: DateTime<Utc>,
+}
+
+// ============================================================
+// 降维打击武器库：防封杀硬核指纹架构与池化 Token 网关 (IDE)
+// ============================================================
+
+/// 物理机硬件环境拟态指纹
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub struct DeviceProfile {
+    pub machine_id: String,
+    pub mac_machine_id: String,
+    pub dev_device_id: String,
+    pub sqm_id: String,
+}
+
+/// Token 池中账号的当前实战健康度
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum AccountStatus {
+    /// 活跃运作中
+    Active,
+    /// 令牌已物理过期，需强制下线
+    Expired,
+    /// 被判定滥用、强制403锁定截杀
+    Forbidden,
+    /// 短期并发过高，被关进小黑屋
+    RateLimited,
+    /// 未知
+    Unknown,
+}
+
+/// 支持刷新续期的 OAuth 令牌环
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthToken {
+    pub access_token: String,
+    pub refresh_token: String,
+    pub expires_in: u64,
+    pub token_type: String,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 指纹型高级池化子网账户实体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IdeAccount {
+    /// 全局唯一标号（多数场景通过 refresh_token 或者邮箱做哈希去重）
+    pub id: String,
+    pub email: String,
+    /// 通道所属应用大类，限制本指纹针对哪个平台池（如：ClaudeCode, Cursor...）
+    pub origin_platform: String,
+    pub token: OAuthToken,
+    pub status: AccountStatus,
+    /// 是否在轮询池里处于被干掉的状态原因脱水
+    pub disabled_reason: Option<String>,
+    /// 是否被人为强制禁用代理转发
+    pub is_proxy_disabled: bool,
+    /// 大盘指标记录
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_used: DateTime<Utc>,
+    
+    /// 核武器：本机硬件码伪装。此项为 Some 时，底层转发网关将剥离原生请求的 Header 和数据包特征，并强行植入其对应的机器码，实现“白嫖免死金牌”。
+    pub device_profile: Option<DeviceProfile>,
+    
+    /// 当该账号支持高阶的限流逻辑（如 Claude 的按次限购）时，脱水保存其配额额度。
+    pub quota_json: Option<String>,
+}
+
+// ============================================================
+// SaaS User Token (用于向下级分发网关使用权的实体)
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserToken {
+    pub id: String,
+    pub token: String,
+    pub username: String,
+    pub description: Option<String>,
+    pub enabled: bool,
+    pub expires_type: String, // "never", "relative", "absolute"
+    pub expires_at: Option<i64>,
+    pub max_ips: i64,
+    pub curfew_start: Option<String>,
+    pub curfew_end: Option<String>,
+    pub total_requests: i64,
+    pub total_tokens_used: i64,
+    pub created_at: i64,
+    pub updated_at: i64,
+    pub last_used_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateUserTokenReq {
+    pub username: String,
+    pub description: Option<String>,
+    pub expires_type: String,
+    pub expires_at: Option<i64>,
+    pub max_ips: i64,
+    pub curfew_start: Option<String>,
+    pub curfew_end: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UpdateUserTokenReq {
+    pub id: String,
+    pub username: Option<String>,
+    pub description: Option<String>,
+    pub enabled: Option<bool>,
+    pub expires_type: Option<String>,
+    pub expires_at: Option<i64>,
+    pub max_ips: Option<i64>,
+    pub curfew_start: Option<String>,
+    pub curfew_end: Option<String>,
 }

@@ -42,6 +42,12 @@ export default function KeysPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }),
   });
 
+  const priorityMut = useMutation({
+    mutationFn: ({ id, priority }: { id: string; priority: number }) =>
+      api.keys.updatePriority(id, priority),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }),
+  });
+
   const checkMut = useMutation({
     mutationFn: api.keys.check,
     onSuccess: () => {
@@ -114,6 +120,7 @@ export default function KeysPage() {
                 onDelete={() => deleteMut.mutate(key.id)}
                 onCheck={() => checkMut.mutate(key.id)}
                 onRefreshBalance={() => refreshBalanceMut.mutate(key.id)}
+                onPriorityChange={(p) => priorityMut.mutate({ id: key.id, priority: p })}
                 isChecking={checkMut.isPending}
                 isRefreshingBalance={
                   refreshBalanceMut.isPending &&
@@ -145,6 +152,7 @@ function KeyCard({
   onDelete,
   onCheck,
   onRefreshBalance,
+  onPriorityChange,
   isChecking,
   isRefreshingBalance,
 }: {
@@ -153,9 +161,12 @@ function KeyCard({
   onDelete: () => void;
   onCheck: () => void;
   onRefreshBalance: () => void;
+  onPriorityChange: (p: number) => void;
   isChecking: boolean;
   isRefreshingBalance: boolean;
 }) {
+  const [editingPriority, setEditingPriority] = useState(false);
+  const [priorityVal, setPriorityVal] = useState(String(apiKey.priority ?? 100));
   const statusClass =
     apiKey.status === "valid" ? "valid" :
     apiKey.status === "banned" ? "banned" :
@@ -244,6 +255,38 @@ function KeyCard({
       {apiKey.notes && (
         <div className="key-card-notes text-muted">{apiKey.notes}</div>
       )}
+
+      {/* 优先级 */}
+      <div className="key-priority-row">
+        <span className="text-muted" style={{ fontSize: 11 }}>优先级</span>
+        {editingPriority ? (
+          <input
+            className="priority-input font-mono"
+            type="number"
+            min={1} max={999}
+            value={priorityVal}
+            autoFocus
+            onChange={(e) => setPriorityVal(e.target.value)}
+            onBlur={() => {
+              const p = Math.max(1, Math.min(999, parseInt(priorityVal, 10) || 100));
+              onPriorityChange(p);
+              setEditingPriority(false);
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+              if (e.key === "Escape") { setPriorityVal(String(apiKey.priority ?? 100)); setEditingPriority(false); }
+            }}
+          />
+        ) : (
+          <button
+            className="priority-badge"
+            onClick={() => { setPriorityVal(String(apiKey.priority ?? 100)); setEditingPriority(true); }}
+            title="点击修改优先级（越大越优先）"
+          >
+            ⬆ {apiKey.priority ?? 100}
+          </button>
+        )}
+      </div>
     </div>
   );
 }

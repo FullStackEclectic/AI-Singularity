@@ -12,14 +12,17 @@ import PromptsPage from "./components/prompts/PromptsPage";
 import SpeedTestPage from "./components/speedtest/SpeedTestPage";
 import AnalyticsPage from "./components/analytics/AnalyticsPage";
 import SessionsPage from "./components/sessions/SessionsPage";
+import IdeAccountsPage from "./components/ideAccounts/IdeAccountsPage";
+import ToolDepotPage from "./components/tools/ToolDepotPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import "./App.css";
 
-export type NavPage = "dashboard" | "keys" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "speedtest" | "analytics" | "sessions" | "settings";
+export type NavPage = "dashboard" | "keys" | "ideAccounts" | "userTokens" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings";
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useProviderStore } from "./stores/providerStore";
+import UserTokenPage from "./components/userTokens/UserTokenPage";
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
@@ -34,9 +37,45 @@ export default function App() {
       window.dispatchEvent(new Event("force_refresh_analytics"));
     });
 
+    // --- 高危环境冲突体检 ---
+    const checkEnv = async () => {
+      try {
+        const { api } = await import("./lib/api");
+        const { message } = await import("@tauri-apps/plugin-dialog");
+        
+        const conflicts = await Promise.all([
+          api.env.checkConflicts("claude"),
+          api.env.checkConflicts("openai"),
+          api.env.checkConflicts("gemini")
+        ]);
+        
+        const allConflicts = conflicts.flat();
+        if (allConflicts.length > 0) {
+          let msg = "发现您的系统底层存在硬编码环境变量，这将导致您的 CLI 工具强行无视本软件代理设置！\n\n请前往系统配置或 ~/.bashrc 删除以下变量：\n";
+          for (const c of allConflicts) {
+             msg += `- ${c.varName} \n  (污染源: ${c.sourcePath})\n`;
+          }
+          await message(msg, { title: "高危：底层环境冲突拦截", kind: "error" });
+        }
+      } catch (e) {
+        console.error("Env check failed:", e);
+      }
+    };
+    checkEnv();
+
+    const unlistenWatcher = listen<string>("external_config_changed", async (event) => {
+      console.warn("🛡️ 捕获到底层配置文件遭到外部篡改: ", event.payload);
+      // 静默热更新 Zustand 缓存池中的数据，确切保证外挂改动实时映射到界面
+      await useProviderStore.getState().fetch();
+      
+      const { message } = await import("@tauri-apps/plugin-dialog");
+      message(`检测到外部程序修改了配置文件:\n${event.payload}\n\n已自动拉取同步！`, { kind: "info", title: "配置文件热更新" });
+    });
+
     return () => {
       unlistenProvider.then((unlisten: () => void) => unlisten());
       unlistenRefresh.then((unlisten: () => void) => unlisten());
+      unlistenWatcher.then((unlisten: () => void) => unlisten());
     };
   }, []);
 
@@ -44,11 +83,14 @@ export default function App() {
     switch (activePage) {
       case "dashboard":  return <DashboardPage />;
       case "keys":       return <KeysPage />;
+      case "ideAccounts":return <IdeAccountsPage />;
+      case "userTokens": return <UserTokenPage />;
       case "models":     return <ModelsPage />;
       case "proxy":      return <ProxyPage />;
       case "providers":  return <ProvidersPage />;
       case "mcp":        return <McpPage />;
       case "skills":     return <SkillsPage />;
+      case "tools":      return <ToolDepotPage />;
       case "prompts":    return <PromptsPage />;
       case "speedtest":  return <SpeedTestPage />;
       case "analytics":  return <AnalyticsPage />;

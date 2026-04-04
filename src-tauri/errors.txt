@@ -1,0 +1,188 @@
+    Checking ai-singularity v0.1.0 (D:\Code\Tauri\AI Singularity\src-tauri)
+error[E0433]: failed to resolve: could not find `mappers` in `proxy`
+   --> src\proxy\server.rs:350:23
+    |
+350 |     use crate::proxy::mappers::{ProtocolMapper, anthropic::AnthropicMapper};
+    |                       ^^^^^^^ could not find `mappers` in `proxy`
+
+error[E0432]: unresolved import `crate::proxy::mappers`
+   --> src\proxy\server.rs:350:23
+    |
+350 |     use crate::proxy::mappers::{ProtocolMapper, anthropic::AnthropicMapper};
+    |                       ^^^^^^^ could not find `mappers` in `proxy`
+
+error[E0433]: failed to resolve: could not find `mappers` in `proxy`
+   --> src\proxy\server.rs:416:23
+    |
+416 |     use crate::proxy::mappers::{ProtocolMapper, openai::OpenAiMapper};
+    |                       ^^^^^^^ could not find `mappers` in `proxy`
+
+error[E0432]: unresolved import `crate::proxy::mappers`
+   --> src\proxy\server.rs:416:23
+    |
+416 |     use crate::proxy::mappers::{ProtocolMapper, openai::OpenAiMapper};
+    |                       ^^^^^^^ could not find `mappers` in `proxy`
+
+warning: unused import: `anyhow::Result`
+ --> src\db.rs:1:5
+  |
+1 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: unused imports: `Request`, `Response`, and `body::Body`
+  --> src\proxy\server.rs:11:5
+   |
+11 |     body::Body,
+   |     ^^^^^^^^^^
+12 |     extract::State,
+13 |     http::{Request, Response, StatusCode},
+   |            ^^^^^^^  ^^^^^^^^
+
+warning: unused import: `Stream`
+  --> src\proxy\server.rs:18:34
+   |
+18 | use futures::stream::{StreamExt, Stream};
+   |                                  ^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\balance_tracker.rs:1:5
+  |
+1 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `error`, `info`, and `warn`
+ --> src\services\balance_tracker.rs:5:15
+  |
+5 | use tracing::{info, warn, error};
+  |               ^^^^  ^^^^  ^^^^^
+
+warning: unused import: `AppError`
+ --> src\services\balance_tracker.rs:9:20
+  |
+9 | use crate::error::{AppError, AppResult};
+  |                    ^^^^^^^^
+
+warning: unused import: `ProviderCategory`
+ --> src\services\provider.rs:2:47
+  |
+2 | use crate::models::{ProviderConfig, Platform, ProviderCategory};
+  |                                               ^^^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\mcp.rs:6:5
+  |
+6 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\prompts.rs:5:5
+  |
+5 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `KeyStatus`
+ --> src\services\alert.rs:2:44
+  |
+2 | use crate::models::{AlertItem, AlertLevel, KeyStatus};
+  |                                            ^^^^^^^^^
+
+warning: unused import: `rusqlite::params`
+ --> src\services\alert.rs:4:5
+  |
+4 | use rusqlite::params;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `warn`
+ --> src\services\skill.rs:5:21
+  |
+5 | use tracing::{info, warn, error};
+  |                     ^^^^
+
+warning: unused import: `debug`
+ --> src\services\ide_injector.rs:9:21
+  |
+9 | use tracing::{info, debug};
+  |                     ^^^^^
+
+warning: unused import: `models::ApiKey`
+ --> src\store.rs:1:13
+  |
+1 | use crate::{models::ApiKey, AppError, AppResult};
+  |             ^^^^^^^^^^^^^^
+
+warning: unused imports: `AeadCore`, `Aead`, `Aes256Gcm`, `Nonce`, and `OsRng`
+ --> src\store.rs:3:12
+  |
+3 |     aead::{Aead, AeadCore, KeyInit, OsRng},
+  |            ^^^^  ^^^^^^^^           ^^^^^
+4 |     Aes256Gcm, Nonce,
+  |     ^^^^^^^^^  ^^^^^
+
+warning: unused imports: `Engine` and `engine::general_purpose::STANDARD`
+ --> src\store.rs:6:14
+  |
+6 | use base64::{engine::general_purpose::STANDARD, Engine};
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^
+
+warning: use of deprecated type alias `std::panic::PanicInfo`: use `PanicHookInfo` instead
+ --> src\panic_hook.rs:5:17
+  |
+5 | use std::panic::PanicInfo;
+  |                 ^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated type alias `std::panic::PanicInfo`: use `PanicHookInfo` instead
+  --> src\panic_hook.rs:12:54
+   |
+12 |     std::panic::set_hook(Box::new(move |panic_info: &PanicInfo<'_>| {
+   |                                                      ^^^^^^^^^
+
+warning: unused variable: `db`
+  --> src\commands\proxy.rs:21:5
+   |
+21 |     db: State<'_, Database>,
+   |     ^^ help: if this is intentional, prefix it with an underscore: `_db`
+   |
+   = note: `#[warn(unused_variables)]` on by default
+
+error[E0308]: mismatched types
+   --> src\proxy\server.rs:366:35
+    |
+366 |     let mut es = EventSource::new(req)?;
+    |                  ---------------- ^^^ expected `RequestBuilder`, found `Request`
+    |                  |
+    |                  arguments to this function are incorrect
+    |
+note: associated function defined here
+   --> C:\Users\bardl\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\reqwest-eventsource-0.6.0\src\event_source.rs:68:12
+    |
+ 68 |     pub fn new(builder: RequestBuilder) -> Result<Self, CannotCloneRequestError> {
+    |            ^^^
+
+error[E0308]: mismatched types
+   --> src\proxy\server.rs:433:35
+    |
+433 |     let mut es = EventSource::new(req)?;
+    |                  ---------------- ^^^ expected `RequestBuilder`, found `Request`
+    |                  |
+    |                  arguments to this function are incorrect
+    |
+note: associated function defined here
+   --> C:\Users\bardl\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\reqwest-eventsource-0.6.0\src\event_source.rs:68:12
+    |
+ 68 |     pub fn new(builder: RequestBuilder) -> Result<Self, CannotCloneRequestError> {
+    |            ^^^
+
+warning: unused import: `KeyInit`
+ --> src\store.rs:3:28
+  |
+3 |     aead::{Aead, AeadCore, KeyInit, OsRng},
+  |                            ^^^^^^^
+
+Some errors have detailed explanations: E0308, E0432, E0433.
+For more information about an error, try `rustc --explain E0308`.
+warning: `ai-singularity` (lib) generated 20 warnings
+error: could not compile `ai-singularity` (lib) due to 6 previous errors; 20 warnings emitted

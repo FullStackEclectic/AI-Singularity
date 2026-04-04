@@ -24,20 +24,21 @@ pub struct UpdateKeyRequest {
     pub name: Option<String>,
     pub secret: Option<String>,
     pub notes: Option<String>,
+    pub priority: Option<i64>,
 }
 
 /// 获取所有 Key 列表（不含 secret）
 #[tauri::command]
 pub async fn list_keys(db: State<'_, Database>) -> Result<Vec<ApiKey>, AppError> {
-    type Row = (String, String, String, Option<String>, String, String, Option<String>, String, Option<String>);
+    type Row = (String, String, String, Option<String>, String, String, Option<String>, String, Option<String>, i64);
     let rows: Vec<Row> = db.query_rows(
-        "SELECT id, name, platform, base_url, key_preview, status, notes, created_at, last_checked_at
-         FROM api_keys ORDER BY created_at DESC",
+        "SELECT id, name, platform, base_url, key_preview, status, notes, created_at, last_checked_at, COALESCE(priority, 100)
+         FROM api_keys ORDER BY priority DESC, created_at DESC",
         &[],
-        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?)),
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?, row.get(8)?, row.get(9)?)),
     )?;
 
-    Ok(rows.into_iter().map(|(id, name, platform_str, base_url, key_preview, status_str, notes, created_at, last_checked_at)| {
+    Ok(rows.into_iter().map(|(id, name, platform_str, base_url, key_preview, status_str, notes, created_at, last_checked_at, priority)| {
         ApiKey {
             id, name,
             platform: serde_json::from_str::<Platform>(&format!("\"{}\"", platform_str)).unwrap_or(Platform::Custom),
@@ -46,6 +47,7 @@ pub async fn list_keys(db: State<'_, Database>) -> Result<Vec<ApiKey>, AppError>
             notes,
             created_at: created_at.parse().unwrap_or_else(|_| Utc::now()),
             last_checked_at: last_checked_at.and_then(|s| s.parse().ok()),
+            priority,
         }
     }).collect())
 }
@@ -74,7 +76,7 @@ pub async fn add_key(db: State<'_, Database>, request: AddKeyRequest) -> Result<
     Ok(ApiKey {
         id, name: request.name, platform: request.platform, base_url: request.base_url,
         key_preview: preview, status: KeyStatus::Unknown, notes: request.notes,
-        created_at: now, last_checked_at: None,
+        created_at: now, last_checked_at: None, priority: 100,
     })
 }
 
@@ -99,6 +101,9 @@ pub async fn update_key(db: State<'_, Database>, request: UpdateKeyRequest) -> R
     }
     if let Some(ref notes) = request.notes {
         db.execute("UPDATE api_keys SET notes = ?1 WHERE id = ?2", &[notes, &request.id])?;
+    }
+    if let Some(priority) = request.priority {
+        db.execute("UPDATE api_keys SET priority = ?1 WHERE id = ?2", &[&priority, &request.id])?;
     }
     Ok(())
 }

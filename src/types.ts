@@ -152,6 +152,20 @@ export interface ApiKey {
   notes?: string;
   created_at: string;
   last_checked_at?: string;
+  /** 轮询优先级：数值越大越优先（默认100） */
+  priority: number;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Token 用量统计
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface TokenUsageStat {
+  /** 分组名（client_app 或 model_name） */
+  name: string;
+  total_tokens: number;
+  prompt_tokens: number;
+  completion_tokens: number;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -226,4 +240,51 @@ export interface Model {
   input_price_per_1m?: number;
   output_price_per_1m?: number;
   is_available: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Environment Conflict Scan
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface EnvConflict {
+  varName: string;
+  varValue: string;
+  sourceType: string;
+  sourcePath: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// IDE 账号兵工厂 (降维池化指纹)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface DeviceProfile {
+  machine_id: string;
+  mac_machine_id: string;
+  dev_device_id: string;
+  sqm_id: string;
+}
+
+export type AccountStatus = "active" | "expired" | "forbidden" | "rate_limited" | "unknown";
+
+export interface OAuthToken {
+  access_token: string;
+  refresh_token: string;
+  expires_in: number;
+  token_type: string;
+  updated_at: string;
+}
+
+export interface IdeAccount {
+  id: string;
+  email: string;
+  origin_platform: string;
+  token: OAuthToken;
+  status: AccountStatus;
+  disabled_reason?: string;
+  is_proxy_disabled: boolean;
+  device_profile?: DeviceProfile;
+  quota_json?: string;
+  created_at: string;
+  updated_at: string;
+  last_used: string;
 }

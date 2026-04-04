@@ -164,3 +164,42 @@
   padding: var(--space-2) var(--space-3);
   font-size: 13px;
 }
+
+/* 优先级行 */
+.key-priority-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.priority-badge {
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  padding: 1px var(--space-2);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.priority-badge:hover {
+  background: var(--color-accent-dim);
+  border-color: var(--color-accent);
+}
+
+.priority-input {
+  width: 64px;
+  background: var(--color-bg-active);
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: var(--color-accent);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  padding: 1px var(--space-2);
+  outline: none;
+  text-align: center;
+}

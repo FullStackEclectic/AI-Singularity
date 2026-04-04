@@ -27,3 +27,9 @@ pub fn sync_prompt(db: State<'_, Database>, id: String, workspace_dir: String) -
     let service = PromptService::new(&db);
     service.sync_prompt_to_workspace(&id, &workspace_dir)
 }
+
+#[tauri::command]
+pub fn sync_prompt_to_tool(db: State<'_, Database>, id: String) -> AppResult<Vec<String>> {
+    let service = PromptService::new(&db);
+    service.sync_to_tool_defaults(&id)
+}

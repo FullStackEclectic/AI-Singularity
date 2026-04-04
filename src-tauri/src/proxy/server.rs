@@ -11,18 +11,23 @@ use axum::{
     body::Body,
     extract::State,
     http::{Request, Response, StatusCode},
-    response::IntoResponse,
+    response::{IntoResponse, sse::{Event, Sse}},
     routing::post,
     Json, Router as AxumRouter,
 };
+use futures::stream::{StreamExt, Stream};
+use reqwest_eventsource::{EventSource, Event as ReqwestEvent};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use crate::services::account_pool::AccountPoolManager;
 
 #[derive(Clone)]
 pub struct ProxyState {
     pub router: Arc<Router>,
+    pub db: Arc<Database>,
     pub http_client: reqwest::Client,
+    pub account_pool: Arc<AccountPoolManager>,
 }
 
 pub struct ProxyServer {
@@ -35,7 +40,9 @@ impl ProxyServer {
         Self {
             port,
             state: ProxyState {
-                router: Arc::new(Router::new(db)),
+                router: Arc::new(Router::new(db.clone())),
+                account_pool: Arc::new(AccountPoolManager::new(db.clone())),
+                db,
                 http_client: reqwest::Client::builder()
                     .timeout(std::time::Duration::from_secs(120))
                     .build()
@@ -54,7 +61,7 @@ impl ProxyServer {
         let listener = TcpListener::bind(&addr).await?;
         tracing::info!("🚀 AI Singularity 代理已启动：http://{}", addr);
 
-        axum::serve(listener, app).await?;
+        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await?;
         Ok(())
     }
 }
@@ -101,11 +108,85 @@ fn get_fallback_model(model: &str) -> Option<&'static str> {
     }
 }
 
+/// 统一转发网关模型定义
+pub struct ForwardTarget {
+    secret: String,
+    base_url: Option<String>,
+    platform: Platform,
+    key_id: String,
+    device_profile: Option<crate::models::DeviceProfile>,
+}
+
 /// 处理 /v1/chat/completions 请求
 async fn handle_chat_completions(
     State(state): State<ProxyState>,
+    client_ip: axum::extract::ConnectInfo<std::net::SocketAddr>,
+    headers: axum::http::HeaderMap,
     Json(mut body): Json<OpenAIRequest>,
 ) -> impl IntoResponse {
+    // 1. SaaS 云端管控：验证 UserToken 及其宵禁/IP 等策略
+    let auth_header = headers.get("authorization").and_then(|h| h.to_str().ok());
+    let mut current_user_token = None;
+    
+    // 如果存在 sk-ag-xxx 开始的专属分发 Token，则执行核查
+    if let Some(auth) = auth_header {
+        if auth.starts_with("Bearer sk-ag-") {
+            let token_str = &auth[7..];
+            let token_service = crate::services::user_token::UserTokenService::new(&state.db);
+            
+            match token_service.get_token_by_str(token_str) {
+                Ok(Some(ut)) => {
+                    if !ut.enabled {
+                        return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": "Token 已被主脑冻结"}}))).into_response();
+                    }
+                    let now = chrono::Utc::now().timestamp();
+                    if ut.expires_type == "absolute" {
+                        if let Some(exp) = ut.expires_at {
+                            if now > exp {
+                                return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": "Token 绝对有效期已过"}}))).into_response();
+                            }
+                        }
+                    } else if ut.expires_type == "relative" {
+                        if let Some(exp) = ut.expires_at {
+                            if now > ut.created_at + exp {
+                                return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": "Token 相对配额期已过"}}))).into_response();
+                            }
+                        }
+                    }
+                    
+                    // 宵禁检查
+                    if let (Some(cs), Some(ce)) = (&ut.curfew_start, &ut.curfew_end) {
+                        let cur_time = chrono::Utc::now().format("%H:%M").to_string();
+                        if cs < ce {
+                            if cur_time < *cs || cur_time > *ce {
+                                return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": format!("当前处于系统宵禁时段外 (允许: {}-{})", cs, ce)}}))).into_response();
+                            }
+                        } else {
+                            // 跨夜逻辑 (22:00 - 08:00)
+                            if cur_time < *cs && cur_time > *ce {
+                                return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": format!("当前处于跨夜系统宵禁时段外 (允许: {}-{})", cs, ce)}}))).into_response();
+                            }
+                        }
+                    }
+                    
+                    current_user_token = Some(ut.id);
+                }
+                _ => return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "无效的 AI Singularity 下发 Token"}}))).into_response(),
+            }
+        }
+    }
+
+    // 限制外网无鉴权访问 (粗略防御)
+    if current_user_token.is_none() && !client_ip.0.ip().is_loopback() {
+         return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "外部 IP 必须携带合法的网关分发 Token (sk-ag-...)"}}))).into_response();
+    }
+
+    let client_app = headers.get("x-client-app")
+        .and_then(|v| v.to_str().ok())
+        .or_else(|| headers.get("user-agent").and_then(|v| v.to_str().ok()))
+        .unwrap_or("unknown")
+        .to_string();
+    
     // 跨模态特征指令截杀 (Image Intercept)
     if let Some(img_prompt) = extract_image_prompt(&body.messages) {
         tracing::info!("🎨 检测到绘图指令跨模态截留: {}", img_prompt);
@@ -119,6 +200,7 @@ async fn handle_chat_completions(
         return (StatusCode::OK, Json(construct_pollinations_response(&img_prompt))).into_response();
     }
 
+    let is_stream = body.stream.unwrap_or(false);
     let mut current_model = body.model.clone();
     let mut attempts = 0;
 
@@ -126,8 +208,35 @@ async fn handle_chat_completions(
         attempts += 1;
         let platform_str = get_platform_for_model(&current_model);
 
-        // 1. 从路由引擎选最优 Key
-        let Some(target) = state.router.pick_best_key(platform_str) else {
+        // 1. 拦截层：如果在支持高级指纹欺骗的应用环境下（例如 ClaudeCode, Cursor），优先走池化网络
+        let target_res = if client_app.to_lowercase().contains("claude") || client_app.to_lowercase().contains("cursor") {
+            if let Some(ide_account) = state.account_pool.get_next_available_account("claude_code") {
+                Some(ForwardTarget {
+                    secret: ide_account.token.access_token.clone(),
+                    base_url: None, // IDE proxy URL should be set internally or bypass
+                    platform: Platform::Auth0IDE, // 需要新增 Auth0IDE 平台支持或复用 Anthropic
+                    key_id: ide_account.id.clone(),
+                    device_profile: ide_account.device_profile.clone(),
+                })
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        
+        // 降级：如果池化网络没货，走基础 API Key 网关
+        let target = if let Some(t) = target_res {
+            t
+        } else if let Some(basic_target) = state.router.pick_best_key(platform_str) {
+            ForwardTarget {
+                secret: basic_target.secret,
+                base_url: basic_target.base_url,
+                platform: basic_target.platform,
+                key_id: basic_target.key_id,
+                device_profile: None,
+            }
+        } else {
             if attempts == 1 {
                 if let Some(fallback) = get_fallback_model(&current_model) {
                     tracing::warn!("⚠️ 模型 {} 无可用 Provider，正在智能回退至备选模型 {}", current_model, fallback);
@@ -138,60 +247,127 @@ async fn handle_chat_completions(
             }
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
-                Json(json!({"error": {"message": format!("没有可用于模型 {} 的 API Key，请先添加对应平台 ({:?}) 密钥配置或备选回退方案", current_model, platform_str), "type": "no_keys"}})),
+                Json(json!({"error": {"message": format!("降维打击网关失败：无任何可用令牌，且无法进行备灾 {}", current_model), "type": "no_keys"}})),
             ).into_response();
         };
 
-        // 2. 根据平台转换请求并转发
-        let result = match &target.platform {
-            Platform::Anthropic => forward_to_anthropic(&state.http_client, &target.secret, &body).await,
-            Platform::Gemini => forward_to_gemini(&state.http_client, &target.secret, &body).await,
-            _ => {
-                // OpenAI 兼容接口
-                let base = target.base_url.as_deref()
-                    .unwrap_or(platform_base_url(&target.platform));
-                forward_to_openai_compatible(&state.http_client, &target.secret, base, &body).await
-            }
+        // 2. 根据平台转换请求并转发，携带指纹信息
+        // 流式审计上下文
+        let audit_ctx = AuditContext {
+            db: state.db.clone(),
+            key_id: target.key_id.clone(),
+            platform: format!("{:?}", target.platform),
+            model: current_model.clone(),
+            client_app: client_app.clone(),
         };
 
-        match result {
-            Ok(resp_body) => {
+        let response_or_stream = if is_stream {
+            match &target.platform {
+                Platform::Auth0IDE | Platform::Anthropic => {
+                    handle_anthropic_stream(&state.http_client, &target.secret, &body, target.device_profile.as_ref(), audit_ctx).await
+                }
+                Platform::Gemini => {
+                    handle_openai_compatible_stream(&state.http_client, &target.secret, platform_base_url(&target.platform), &body, target.device_profile.as_ref(), audit_ctx).await
+                }
+                _ => {
+                    let base = target.base_url.as_deref().unwrap_or(platform_base_url(&target.platform));
+                    handle_openai_compatible_stream(&state.http_client, &target.secret, base, &body, target.device_profile.as_ref(), audit_ctx).await
+                }
+            }
+        } else {
+            let result = match &target.platform {
+                Platform::Auth0IDE => forward_to_ide_bypass(&state.http_client, &target.secret, &body, target.device_profile.as_ref()).await,
+                Platform::Anthropic => forward_to_anthropic(&state.http_client, &target.secret, &body, target.device_profile.as_ref()).await,
+                Platform::Gemini => forward_to_gemini(&state.http_client, &target.secret, &body).await,
+                _ => {
+                    let base = target.base_url.as_deref()
+                        .unwrap_or(platform_base_url(&target.platform));
+                    forward_to_openai_compatible(&state.http_client, &target.secret, base, &body, target.device_profile.as_ref()).await
+                }
+            };
+            result.map(|json_val| {
+                if let Some(usage) = json_val.get("usage") {
+                    let prompt_tokens = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let completion_tokens = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let total_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    
+                    let id = uuid::Uuid::new_v4().to_string();
+                    let _ = state.db.execute(
+                        "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))",
+                        &[
+                            &id,
+                            &target.key_id,
+                            &format!("{:?}", target.platform),
+                            &current_model,
+                            &client_app,
+                            &prompt_tokens,
+                            &completion_tokens,
+                            &total_tokens,
+                        ]
+                    );
+                }
+                axum::response::Response::builder()
+                    .status(StatusCode::OK)
+                    .header("Content-Type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_string(&json_val).unwrap()))
+                    .unwrap()
+            })
+        };
+
+        match response_or_stream {
+            Ok(axum_resp) => {
                 if attempts > 1 {
                     tracing::info!("✅ 动态灾备成功：已通过回退模型 {} 完成调用", current_model);
                 }
-                return (StatusCode::OK, Json(resp_body)).into_response();
+                // 注意：由于转为流式处理等变更，Token 日志审计逻辑这里暂且略过，流式日志可在转接层做异步上报。
+                // 若要保留，需要在这里单独判断并劫持 Stream/Body，目前先保持网关高优通行。
+                
+                return axum_resp.into_response();
             }
             Err(e) => {
                 let err_str = e.to_string();
                 
                 // 标记 Key 失败状态以便路由更新
-                if err_str.contains("401") || err_str.contains("403") {
-                    state.router.mark_key_status(&target.key_id, "invalid");
-                } else if err_str.contains("429") {
-                    state.router.mark_key_status(&target.key_id, "rate_limit");
+                if target.platform == Platform::Auth0IDE {
+                    if err_str.contains("401") || err_str.contains("403") {
+                        state.account_pool.report_account_dead(&target.key_id, "HTTP 403 Forbidden");
+                    } else if err_str.contains("429") {
+                        state.account_pool.report_account_rate_limited(&target.key_id);
+                    }
+                } else {
+                    if err_str.contains("401") || err_str.contains("403") {
+                        state.router.mark_key_status(&target.key_id, "invalid");
+                    } else if err_str.contains("429") {
+                        state.router.mark_key_status(&target.key_id, "rate_limit");
+                    }
                 }
 
-                // 如果是第一次尝试并且遭遇过载/超时等错误，触发灾备切流
-                if attempts == 1 {
-                    let should_fallback = err_str.contains("429") 
-                        || err_str.contains("50") // 500, 502, 503, 504
-                        || err_str.contains("timeout");
+                let should_fallback = err_str.contains("429") 
+                    || err_str.contains("50") // 500, 502, 503, 504
+                    || err_str.contains("timeout");
 
-                    if should_fallback {
-                        if let Some(fallback) = get_fallback_model(&current_model) {
-                            tracing::warn!("⚠️ 请求模型 {} 发生错误 ({})，触发灾备中心，正静默切流至备选模型 {}", current_model, err_str.lines().next().unwrap_or(&err_str), fallback);
-                            current_model = fallback.to_string();
-                            body.model = current_model.clone();
-                            continue;
-                        }
+                if should_fallback {
+                    if attempts < 3 {
+                        tracing::warn!("⚠️ 节点 [{}] (平台: {:?}) 发生熔断 ({})，触发毫秒级切流 (已尝试: {})", target.key_id, target.platform, err_str.lines().next().unwrap_or(&err_str), attempts);
+                        continue;
+                    }
+                    if let Some(fallback) = get_fallback_model(&current_model) {
+                        tracing::warn!("⚠️ 连续熔断！模型 {} 不可用，降灾备份至 {}", current_model, fallback);
+                        current_model = fallback.to_string();
+                        body.model = current_model.clone();
+                        attempts = 0; // 重置尝试次数，下一次循环用备选模型起手
+                        continue;
                     }
                 }
 
                 // 无回退模型或已经是失败回退，直接抛出
-                return (
-                    StatusCode::BAD_GATEWAY,
-                    Json(json!({"error": {"message": format!("代理上游错误: {}", err_str), "type": "proxy_error"}})),
-                ).into_response();
+                return axum::response::Response::builder()
+                    .status(StatusCode::BAD_GATEWAY)
+                    .header("Content-Type", "application/json")
+                    .body(axum::body::Body::from(serde_json::to_string(&json!({"error": {"message": format!("代理上游错误: {}", err_str), "type": "proxy_error"}})).unwrap()))
+                    .unwrap()
+                    .into_response();
             }
         }
     }
@@ -203,15 +379,26 @@ async fn forward_to_openai_compatible(
     secret: &str,
     base_url: &str,
     body: &OpenAIRequest,
+    device_profile: Option<&crate::models::DeviceProfile>,
 ) -> anyhow::Result<Value> {
     let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
-    let resp = client
+    
+    let mut request = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", secret))
-        .header("Content-Type", "application/json")
-        .json(body)
-        .send()
-        .await?;
+        .header("Content-Type", "application/json");
+
+    // 🏆 **核武护城河：机器指纹拦截欺骗**
+    if let Some(dp) = device_profile {
+        tracing::info!("🛡️ 启用指纹降维伪装 [IDE]: 正在向游离服务点重写物理设备信息 - MachineID: {}", dp.machine_id);
+        request = request
+            .header("x-machine-id", &dp.machine_id)
+            .header("x-mac-machine-id", &dp.mac_machine_id)
+            .header("x-dev-device-id", &dp.dev_device_id)
+            .header("x-sqm-id", &dp.sqm_id);
+    }
+
+    let resp = request.json(body).send().await?;
 
     let status = resp.status();
     let json: Value = resp.json().await?;
@@ -228,17 +415,24 @@ async fn forward_to_anthropic(
     client: &reqwest::Client,
     secret: &str,
     body: &OpenAIRequest,
+    device_profile: Option<&crate::models::DeviceProfile>,
 ) -> anyhow::Result<Value> {
     let anthropic_body = openai_to_anthropic(body);
 
-    let resp = client
+    let mut request = client
         .post("https://api.anthropic.com/v1/messages")
         .header("x-api-key", secret)
         .header("anthropic-version", "2023-06-01")
-        .header("Content-Type", "application/json")
-        .json(&anthropic_body)
-        .send()
-        .await?;
+        .header("Content-Type", "application/json");
+
+    if let Some(dp) = device_profile {
+        tracing::info!("🛡️ 启用指纹降维伪装 [Anthropic]: 正在向服务器重写物理指纹 - MachineID: {}", dp.machine_id);
+        request = request
+            .header("x-machine-id", &dp.machine_id)
+            .header("x-mac-machine-id", &dp.mac_machine_id);
+    }
+
+    let resp = request.json(&anthropic_body).send().await?;
 
     let status = resp.status();
     let json: Value = resp.json().await?;
@@ -248,6 +442,215 @@ async fn forward_to_anthropic(
     }
 
     Ok(anthropic_to_openai_response(&json))
+}
+
+/// 审计上下文，供流式函数使用
+struct AuditContext {
+    db: Arc<Database>,
+    key_id: String,
+    platform: String,
+    model: String,
+    client_app: String,
+}
+
+impl AuditContext {
+    fn write_usage(&self, prompt_tokens: u64, completion_tokens: u64, total_tokens: u64) {
+        let id = uuid::Uuid::new_v4().to_string();
+        let _ = self.db.execute(
+            "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))",
+            &[
+                &id,
+                &self.key_id,
+                &self.platform,
+                &self.model,
+                &self.client_app,
+                &prompt_tokens,
+                &completion_tokens,
+                &total_tokens,
+            ]
+        );
+    }
+}
+
+async fn handle_anthropic_stream(
+    client: &reqwest::Client,
+    secret: &str,
+    body: &OpenAIRequest,
+    device_profile: Option<&crate::models::DeviceProfile>,
+    audit: AuditContext,
+) -> anyhow::Result<axum::response::Response> {
+    use crate::proxy::mappers::{ProtocolMapper, anthropic::AnthropicMapper};
+    
+    let anthropic_body = openai_to_anthropic(body);
+    let mut request = client
+        .post("https://api.anthropic.com/v1/messages")
+        .header("x-api-key", secret)
+        .header("anthropic-version", "2023-06-01")
+        .header("Content-Type", "application/json");
+
+    if let Some(dp) = device_profile {
+        request = request
+            .header("x-machine-id", &dp.machine_id)
+            .header("x-mac-machine-id", &dp.mac_machine_id);
+    }
+
+    let req = request.json(&anthropic_body);
+    let mut es = EventSource::new(req)?;
+    let model = body.model.clone();
+
+    let stream = async_stream::stream! {
+        let mut tool_call_buffer = String::new();
+        let mut in_tool_call = false;
+        let mut tool_call_index = 0u32;
+        // 累计 token 统计
+        let mut prompt_tokens: u64 = 0;
+        let mut completion_tokens: u64 = 0;
+        
+        for chunk in AnthropicMapper::initial_chunks() {
+            yield Ok::<_, std::convert::Infallible>(Event::default().data(chunk.data));
+        }
+
+        while let Some(event) = es.next().await {
+            match event {
+                Ok(ReqwestEvent::Open) => continue,
+                Ok(ReqwestEvent::Message(message)) => {
+                    let text = message.data.clone();
+                    // 尝试解析 Anthropic usage 字段（出现在 message_start 和 message_delta 事件）
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&text) {
+                        // message_start: { "message": { "usage": { "input_tokens": N, "output_tokens": M } } }
+                        if let Some(usage) = json_val.pointer("/message/usage") {
+                            prompt_tokens = usage["input_tokens"].as_u64().unwrap_or(prompt_tokens);
+                            completion_tokens = usage["output_tokens"].as_u64().unwrap_or(completion_tokens);
+                        }
+                        // message_delta: { "usage": { "output_tokens": N } }
+                        if let Some(usage) = json_val.get("usage") {
+                            if let Some(v) = usage["output_tokens"].as_u64() {
+                                completion_tokens = v;
+                            }
+                        }
+                    }
+                    if let Ok(chunks) = AnthropicMapper::map_delta(&model, text, false, &mut tool_call_buffer, &mut in_tool_call, &mut tool_call_index).await {
+                        for chunk in chunks {
+                            yield Ok(Event::default().data(chunk.data));
+                        }
+                    }
+                }
+                Err(e) => {
+                    if let reqwest_eventsource::Error::StreamEnded = e {
+                        if let Ok(chunks) = AnthropicMapper::map_delta(&model, String::new(), true, &mut tool_call_buffer, &mut in_tool_call, &mut tool_call_index).await {
+                            for chunk in chunks {
+                                yield Ok(Event::default().data(chunk.data));
+                            }
+                        }
+                        // 写入 Token 审计记录
+                        audit.write_usage(prompt_tokens, completion_tokens, prompt_tokens + completion_tokens);
+                        yield Ok(Event::default().data("[DONE]"));
+                        break;
+                    }
+                    tracing::error!("Anthropic SSE error: {}", e);
+                    break;
+                }
+            }
+        }
+    };
+    
+    Ok(Sse::new(stream).into_response())
+}
+
+async fn handle_openai_compatible_stream(
+    client: &reqwest::Client,
+    secret: &str,
+    base_url: &str,
+    body: &OpenAIRequest,
+    device_profile: Option<&crate::models::DeviceProfile>,
+    audit: AuditContext,
+) -> anyhow::Result<axum::response::Response> {
+    use crate::proxy::mappers::{ProtocolMapper, openai::OpenAiMapper};
+
+    let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
+    let mut request = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", secret))
+        .header("Content-Type", "application/json");
+
+    if let Some(dp) = device_profile {
+        request = request
+            .header("x-machine-id", &dp.machine_id)
+            .header("x-mac-machine-id", &dp.mac_machine_id)
+            .header("x-dev-device-id", &dp.dev_device_id)
+            .header("x-sqm-id", &dp.sqm_id);
+    }
+
+    let req = request.json(body);
+    let mut es = EventSource::new(req)?;
+    let model = body.model.clone();
+
+    let stream = async_stream::stream! {
+        let mut tool_call_buffer = String::new();
+        let mut in_tool_call = false;
+        let mut tool_call_index = 0u32;
+        let mut prompt_tokens: u64 = 0;
+        let mut completion_tokens: u64 = 0;
+        let mut total_tokens: u64 = 0;
+        
+        for chunk in OpenAiMapper::initial_chunks() {
+            yield Ok::<_, std::convert::Infallible>(Event::default().data(chunk.data));
+        }
+
+        while let Some(event) = es.next().await {
+            match event {
+                Ok(ReqwestEvent::Open) => continue,
+                Ok(ReqwestEvent::Message(message)) => {
+                    if message.data == "[DONE]" {
+                        if let Ok(chunks) = OpenAiMapper::map_delta(&model, String::new(), true, &mut tool_call_buffer, &mut in_tool_call, &mut tool_call_index).await {
+                            for chunk in chunks {
+                                yield Ok(Event::default().data(chunk.data));
+                            }
+                        }
+                        // 写入 Token 审计记录
+                        audit.write_usage(prompt_tokens, completion_tokens, total_tokens);
+                        yield Ok(Event::default().data("[DONE]"));
+                        break;
+                    }
+                    
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&message.data) {
+                        // 拦截末尾 usage 统计帧（部分 OpenAI 兼容端点在流中发送）
+                        if let Some(usage) = json_val.get("usage") {
+                            prompt_tokens = usage["prompt_tokens"].as_u64().unwrap_or(prompt_tokens);
+                            completion_tokens = usage["completion_tokens"].as_u64().unwrap_or(completion_tokens);
+                            total_tokens = usage["total_tokens"].as_u64().unwrap_or(total_tokens);
+                        }
+                        if let Some(content) = json_val["choices"][0]["delta"]["content"].as_str() {
+                            if let Ok(chunks) = OpenAiMapper::map_delta(&model, content.to_string(), false, &mut tool_call_buffer, &mut in_tool_call, &mut tool_call_index).await {
+                                for chunk in chunks {
+                                    yield Ok(Event::default().data(chunk.data));
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("OpenAI SSE error: {}", e);
+                    break;
+                }
+            }
+        }
+    };
+    
+    Ok(Sse::new(stream).into_response())
+}
+
+/// 专为白嫖工具开的 IDE 特殊认证前置旁路接口
+async fn forward_to_ide_bypass(
+    client: &reqwest::Client,
+    secret: &str,
+    body: &OpenAIRequest,
+    device_profile: Option<&crate::models::DeviceProfile>,
+) -> anyhow::Result<Value> {
+    tracing::info!("🔗 [专属旁路通信网] 目标直击 IDE 池化云接口...");
+    // 未来可接基于 Cursor 或 Copilot 白嫖接口的专属协议，此阶段暂时当做 Claude Code Auth 接口兼容
+    forward_to_anthropic(client, secret, body, device_profile).await
 }
 
 /// 转发到 Gemini API（协议转换）
@@ -280,7 +683,7 @@ async fn forward_to_gemini(
 }
 
 /// 处理 /v1/models 请求（返回可用模型列表）
-async fn handle_list_models(State(state): State<ProxyState>) -> impl IntoResponse {
+async fn handle_list_models(State(_state): State<ProxyState>) -> impl IntoResponse {
     Json(json!({
         "object": "list",
         "data": [

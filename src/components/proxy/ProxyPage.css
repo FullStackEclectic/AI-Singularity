@@ -1,132 +1,330 @@
-.proxy-page { height: 100%; display: flex; flex-direction: column; }
+/* Cyberpunk Theme Base */
+.proxy-page.cyberpunk-theme {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: #050510;
+  color: #e0e0e0;
+  font-family: var(--font-mono);
+  overflow: hidden;
+}
+
+.page-header {
+  padding: var(--space-6) var(--space-8);
+  border-bottom: 1px solid rgba(0, 255, 170, 0.2);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: linear-gradient(to bottom, rgba(0,255,170,0.05), transparent);
+}
+
+.cyber-title {
+  font-size: 28px;
+  font-weight: 800;
+  margin-bottom: var(--space-2);
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  letter-spacing: 2px;
+}
+
+.cyber-glitch {
+  color: #00ffaa;
+  text-shadow: 0 0 10px rgba(0, 255, 170, 0.5);
+  position: relative;
+}
+
+.cyber-sub {
+  font-size: 14px;
+  color: #0ff;
+  opacity: 0.8;
+  font-weight: 400;
+}
+
+.glow-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 13px;
+  letter-spacing: 0.5px;
+}
 
 .proxy-status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border: 1px dashed rgba(0, 255, 170, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.radar-ping {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background-color: #ff3366;
+  box-shadow: 0 0 8px #ff3366;
+}
+
+.radar-ping.active {
+  background-color: #00ffaa;
+  box-shadow: 0 0 12px #00ffaa, 0 0 20px #00ffaa;
+  animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping {
+  75%, 100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
+.cyber-status-text {
+  color: #aaa;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+.radar-ping.active + .cyber-status-text {
+  color: #00ffaa;
+}
+
+/* Body and Layout */
+.proxy-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-6) var(--space-8);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.cyber-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-6);
+}
+
+/* Cards */
+.cyber-card {
+  background: rgba(10, 15, 25, 0.8);
+  border: 1px solid rgba(0, 255, 255, 0.2);
+  border-radius: 0;
+  padding: var(--space-5);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0,255,170,0.02);
+  position: relative;
+}
+
+.cyber-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0;
+  width: 10px; height: 100%;
+  background: rgba(0, 255, 170, 0.1);
+  border-left: 2px solid #00ffaa;
+}
+
+.cyber-section-title {
+  font-size: 14px;
+  color: #0ff;
+  margin-bottom: var(--space-4);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
   display: flex;
   align-items: center;
   gap: var(--space-2);
 }
 
-.proxy-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: var(--space-6) var(--space-8);
+.pulse-dot {
+  width: 8px; height: 8px;
+  background: #ff00ff;
+  border-radius: 50%;
+  box-shadow: 0 0 8px #ff00ff;
 }
 
-/* 控制卡片 */
-.proxy-control-card {
+/* Controls */
+.cyber-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--space-5);
+}
+
+.cyber-btn {
+  background: transparent;
+  color: #ff3366;
+  border: 1px solid #ff3366;
+  padding: var(--space-2) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: all 0.2s;
+  text-shadow: 0 0 5px rgba(255, 51, 102, 0.5);
+  box-shadow: inset 0 0 10px rgba(255, 51, 102, 0.1);
+}
+
+.cyber-btn:hover {
+  background: rgba(255, 51, 102, 0.1);
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.4), inset 0 0 10px rgba(255, 51, 102, 0.2);
+}
+
+.cyber-btn.active {
+  color: #00ffaa;
+  border-color: #00ffaa;
+  text-shadow: 0 0 5px rgba(0, 255, 170, 0.5);
+  box-shadow: inset 0 0 10px rgba(0, 255, 170, 0.1);
+}
+
+.cyber-btn.active:hover {
+  background: rgba(0, 255, 170, 0.1);
+  box-shadow: 0 0 15px rgba(0, 255, 170, 0.4), inset 0 0 10px rgba(0, 255, 170, 0.2);
+}
+
+.btn-icon { font-size: 16px; }
+
+.cyber-endpoint-box {
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(0, 255, 170, 0.3);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-5);
-}
-
-.proxy-control-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.proxy-control-title {
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--color-text-primary);
-  margin-bottom: var(--space-1);
-}
-
-.proxy-control-sub {
+  gap: var(--space-3);
   font-size: 13px;
 }
 
-.proxy-toggle-btn {
-  flex-shrink: 0;
-  padding: var(--space-2) var(--space-5);
-}
+.endpoint-label { color: rgba(255, 255, 255, 0.5); }
 
-/* 端点地址 */
-.proxy-endpoint {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-}
-
-.proxy-endpoint-label {
-  font-size: 12px;
-  margin-bottom: var(--space-2);
-}
-
-.proxy-endpoint-row {
+.endpoint-code-row {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
   justify-content: space-between;
+  align-items: center;
+  background: #020205;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid #333;
 }
 
-.proxy-endpoint-url {
-  font-size: 14px;
-  color: var(--color-accent);
+.endpoint-url { color: #00ffaa; font-size: 14px; }
+
+.cyber-icon-btn {
   background: none;
   border: none;
-  user-select: text;
-}
-
-/* 端口设置 */
-.proxy-port-row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.proxy-port-input {
-  width: 100px;
-  text-align: center;
+  color: #0ff;
+  cursor: pointer;
   font-family: var(--font-mono);
+  font-size: 12px;
 }
 
-/* 使用说明 */
-.proxy-usage-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-4);
-}
+.cyber-icon-btn:hover { text-shadow: 0 0 8px #0ff; }
 
-.proxy-usage-item {
-  background: var(--color-bg-primary);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-}
-
-.proxy-usage-icon { font-size: 20px; margin-bottom: var(--space-2); }
-
-.proxy-usage-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  margin-bottom: var(--space-2);
-}
-
-.proxy-usage-code {
-  display: block;
-  font-size: 11px;
-  color: var(--color-accent);
-  background: var(--color-bg-active);
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
-  word-break: break-all;
-  user-select: text;
-}
-
-/* 协议列表 */
-.protocol-list { display: flex; flex-direction: column; gap: var(--space-2); }
-
-.protocol-item {
+.port-config {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
-  transition: background var(--transition-fast);
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: var(--space-2);
 }
 
-.protocol-item:hover { background: var(--color-bg-hover); }
+.cyber-input-mini {
+  background: #020205;
+  border: 1px solid #333;
+  color: #00ffaa;
+  padding: 4px 8px;
+  width: 80px;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.cyber-input-mini:disabled { color: #555; }
+
+/* Radar Monitoring */
+.radar-monitor {
+  display: flex;
+  gap: var(--space-6);
+  align-items: center;
+}
+
+.radar-circle {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 255, 170, 0.4);
+  position: relative;
+  background: repeating-radial-gradient(
+    rgba(0, 255, 170, 0.1) 0,
+    rgba(0, 255, 170, 0.1) 10px,
+    transparent 10px,
+    transparent 20px
+  );
+  overflow: hidden;
+}
+
+.radar-sweep {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 50%;
+  height: 50%;
+  background: linear-gradient(45deg, rgba(0, 255, 170, 0.8), transparent);
+  transform-origin: top left;
+  animation: sweep 4s linear infinite;
+}
+
+@keyframes sweep {
+  to { transform: rotate(360deg); }
+}
+
+.radar-blip {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 5px #fff, 0 0 10px #00ffaa;
+  top: 30%;
+  left: 60%;
+  animation: blink 2s infinite;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 1; }
+}
+
+.radar-stats { display: flex; flex-direction: column; gap: var(--space-3); font-size: 12px; }
+
+.stat-line { display: flex; justify-content: space-between; gap: var(--space-4); }
+
+.stat-label { color: rgba(255, 255, 255, 0.5); }
+.stat-val { color: #aaa; }
+.stat-val.highlight { color: #ff00ff; text-shadow: 0 0 5px rgba(255, 0, 255, 0.5); }
+.text-success { color: #00ffaa; }
+
+/* Protocols */
+.cyber-protocol-list { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.cyber-protocol-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(0, 255, 255, 0.1);
+}
+
+.protocol-flow { color: #fff; font-size: 13px; }
+
+.protocol-meta { display: flex; align-items: center; gap: var(--space-3); }
+
+.cyber-tag {
+  font-size: 10px;
+  color: #ff3366;
+  border: 1px solid rgba(255, 51, 102, 0.3);
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+
+.status-badge { font-size: 11px; font-weight: 600; padding: 2px 6px; }
+.status-badge.online { color: #00ffaa; background: rgba(0, 255, 170, 0.1); }
+.status-badge.standby { color: #888; background: rgba(255, 255, 255, 0.05); }

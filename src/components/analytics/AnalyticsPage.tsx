@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { api } from "../../lib/api";
-import type { BalanceSummary } from "../../types";
+import type { BalanceSummary, TokenUsageStat } from "../../types";
 import "./AnalyticsPage.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,6 +29,8 @@ export default function AnalyticsPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [tokenByApp, setTokenByApp] = useState<TokenUsageStat[]>([]);
+  const [tokenByModel, setTokenByModel] = useState<TokenUsageStat[]>([]);
 
   const loadSummaries = useCallback(async () => {
     setIsLoading(true);
@@ -79,6 +81,14 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => { loadSummaries(); }, []);
+
+  useEffect(() => {
+    // 加载 Token 用量统计数据
+    api.stats.getTokenUsage().then((data) => {
+      setTokenByApp(data.by_app ?? []);
+      setTokenByModel(data.by_model ?? []);
+    }).catch(() => {});
+  }, [lastRefresh]); // 每次刷新后重载
 
   useEffect(() => {
     if (selectedProvider) loadHistory(selectedProvider);
@@ -205,6 +215,29 @@ export default function AnalyticsPage() {
           </div>
         )}
       </div>
+
+      {/* ── Token 用量分析看板 ──────────────────────────── */}
+      {(tokenByApp.length > 0 || tokenByModel.length > 0) && (
+        <div className="analytics-token-section">
+          <div className="section-divider">
+            <span className="section-divider-label">Token 用量分析</span>
+          </div>
+          <div className="token-charts-row">
+            {tokenByApp.length > 0 && (
+              <div className="token-chart-card card">
+                <div className="panel-title">应用占比（按工具）</div>
+                <TokenPieChart data={tokenByApp} />
+              </div>
+            )}
+            {tokenByModel.length > 0 && (
+              <div className="token-chart-card card">
+                <div className="panel-title">模型用量对比</div>
+                <TokenBarChart data={tokenByModel} />
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -425,6 +458,118 @@ function BalanceTrendChart({
         <span className="text-muted">{history.length > 0 ? new Date(history[0].snapped_at).toLocaleDateString() : ""}</span>
         <span className="text-muted">{history.length > 0 ? new Date(history[history.length - 1].snapped_at).toLocaleDateString() : ""}</span>
       </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TokenPieChart — 应用消耗占比饼图（纯 SVG）
+// ─────────────────────────────────────────────────────────────────────────────
+
+const PIE_COLORS = [
+  "var(--color-accent)",
+  "#22d3ee",
+  "#a78bfa",
+  "#fb923c",
+  "#4ade80",
+  "#f472b6",
+  "#facc15",
+];
+
+function TokenPieChart({ data }: { data: TokenUsageStat[] }) {
+  if (data.length === 0) return null;
+  const total = data.reduce((s, d) => s + d.total_tokens, 0) || 1;
+
+  let cumulativeAngle = -Math.PI / 2; // 从顶部开始
+  const cx = 80; const cy = 80; const r = 70;
+
+  const slices = data.map((d, i) => {
+    const ratio = d.total_tokens / total;
+    const angle = ratio * 2 * Math.PI;
+    const startAngle = cumulativeAngle;
+    const endAngle = cumulativeAngle + angle;
+    cumulativeAngle = endAngle;
+
+    const x1 = cx + r * Math.cos(startAngle);
+    const y1 = cy + r * Math.sin(startAngle);
+    const x2 = cx + r * Math.cos(endAngle);
+    const y2 = cy + r * Math.sin(endAngle);
+    const largeArc = angle > Math.PI ? 1 : 0;
+
+    return {
+      path: `M ${cx} ${cy} L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`,
+      color: PIE_COLORS[i % PIE_COLORS.length],
+      label: d.name,
+      ratio,
+      tokens: d.total_tokens,
+    };
+  });
+
+  return (
+    <div className="token-pie-container">
+      <svg viewBox="0 0 160 160" width="160" height="160">
+        {slices.map((s, i) => (
+          <path key={i} d={s.path} fill={s.color} opacity={0.9} stroke="var(--color-surface)" strokeWidth={1}>
+            <title>{s.label}: {s.tokens.toLocaleString()} tokens ({(s.ratio * 100).toFixed(1)}%)</title>
+          </path>
+        ))}
+        {/* 中心挖空效果 */}
+        <circle cx={cx} cy={cy} r={32} fill="var(--color-surface)" />
+        <text x={cx} y={cy - 4} textAnchor="middle" fontSize={10} fill="var(--color-text-muted)">Total</text>
+        <text x={cx} y={cy + 10} textAnchor="middle" fontSize={9} fill="var(--color-text-primary)">
+          {total >= 1000000 ? `${(total / 1000000).toFixed(1)}M` : total >= 1000 ? `${(total / 1000).toFixed(0)}K` : total}
+        </text>
+      </svg>
+      <div className="pie-legend">
+        {slices.map((s, i) => (
+          <div key={i} className="pie-legend-item">
+            <span className="pie-legend-dot" style={{ background: s.color }} />
+            <span className="pie-legend-name text-muted">{s.label}</span>
+            <span className="pie-legend-pct">{(s.ratio * 100).toFixed(1)}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// TokenBarChart — 模型用量条形图（纯 SVG）
+// ─────────────────────────────────────────────────────────────────────────────
+
+function TokenBarChart({ data }: { data: TokenUsageStat[] }) {
+  if (data.length === 0) return null;
+  const sorted = [...data].sort((a, b) => b.total_tokens - a.total_tokens).slice(0, 8);
+  const maxVal = sorted[0]?.total_tokens || 1;
+
+  return (
+    <div className="token-bar-container">
+      {sorted.map((d, i) => {
+        const ratio = d.total_tokens / maxVal;
+        return (
+          <div key={i} className="token-bar-row">
+            <div className="token-bar-label text-muted" title={d.name}>
+              {d.name.length > 22 ? d.name.slice(0, 20) + "…" : d.name}
+            </div>
+            <div className="token-bar-track">
+              <div
+                className="token-bar-fill"
+                style={{
+                  width: `${ratio * 100}%`,
+                  background: PIE_COLORS[i % PIE_COLORS.length],
+                }}
+              />
+            </div>
+            <div className="token-bar-value">
+              {d.total_tokens >= 1000000
+                ? `${(d.total_tokens / 1000000).toFixed(2)}M`
+                : d.total_tokens >= 1000
+                ? `${(d.total_tokens / 1000).toFixed(1)}K`
+                : d.total_tokens}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }

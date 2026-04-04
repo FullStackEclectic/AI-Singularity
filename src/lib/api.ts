@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApiKey, Balance, BalanceSummary, DashboardStats, Platform, ProviderConfig, McpServer } from "../types";
+import type { ApiKey, Balance, BalanceSummary, DashboardStats, Platform, ProviderConfig, McpServer, EnvConflict, TokenUsageStat } from "../types";
 
 export interface AddKeyRequest {
   name: string;
@@ -11,14 +11,22 @@ export interface AddKeyRequest {
 
 export const api = {
   stats: {
-    getDashboard: (): Promise<DashboardStats> => invoke("get_dashboard_stats"),
+    getDashboard: (): Promise<DashboardStats>        => invoke("get_dashboard_stats"),
+    getTokenUsage: (): Promise<{ by_app: TokenUsageStat[]; by_model: TokenUsageStat[] }> =>
+      invoke("get_token_usage_stats"),
+  },
+
+  env: {
+    checkConflicts: (appName: string): Promise<EnvConflict[]> => invoke("check_system_env_conflicts", { appName }),
   },
 
   keys: {
-    list:   (): Promise<ApiKey[]>             => invoke("list_keys"),
-    add:    (req: AddKeyRequest): Promise<ApiKey> => invoke("add_key", { request: req }),
-    delete: (id: string): Promise<void>       => invoke("delete_key", { id }),
-    check:  (id: string)                      => invoke("check_key", { id }),
+    list:           (): Promise<ApiKey[]>              => invoke("list_keys"),
+    add:            (req: AddKeyRequest): Promise<ApiKey> => invoke("add_key", { request: req }),
+    delete:         (id: string): Promise<void>        => invoke("delete_key", { id }),
+    check:          (id: string)                       => invoke("check_key", { id }),
+    updatePriority: (id: string, priority: number): Promise<void> =>
+      invoke("update_key", { request: { id, priority } }),
   },
 
   balance: {
@@ -54,10 +62,11 @@ export const api = {
   },
 
   prompts: {
-    list:   (): Promise<any[]>                  => invoke("get_prompts"),
-    save:   (prompt: any): Promise<void>        => invoke("save_prompt", { prompt }),
-    delete: (id: string): Promise<void>         => invoke("delete_prompt", { id }),
-    sync:   (id: string, workspaceDir: string): Promise<void> => invoke("sync_prompt", { id, workspaceDir }),
+    list:       (): Promise<any[]>                  => invoke("get_prompts"),
+    save:       (prompt: any): Promise<void>        => invoke("save_prompt", { prompt }),
+    delete:     (id: string): Promise<void>         => invoke("delete_prompt", { id }),
+    sync:       (id: string, workspaceDir: string): Promise<void> => invoke("sync_prompt", { id, workspaceDir }),
+    syncToTool: (id: string): Promise<string[]>     => invoke("sync_prompt_to_tool", { id }),
   },
 
   alerts: {
@@ -66,5 +75,31 @@ export const api = {
 
   speedtest: {
     run: (): Promise<any[]>                     => invoke("run_speedtest"),
+  },
+
+  ideAccounts: {
+    list:   (): Promise<any[]>                  => invoke("get_all_ide_accounts"),
+    import: (accounts: any[]): Promise<number>  => invoke("import_ide_accounts", { accounts }),
+    delete: (id: string): Promise<number>       => invoke("delete_ide_account", { id }),
+    launchSandbox: (commandStr: string, proxyPort: number): Promise<void> => 
+      invoke("launch_tool_sandboxed", { commandStr, proxyPort }),
+    forceInject: (accountId: string): Promise<void> =>
+      invoke("force_inject_ide", { accountId }),
+  },
+
+  tools: {
+    checkStatus: (toolId: string): Promise<any> => invoke("check_tool_status", { toolId }),
+    deploy: (toolId: string): Promise<void> => invoke("deploy_tool", { toolId }),
+  },
+
+  userTokens: {
+    list:   (): Promise<any[]>                  => invoke("get_all_user_tokens"),
+    create: (req: any): Promise<any>            => invoke("create_user_token", { req }),
+    update: (req: any): Promise<void>           => invoke("update_user_token", { req }),
+    delete: (id: string): Promise<void>         => invoke("delete_user_token", { id }),
+  },
+
+  analytics: {
+    getDashboardMetrics: (days: number): Promise<any> => invoke("get_dashboard_metrics", { days }),
   },
 };

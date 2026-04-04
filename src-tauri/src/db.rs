@@ -1,11 +1,20 @@
 use anyhow::Result;
 use rusqlite::{Connection, Result as SqlResult};
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct Database {
     pub path: PathBuf,
-    conn: Mutex<Connection>,
+    conn: Arc<Mutex<Connection>>,
+}
+
+impl Clone for Database {
+    fn clone(&self) -> Self {
+        Self {
+            path: self.path.clone(),
+            conn: self.conn.clone(),
+        }
+    }
 }
 
 impl Database {
@@ -13,7 +22,7 @@ impl Database {
         let conn = Connection::open(path)?;
         let db = Self {
             path: path.to_path_buf(),
-            conn: Mutex::new(conn),
+            conn: Arc::new(Mutex::new(conn)),
         };
         db.run_migrations()?;
         Ok(db)
@@ -157,6 +166,95 @@ impl Database {
                 "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (2, datetime('now'));",
             )?;
         }
+        
+        // ── Migration 3: Token 用量审计表 ─────────────────────────────────
+        if current_version < 3 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS token_usage_records (
+                    id                  TEXT PRIMARY KEY,
+                    key_id              TEXT NOT NULL,
+                    platform            TEXT NOT NULL,
+                    model_name          TEXT NOT NULL,
+                    client_app          TEXT NOT NULL,
+                    prompt_tokens       INTEGER NOT NULL DEFAULT 0,
+                    completion_tokens   INTEGER NOT NULL DEFAULT 0,
+                    total_tokens        INTEGER NOT NULL DEFAULT 0,
+                    created_at          TEXT NOT NULL
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (3, datetime('now'));",
+            )?;
+        }
+        
+        // ── Migration 4: 降维打击武器库体系表 (IDE 指纹账号轮询池) ─────────────────────────────────
+        if current_version < 4 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS ide_accounts (
+                    id                  TEXT PRIMARY KEY,
+                    email               TEXT NOT NULL,
+                    origin_platform     TEXT NOT NULL,
+                    access_token        TEXT NOT NULL,
+                    refresh_token       TEXT NOT NULL,
+                    expires_in          INTEGER NOT NULL DEFAULT 0,
+                    token_type          TEXT NOT NULL,
+                    status              TEXT NOT NULL DEFAULT 'active',
+                    disabled_reason     TEXT,
+                    is_proxy_disabled   BOOLEAN NOT NULL DEFAULT 0,
+                    machine_id          TEXT,
+                    mac_machine_id      TEXT,
+                    dev_device_id       TEXT,
+                    sqm_id              TEXT,
+                    quota_json          TEXT,
+                    created_at          TEXT NOT NULL,
+                    updated_at          TEXT NOT NULL,
+                    last_used           TEXT NOT NULL
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (4, datetime('now'));",
+            )?;
+        }
+
+        // ── Migration 5: SaaS User Tokens (用于向下级分发的子账号凭证) ─────────────────────────────────
+        if current_version < 5 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS user_tokens (
+                    id                  TEXT PRIMARY KEY,
+                    token               TEXT NOT NULL UNIQUE,
+                    username            TEXT NOT NULL,
+                    description         TEXT,
+                    enabled             BOOLEAN NOT NULL DEFAULT 1,
+                    expires_type        TEXT NOT NULL DEFAULT 'never',
+                    expires_at          INTEGER,
+                    max_ips             INTEGER NOT NULL DEFAULT 0,
+                    curfew_start        TEXT,
+                    curfew_end          TEXT,
+                    total_requests      INTEGER NOT NULL DEFAULT 0,
+                    total_tokens_used   INTEGER NOT NULL DEFAULT 0,
+                    created_at          INTEGER NOT NULL,
+                    updated_at          INTEGER NOT NULL,
+                    last_used_at        INTEGER
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (5, datetime('now'));",
+            )?;
+        }
+
+        // ── Migration 6: api_keys 优先级字段 + prompts tool_targets 补充 ─────
+        if current_version < 6 {
+            // 忽略"column already exists"错误
+            let _ = conn.execute_batch(
+                "ALTER TABLE api_keys ADD COLUMN priority INTEGER NOT NULL DEFAULT 100;",
+            );
+            let _ = conn.execute_batch(
+                "ALTER TABLE prompts ADD COLUMN tool_targets TEXT;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (6, datetime('now'));",
+            )?;
+        }
 
         Ok(())
     }
@@ -203,5 +301,217 @@ impl Database {
     pub fn query_scalar<T: rusqlite::types::FromSql>(&self, sql: &str, params: &[&dyn rusqlite::ToSql]) -> SqlResult<T> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(sql, params, |r| r.get(0))
+    }
+
+    // ============================================================
+    // IdeAccount / 降维指纹池 专有 CRUD
+    // ============================================================
+
+    /// 根据归属平台查询当前全体存活账号
+    pub fn get_active_ide_accounts(&self, origin_platform: &str) -> SqlResult<Vec<crate::models::IdeAccount>> {
+        self.query_rows(
+            "SELECT 
+                id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
+                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
+                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used
+             FROM ide_accounts 
+             WHERE origin_platform = ? AND status = 'active' AND is_proxy_disabled = 0",
+            &[&origin_platform],
+            |row| {
+                use chrono::{DateTime, Utc};
+                use std::str::FromStr;
+                let machine_id: Option<String> = row.get(10)?;
+                let profile = if let Some(mid) = machine_id {
+                    Some(crate::models::DeviceProfile {
+                        machine_id: mid,
+                        mac_machine_id: row.get(11)?,
+                        dev_device_id: row.get(12)?,
+                        sqm_id: row.get(13)?,
+                    })
+                } else {
+                    None
+                };
+
+                let status_str: String = row.get(7)?;
+                let status = match status_str.as_str() {
+                    "forbidden" => crate::models::AccountStatus::Forbidden,
+                    "rate_limited" => crate::models::AccountStatus::RateLimited,
+                    "expired" => crate::models::AccountStatus::Expired,
+                    _ => crate::models::AccountStatus::Active,
+                };
+
+                Ok(crate::models::IdeAccount {
+                    id: row.get(0)?,
+                    email: row.get(1)?,
+                    origin_platform: row.get(2)?,
+                    token: crate::models::OAuthToken {
+                        access_token: row.get(3)?,
+                        refresh_token: row.get(4)?,
+                        expires_in: row.get(5)?,
+                        token_type: row.get(6)?,
+                        updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
+                    },
+                    status,
+                    disabled_reason: row.get(8)?,
+                    is_proxy_disabled: row.get(9)?,
+                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(15)?).unwrap_or_else(|_| Utc::now()),
+                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
+                    last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
+                    device_profile: profile,
+                    quota_json: row.get(14)?,
+                })
+            },
+        )
+    }
+
+    /// 更新某账号在高并发环境下的实时健康红绿灯状态
+    pub fn update_ide_account_status(&self, id: &str, status: crate::models::AccountStatus, reason: Option<&str>) -> SqlResult<usize> {
+        let status_str = match status {
+            crate::models::AccountStatus::Active => "active",
+            crate::models::AccountStatus::Expired => "expired",
+            crate::models::AccountStatus::Forbidden => "forbidden",
+            crate::models::AccountStatus::RateLimited => "rate_limited",
+            crate::models::AccountStatus::Unknown => "unknown",
+        };
+        self.execute(
+            "UPDATE ide_accounts SET status = ?, disabled_reason = ?, updated_at = datetime('now') WHERE id = ?",
+            &[&status_str, &reason, &id],
+        )
+    }
+
+    /// 获取全体存库的指纹账号（用于展示到上帝盘）
+    pub fn get_all_ide_accounts(&self) -> SqlResult<Vec<crate::models::IdeAccount>> {
+        self.query_rows(
+            "SELECT 
+                id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
+                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
+                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used
+             FROM ide_accounts ORDER BY created_at DESC",
+            &[],
+            |row| {
+                use chrono::{DateTime, Utc};
+                use std::str::FromStr;
+                let machine_id: Option<String> = row.get(10)?;
+                let profile = if let Some(mid) = machine_id {
+                    Some(crate::models::DeviceProfile {
+                        machine_id: mid,
+                        mac_machine_id: row.get(11)?,
+                        dev_device_id: row.get(12)?,
+                        sqm_id: row.get(13)?,
+                    })
+                } else {
+                    None
+                };
+
+                let status_str: String = row.get(7)?;
+                let status = match status_str.as_str() {
+                    "forbidden" => crate::models::AccountStatus::Forbidden,
+                    "rate_limited" => crate::models::AccountStatus::RateLimited,
+                    "expired" => crate::models::AccountStatus::Expired,
+                    _ => crate::models::AccountStatus::Active,
+                };
+
+                Ok(crate::models::IdeAccount {
+                    id: row.get(0)?,
+                    email: row.get(1)?,
+                    origin_platform: row.get(2)?,
+                    token: crate::models::OAuthToken {
+                        access_token: row.get(3)?,
+                        refresh_token: row.get(4)?,
+                        expires_in: row.get(5)?,
+                        token_type: row.get(6)?,
+                        updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
+                    },
+                    status,
+                    disabled_reason: row.get(8)?,
+                    is_proxy_disabled: row.get(9)?,
+                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(15)?).unwrap_or_else(|_| Utc::now()),
+                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
+                    last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
+                    device_profile: profile,
+                    quota_json: row.get(14)?,
+                })
+            },
+        )
+    }
+
+    /// 插入或全量热更一个指纹账号（核心武器库导入接口）
+    pub fn upsert_ide_account(&self, acc: &crate::models::IdeAccount) -> SqlResult<usize> {
+        let status_str = match acc.status {
+            crate::models::AccountStatus::Active => "active",
+            crate::models::AccountStatus::Expired => "expired",
+            crate::models::AccountStatus::Forbidden => "forbidden",
+            crate::models::AccountStatus::RateLimited => "rate_limited",
+            crate::models::AccountStatus::Unknown => "unknown",
+        };
+        let (mid, mac, did, sqm) = match &acc.device_profile {
+            Some(p) => (Some(&p.machine_id), Some(&p.mac_machine_id), Some(&p.dev_device_id), Some(&p.sqm_id)),
+            None => (None, None, None, None),
+        };
+        
+        let c_at = acc.created_at.to_rfc3339();
+        let u_at = acc.updated_at.to_rfc3339();
+        let lu = acc.last_used.to_rfc3339();
+
+        self.execute(
+            "INSERT INTO ide_accounts (
+                id, email, origin_platform, access_token, refresh_token, expires_in, token_type,
+                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id,
+                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+            ON CONFLICT(id) DO UPDATE SET 
+                email = excluded.email,
+                origin_platform = excluded.origin_platform,
+                access_token = excluded.access_token,
+                refresh_token = excluded.refresh_token,
+                expires_in = excluded.expires_in,
+                token_type = excluded.token_type,
+                status = excluded.status,
+                disabled_reason = excluded.disabled_reason,
+                is_proxy_disabled = excluded.is_proxy_disabled,
+                machine_id = excluded.machine_id,
+                mac_machine_id = excluded.mac_machine_id,
+                dev_device_id = excluded.dev_device_id,
+                sqm_id = excluded.sqm_id,
+                quota_json = excluded.quota_json,
+                updated_at = excluded.updated_at,
+                last_used = excluded.last_used",
+            rusqlite::params![
+                acc.id, acc.email, acc.origin_platform, acc.token.access_token, acc.token.refresh_token,
+                acc.token.expires_in, acc.token.token_type, status_str, acc.disabled_reason,
+                acc.is_proxy_disabled, mid, mac, did, sqm, acc.quota_json, c_at, u_at, lu
+            ],
+        )
+    }
+
+    /// 删除僵尸账户
+    pub fn delete_ide_account(&self, id: &str) -> SqlResult<usize> {
+        self.execute("DELETE FROM ide_accounts WHERE id = ?", &[&id])
+    }
+
+    /// 执行自动恢复 Rate Limit (429) 限流节点的引擎方法 (限流冷却复活)
+    pub fn recover_rate_limited_nodes(&self) {
+        let conn = self.conn.lock().unwrap();
+        // 复活超过 5 分钟的 API Keys
+        let api_key_sql = "UPDATE api_keys
+                           SET status = 'valid'
+                           WHERE status = 'rate_limit'
+                           AND last_checked_at < datetime('now', '-5 minutes');";
+        
+        let api_rows = conn.execute(api_key_sql, []).unwrap_or(0);
+        if api_rows > 0 {
+            tracing::info!("♻️ [流量重塑] 成功复活了 {} 个进入冷却期的 API Key 节点", api_rows);
+        }
+
+        // 复活超过 5 分钟的高优 IDE 僵尸账号
+        let ide_account_sql = "UPDATE ide_accounts
+                               SET status = 'active'
+                               WHERE status = 'rate_limited'
+                               AND updated_at < datetime('now', '-5 minutes');";
+        
+        let ide_rows = conn.execute(ide_account_sql, []).unwrap_or(0);
+        if ide_rows > 0 {
+            tracing::info!("♻️ [降维预警解除] 成功复活了 {} 个高优 IDE 伪装节点的 Rate Limit", ide_rows);
+        }
     }
 }

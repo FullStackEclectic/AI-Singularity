@@ -1,151 +1,135 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import { 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend,
+  BarChart, Bar
+} from "recharts";
 import "./DashboardPage.css";
 
-const PLATFORMS = [
-  { name: "OpenAI",    color: "var(--color-openai)",    icon: "◎", key: "open_ai"  },
-  { name: "Anthropic", color: "var(--color-anthropic)", icon: "◈", key: "anthropic" },
-  { name: "Gemini",    color: "var(--color-gemini)",    icon: "◆", key: "gemini"    },
-  { name: "DeepSeek",  color: "var(--color-deepseek)",  icon: "◉", key: "deep_seek" },
-  { name: "百炼",      color: "#f27c3f",                icon: "◐", key: "aliyun"    },
-  { name: "豆包",      color: "#30b0c7",                icon: "◑", key: "bytedance" },
-  { name: "Kimi",      color: "#6366f1",                icon: "◒", key: "moonshot"  },
-  { name: "智谱 GLM",  color: "#8b5cf6",                icon: "◓", key: "zhipu"    },
-];
-
-const ALERT_ICONS: Record<string, string> = {
-  critical: "🔴",
-  warning:  "🟡",
-  info:     "🔵",
-};
-
-const ALERT_CLASS: Record<string, string> = {
-  critical: "alert-item-critical",
-  warning:  "alert-item-warning",
-  info:     "alert-item-info",
+const STATUS_COLORS: Record<string, string> = {
+  "Active": "#10b981",    // Aurora Green
+  "Forbidden": "#ff4d4f", // Alert Red
+  "Expired": "#f59e0b",   // Warning Amber
+  "RateLimited": "#6366f1"
 };
 
 export default function DashboardPage() {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["dashboard-stats"],
-    queryFn: api.stats.getDashboard,
-    refetchInterval: 30_000,
+  const { data: metrics, isLoading } = useQuery({
+    queryKey: ["dashboard-metrics"],
+    queryFn: () => api.analytics.getDashboardMetrics(7),
+    refetchInterval: 15_000,
   });
-
-  const { data: keys = [] } = useQuery({
-    queryKey: ["keys"],
-    queryFn: api.keys.list,
-  });
-
-  const { data: alerts = [], isLoading: alertsLoading } = useQuery({
-    queryKey: ["alerts"],
-    queryFn: api.alerts.get,
-    refetchInterval: 60_000,
-  });
-
-  // 按平台统计 Key 数量
-  const keysByPlatform = keys.reduce<Record<string, number>>((acc, k: any) => {
-    acc[k.platform] = (acc[k.platform] || 0) + 1;
-    return acc;
-  }, {});
-
-  const criticalCount = alerts.filter((a: any) => a.level === "critical").length;
-  const warningCount  = alerts.filter((a: any) => a.level === "warning").length;
 
   const STATS_ITEMS = [
-    { label: "已配置账号", value: isLoading ? "—" : String(stats?.total_keys ?? 0),                       icon: "🔑", color: "var(--color-accent)"   },
-    { label: "有效 Key",   value: isLoading ? "—" : String(stats?.valid_keys ?? 0),                        icon: "✅", color: "var(--color-success)"  },
-    { label: "本月消耗",   value: isLoading ? "—" : `$${(stats?.total_cost_usd ?? 0).toFixed(2)}`,         icon: "💰", color: "var(--color-warning)"  },
-    { label: "活跃告警",   value: alertsLoading ? "—" : String(criticalCount + warningCount),              icon: criticalCount > 0 ? "🚨" : "🔔", color: criticalCount > 0 ? "var(--color-danger)" : "var(--color-info)" },
+    { label: "可用指纹据点", value: isLoading ? "—" : String(metrics?.active_ide_accounts ?? 0), icon: "☢️", color: "var(--color-primary)" },
+    { label: "下发终端总数", value: isLoading ? "—" : String(metrics?.total_user_tokens ?? 0), icon: "🛡️", color: "var(--color-info)" },
+    { label: "今日吞吐量 (Tokens)", value: isLoading ? "—" : String(metrics?.today_total_tokens ?? 0), icon: "🔥", color: "var(--color-warning)" },
+    { label: "阵亡率 (403/429)", value: isLoading ? "—" : `${((metrics?.forbidden_accounts_ratio ?? 0) * 100).toFixed(1)}%`, icon: "⚠️", color: "var(--color-danger)" },
   ];
 
   return (
-    <div className="dashboard">
-      <div className="page-header">
+    <div className="dashboard cyberpunk-theme">
+      <div className="page-header glow-border-bottom">
         <div>
-          <h1 className="page-title">总览</h1>
-          <p className="page-subtitle">所有 AI 资源的一站式控制中心</p>
-        </div>
-        <div className="dashboard-status-bar">
-          <span className={`status-dot ${criticalCount > 0 ? "invalid" : "valid"}`} />
-          <span className="text-secondary" style={{ fontSize: 13 }}>
-            {criticalCount > 0 ? `${criticalCount} 项紧急告警` : "系统正常"}
-          </span>
+          <h1 className="page-title cyber-glitch" data-text="总览雷达">总览雷达</h1>
+          <p className="page-subtitle text-muted">全域算力引擎实时监控矩阵</p>
         </div>
       </div>
 
       <div className="dashboard-body">
-        {/* 统计卡片 */}
+        {/* 指标卡片 */}
         <div className="stats-grid">
           {STATS_ITEMS.map((s) => (
-            <div key={s.label} className={`stat-card card animate-fade-in ${isLoading ? "loading" : ""}`}>
-              <div className="stat-icon" style={{ color: s.color }}>{s.icon}</div>
-              <div className="stat-value">{s.value}</div>
+            <div key={s.label} className={`stat-card hex-border glassmorphism animate-pulse-glow ${isLoading ? "loading" : ""}`}>
+              <div className="stat-icon" style={{ textShadow: `0 0 10px ${s.color}`, color: s.color }}>{s.icon}</div>
+              <div className="stat-value neon-text">{s.value}</div>
               <div className="stat-label text-muted">{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* 告警面板 */}
-        {!alertsLoading && alerts.length > 0 && (
-          <div className="alerts-section">
-            <h2 className="section-title" style={{ marginTop: "var(--space-6)" }}>
-              🔔 当前告警
-            </h2>
-            <div className="alerts-list">
-              {(alerts as any[]).map((a) => (
-                <div key={a.id} className={`alert-item card ${ALERT_CLASS[a.level] ?? ""} animate-fade-in`}>
-                  <div className="alert-icon">{ALERT_ICONS[a.level] ?? "ℹ️"}</div>
-                  <div className="alert-content">
-                    <div className="alert-title">{a.title}</div>
-                    <div className="alert-message text-muted">{a.message}</div>
-                  </div>
-                  {a.platform && (
-                    <div className="badge badge-muted" style={{ flexShrink: 0 }}>{a.platform}</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* 平台支持矩阵 */}
-        <div className="card" style={{ marginTop: "var(--space-6)" }}>
-          <h2 className="section-title">平台一览</h2>
-          <div className="platform-grid">
-            {PLATFORMS.map((p) => {
-              const count = keysByPlatform[p.key] ?? 0;
-              return (
-                <div key={p.name} className="platform-item">
-                  <span className="platform-icon" style={{ color: p.color }}>{p.icon}</span>
-                  <span className="platform-name">{p.name}</span>
-                  {count > 0 ? (
-                    <span className="badge badge-success" style={{ marginLeft: "auto" }}>
-                      {count} 个 Key
-                    </span>
-                  ) : (
-                    <span className="badge badge-muted" style={{ marginLeft: "auto" }}>
-                      未配置
-                    </span>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* 快速开始（仅无 Key 时展示） */}
-        {(stats?.total_keys ?? 0) === 0 && !isLoading && (
-          <div className="card card-accent" style={{ marginTop: "var(--space-6)" }}>
-            <div className="quick-start">
-              <div className="quick-start-icon">✦</div>
-              <div className="quick-start-content">
-                <h3>开始使用 AI Singularity</h3>
-                <p className="text-secondary">
-                  添加你的第一个 API Key，开始统一管理所有 AI 资源
-                </p>
+        {metrics && (
+          <div className="charts-grid">
+            {/* 过去7天的吞吐趋势 */}
+            <div className="chart-panel span-2 glassmorphism border-cyan">
+              <h3 className="chart-title">▶ 算力潮汐折线 / 7-DAY THROUGHPUT</h3>
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <AreaChart data={metrics.token_trends} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-cyan)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--color-cyan)" stopOpacity={0}/>
+                      </linearGradient>
+                      <linearGradient id="colorPrompt" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="var(--color-purple)" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="var(--color-purple)" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} />
+                    <XAxis dataKey="date" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'var(--color-cyan)', backdropFilter: 'blur(4px)' }}
+                      itemStyle={{ color: '#e2e8f0' }}
+                    />
+                    <Legend />
+                    <Area type="monotone" name="提示词 (Prompt)" dataKey="prompt_tokens" stroke="var(--color-purple)" fillOpacity={1} fill="url(#colorPrompt)" />
+                    <Area type="monotone" name="总吞吐 (Total)" dataKey="total_tokens" stroke="var(--color-cyan)" fillOpacity={1} fill="url(#colorTotal)" />
+                  </AreaChart>
+                </ResponsiveContainer>
               </div>
-              <a href="#keys" className="btn btn-primary">＋ 添加 API Key</a>
+            </div>
+
+            {/* IDE 账号健康度分布 */}
+            <div className="chart-panel glassmorphism border-emerald">
+              <h3 className="chart-title">▶ 兵工厂态势 / IDE FLEET STATUS</h3>
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <PieChart>
+                    <Pie
+                      data={metrics.ide_status_distribution.filter((d: any) => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {
+                        metrics.ide_status_distribution.map((entry: any, index: number) => (
+                          <Cell key={`cell-${index}`} fill={STATUS_COLORS[entry.name] || "#64748b"} />
+                        ))
+                      }
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'var(--color-emerald)' }} 
+                    />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* 顶部消耗排行榜 */}
+            <div className="chart-panel glassmorphism border-orange">
+              <h3 className="chart-title">▶ 终端消耗排名 / TOP CONSUMERS</h3>
+              <div style={{ width: '100%', height: 300 }}>
+                <ResponsiveContainer>
+                  <BarChart data={metrics.top_consumers} layout="vertical" margin={{ top: 10, right: 30, left: 40, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.4} horizontal={false} />
+                    <XAxis type="number" stroke="#94a3b8" />
+                    <YAxis dataKey="client_app" type="category" stroke="#94a3b8" fontSize={12} width={80} />
+                    <Tooltip 
+                        cursor={{fill: 'transparent'}}
+                        contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', borderColor: 'var(--color-warning)' }} 
+                    />
+                    <Bar dataKey="total_tokens" name="消耗量" fill="var(--color-warning)" barSize={20} radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         )}

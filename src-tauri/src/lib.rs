@@ -8,6 +8,7 @@ mod models;
 mod proxy;
 mod services;
 mod store;
+mod panic_hook;
 pub mod tray;
 
 pub use error::{AppError, AppResult};
@@ -15,6 +16,10 @@ pub use error::{AppError, AppResult};
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            Some(vec!["--silent"]),
+        ))
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
@@ -31,30 +36,63 @@ pub fn run() {
                 .expect("Failed to get app data directory");
             std::fs::create_dir_all(&app_data_dir).expect("Failed to create app data directory");
 
+            // --- 全局灾难捕获系统 ---
+            crate::panic_hook::set_panic_hook(app_data_dir.clone());
+
             let db_path = app_data_dir.join("data.db");
             let db = db::Database::new(&db_path).expect("Failed to initialize database");
+
+            // --- 主动健康探活守护进程（每 30 分钟探活所有 Key） ---
+            crate::services::health_check_daemon::HealthCheckDaemon::new(
+                std::sync::Arc::new(db.clone())
+            ).start(30);
+
             app.manage(db);
 
-            let _ = crate::tray::setup_tray(app.app_handle());
+            // --- 判断静默启动（托盘后台模式） ---
+            let args: Vec<String> = std::env::args().collect();
+            let is_silent = args.iter().any(|arg| arg == "--silent");
 
-            // --- V2.0 系统级守护任务 ---
-            let app_handle = app.app_handle().clone();
-            tokio::spawn(async move {
-                // 每 2 小时轮询一次平台余额快照
-                let mut interval = tokio::time::interval(std::time::Duration::from_secs(7200));
-                use tauri::Manager;
+            if let Some(window) = app.get_webview_window("main") {
+                if !is_silent {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+
+            // --- V2.5 高可用防熔断中枢：流控冷却复活引擎 ---
+            let app_h_recovery = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
                 loop {
-                    interval.tick().await;
-                    
-                    let db_state = app_handle.state::<crate::db::Database>();
-                    let tracker = crate::services::balance_tracker::BalanceTracker::new(&*db_state);
-                    let _ = tracker.refresh_all().await;
-                    
-                    let alert_service = crate::services::alert::AlertService::new(&*db_state);
-                    let alerts = alert_service.get_alerts();
-                    alert_service.notify_os_throttle(&app_handle, alerts);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
+                    let db_state = app_h_recovery.state::<crate::db::Database>();
+                    db_state.recover_rate_limited_nodes();
                 }
             });
+
+            // --- V2.0 系统级守护任务 ---
+            let app_handle = app.handle().clone();
+            std::thread::spawn(move || {
+                loop {
+                    // 每 2 小时轮询一次平台余额快照 (先 Sleep 等待系统稳定运行)
+                    std::thread::sleep(std::time::Duration::from_secs(7200));
+                    
+                    let app_h = app_handle.clone();
+                    tauri::async_runtime::block_on(async move {
+                        use tauri::Manager;
+                        let db_state = app_h.state::<crate::db::Database>();
+                        let tracker = crate::services::balance_tracker::BalanceTracker::new(&*db_state);
+                        let _ = tracker.refresh_all().await;
+                        
+                        let alert_service = crate::services::alert::AlertService::new(&*db_state);
+                        let alerts = alert_service.get_alerts();
+                        alert_service.notify_os_throttle(&app_h, alerts);
+                    });
+                }
+            });
+
+            // 挂载防篡改配置双向同步雷达
+            crate::services::watcher::WatcherService::start_watching(app.app_handle().clone());
 
             Ok(())
         })
@@ -73,6 +111,7 @@ pub fn run() {
             commands::balance_tracker::get_burn_rate_forecast,
             // 统计
             commands::stats::get_dashboard_stats,
+            commands::stats::get_token_usage_stats,
             // 代理
             commands::proxy::start_proxy,
             commands::proxy::get_proxy_status,
@@ -91,6 +130,7 @@ pub fn run() {
             commands::prompts::save_prompt,
             commands::prompts::delete_prompt,
             commands::prompts::sync_prompt,
+            commands::prompts::sync_prompt_to_tool,
             // 告警 & 测速
             commands::alert::get_alerts,
             // 配置备份
@@ -104,8 +144,29 @@ pub fn run() {
             // Sessions
             commands::session::list_sessions,
             commands::session::get_session_details,
+            commands::session::scan_zombies,
             // OAuth
             commands::oauth::start_oauth_flow,
+            // 系统检测
+            commands::env::check_system_env_conflicts,
+            // 降维指纹核心库 (Ide Account Pool)
+            commands::ide_account::get_all_ide_accounts,
+            commands::ide_account::import_ide_accounts,
+            commands::ide_account::delete_ide_account,
+            // 重装沙盒启动器
+            commands::sandbox::launch_tool_sandboxed,
+            // 局域网兵工厂分发
+            commands::tools::check_tool_status,
+            commands::tools::deploy_tool,
+            // 洗脑芯片 (强连)
+            commands::injector::force_inject_ide,
+            // SaaS 分发管理 (User Tokens)
+            commands::user_token::create_user_token,
+            commands::user_token::get_all_user_tokens,
+            commands::user_token::update_user_token,
+            commands::user_token::delete_user_token,
+            // 监控大盘数据
+            commands::analytics::get_dashboard_metrics,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

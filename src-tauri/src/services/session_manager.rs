@@ -1,7 +1,18 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
+use std::path::{PathBuf, Path};
 use std::time::SystemTime;
+use sysinfo::System;
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ZombieProcess {
+    pub pid: u32,
+    pub name: String,
+    pub command: String,
+    pub active_time_sec: u64,
+    pub tool_type: String, 
+    pub cwd: String,
+}
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ChatMessage {
@@ -23,6 +34,45 @@ pub struct ChatSession {
 pub struct SessionManager;
 
 impl SessionManager {
+    /// 全域进程雷达：探测环境内存活的第三方 AI CLI 工具
+    pub fn scan_zombie_processes() -> Vec<ZombieProcess> {
+        let mut sys = System::new_all();
+        sys.refresh_all();
+        let mut zombies = Vec::new();
+
+        for (pid, process) in sys.processes() {
+            let cmd_args: Vec<String> = process.cmd().iter().map(|s| s.to_string_lossy().to_string()).collect();
+            let cmd = cmd_args.join(" ").to_lowercase();
+            let name = process.name().to_string_lossy().to_string().to_lowercase();
+            let cwd = process.cwd().map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+            
+            let mut tool_type = None;
+
+            if cmd.contains("claude-cli") || (cmd.contains("claude") && cmd.contains("node")) {
+                tool_type = Some("ClaudeCode");
+            } else if cmd.contains("aider") && !cmd.contains("cargo") {
+                tool_type = Some("Aider");
+            } else if cmd.contains("opencode") {
+                tool_type = Some("OpenCode");
+            }
+
+            if let Some(tt) = tool_type {
+                zombies.push(ZombieProcess {
+                    pid: pid.as_u32(),
+                    name: process.name().to_string_lossy().to_string(),
+                    command: cmd_args.join(" "),
+                    active_time_sec: process.run_time(),
+                    tool_type: tt.to_string(),
+                    cwd: cwd.clone(),
+                });
+            }
+        }
+        
+        // 去重逻辑，有时候进程会 spawning 树，这里简单过滤
+        zombies.sort_by(|a, b| b.active_time_sec.cmp(&a.active_time_sec));
+        zombies
+    }
+
     /// 扫描 ~/.claude/projects/ 目录下的所有 jsonl
     pub fn list_sessions() -> Result<Vec<ChatSession>, String> {
         let home_dir = dirs::home_dir().ok_or("Cannot find home directory")?;
@@ -76,7 +126,40 @@ impl SessionManager {
                 }
             }
         }
-        
+        // 动态侦测进程并吸血：通过僵尸雷达拉取 Aider 缓存
+        let zombies = Self::scan_zombie_processes();
+        for zombie in zombies {
+            if zombie.tool_type == "Aider" && !zombie.cwd.is_empty() {
+                let path = PathBuf::from(&zombie.cwd).join(".aider.chat.history.md");
+                if path.exists() {
+                    if let Ok(metadata) = fs::metadata(&path) {
+                        let modified = metadata.modified()
+                            .unwrap_or(SystemTime::UNIX_EPOCH)
+                            .duration_since(SystemTime::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        
+                        let content = fs::read_to_string(&path).unwrap_or_default();
+                        let count = content.lines().count();
+                        
+                        let project_name = PathBuf::from(&zombie.cwd).file_name().unwrap_or_default().to_string_lossy().into_owned();
+                        
+                        // 防止重复推入同一个项目的 Aider 会话（多个相同 cwd 的 aider 进程）
+                        if !sessions.iter().any(|s| s.filepath == path.to_string_lossy().to_string()) {
+                            sessions.push(ChatSession {
+                                id: format!("aider-{}", zombie.pid),
+                                title: format!("Aider // {}", project_name),
+                                created_at: modified,
+                                updated_at: modified,
+                                messages_count: count, // markdown lines count
+                                filepath: path.to_string_lossy().into_owned(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
         // 近期活跃的排前
         sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
         Ok(sessions)
@@ -92,6 +175,38 @@ impl SessionManager {
         let content = fs::read_to_string(&path).map_err(|e| e.to_string())?;
         let mut messages = Vec::new();
         
+        // 兼容 Aider 离线 Markdown 格式
+        if filepath.ends_with(".md") {
+            // Aider 的聊天记录通常是很长的 Markdown，如果没有明显结构，我们可以把它作为一个超级 Block 返回
+            // 或者用正则切割 USER 和 ASSISTANT 块。由于 Aider 常以 `> USER:` 和 `> ASSISTANT:` 作为交互分隔。
+            let mut current_role = "system".to_string();
+            let mut current_text = String::new();
+            
+            for line in content.lines() {
+                if line.starts_with("> USER:") {
+                    if !current_text.trim().is_empty() {
+                        messages.push(ChatMessage { role: current_role, content: current_text.clone(), timestamp: None });
+                    }
+                    current_role = "user".to_string();
+                    current_text = String::new();
+                } else if line.starts_with("> ASSISTANT:") {
+                    if !current_text.trim().is_empty() {
+                        messages.push(ChatMessage { role: current_role, content: current_text.clone(), timestamp: None });
+                    }
+                    current_role = "assistant".to_string();
+                    current_text = String::new();
+                } else {
+                    current_text.push_str(line);
+                    current_text.push('\n');
+                }
+            }
+            if !current_text.trim().is_empty() {
+                messages.push(ChatMessage { role: current_role, content: current_text, timestamp: None });
+            }
+            return Ok(messages);
+        }
+
+        // Claude 的 JSONL 逻辑
         for line in content.lines() {
             if line.trim().is_empty() {
                 continue;
