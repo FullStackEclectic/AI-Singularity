@@ -102,4 +102,8 @@ export const api = {
   analytics: {
     getDashboardMetrics: (days: number): Promise<any> => invoke("get_dashboard_metrics", { days }),
   },
+
+  oauth: {
+    startFlow: (provider: string): Promise<string> => invoke("start_oauth_flow", { provider }),
+  },
 };

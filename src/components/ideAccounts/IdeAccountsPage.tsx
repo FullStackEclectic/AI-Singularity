@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import AddIdeAccountDialog from "./AddIdeAccountDialog";
 import { api } from "../../lib/api";
 import type { IdeAccount } from "../../types";
 import "./IdeAccountsPage.css";
@@ -115,25 +116,7 @@ export default function IdeAccountsPage() {
           <p className="page-subtitle">构建免死金牌账号池，进行多指纹高维伪装欺骗与请求动态负载均衡。</p>
         </div>
         <div className="header-actions">
-           <button 
-             className="btn btn-primary"
-             onClick={() => {
-               // Fallback input flow or trigger file select
-               const input = document.createElement("input");
-               input.type = "file";
-               input.accept = ".json";
-               input.onchange = async (e: any) => {
-                 const file = e.target.files[0];
-                 if (file) {
-                   const text = await file.text();
-                   await parseAndImport(text);
-                 }
-               };
-               input.click();
-             }}
-           >
-             + 批量注入凭证 (.json)
-           </button>
+           <AddIdeAccountDialog onSuccess={fetchAccounts} />
         </div>
       </div>
 
