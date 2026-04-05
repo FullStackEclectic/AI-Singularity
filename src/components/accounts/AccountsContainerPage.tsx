@@ -1,41 +1,33 @@
 import { useState } from "react";
-import KeysPage from "../keys/KeysPage";
-import IdeAccountsPage from "../ideAccounts/IdeAccountsPage";
-import UserTokenPage from "../userTokens/UserTokenPage";
+import UnifiedAccountsList from "./UnifiedAccountsList";
+import SharingPage from "./SharingPage";
 import "./AccountsContainerPage.css";
 
-type AccountTab = "keys" | "ide" | "saas";
+type AccountTab = "managed" | "shared";
 
 export default function AccountsContainerPage() {
-  const [activeTab, setActiveTab] = useState<AccountTab>("keys");
+  const [activeTab, setActiveTab] = useState<AccountTab>("managed");
 
   return (
-    <div className="accounts-container animate-fade-in">
-      <div className="accounts-tabs">
+    <div className="accounts-container animate-fade-in" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      <div className="accounts-tabs" style={{ padding: '0 1.5rem', paddingTop: '1rem' }}>
         <button 
-          className={activeTab === "keys" ? "active" : ""} 
-          onClick={() => setActiveTab("keys")}
+          className={activeTab === "managed" ? "active" : ""} 
+          onClick={() => setActiveTab("managed")}
         >
-          标准账号 (API Keys)
+           算力接入账号
         </button>
         <button 
-          className={activeTab === "ide" ? "active" : ""} 
-          onClick={() => setActiveTab("ide")}
+          className={activeTab === "shared" ? "active" : ""} 
+          onClick={() => setActiveTab("shared")}
         >
-          白嫖账号 (IDE 指纹池)
-        </button>
-        <button 
-          className={activeTab === "saas" ? "active" : ""} 
-          onClick={() => setActiveTab("saas")}
-        >
-          共享子号 (SaaS 下发)
+           分享凭证下发
         </button>
       </div>
 
-      <div className="accounts-tab-content">
-        {activeTab === "keys" && <KeysPage />}
-        {activeTab === "ide" && <IdeAccountsPage />}
-        {activeTab === "saas" && <UserTokenPage />}
+      <div className="accounts-tab-content" style={{ flex: 1, overflow: 'hidden' }}>
+        {activeTab === "managed" && <UnifiedAccountsList />}
+        {activeTab === "shared" && <SharingPage />}
       </div>
     </div>
   );

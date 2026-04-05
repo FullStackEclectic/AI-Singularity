@@ -28,3 +28,27 @@ pub async fn delete_ide_account(db: State<'_, Database>, id: String) -> AppResul
     let count = db.delete_ide_account(&id)?;
     Ok(count)
 }
+
+/// 更新 IDE 账号标签列表
+#[tauri::command]
+pub async fn update_ide_account_tags(
+    db: State<'_, Database>,
+    id: String,
+    tags: Vec<String>,
+) -> AppResult<()> {
+    let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
+    db.update_ide_account_tags(&id, &tags_json)?;
+    Ok(())
+}
+
+/// 更新 API Key 标签列表
+#[tauri::command]
+pub async fn update_api_key_tags(
+    db: State<'_, Database>,
+    id: String,
+    tags: Vec<String>,
+) -> AppResult<()> {
+    let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
+    db.update_api_key_tags(&id, &tags_json)?;
+    Ok(())
+}

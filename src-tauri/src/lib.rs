@@ -147,12 +147,22 @@ pub fn run() {
             commands::session::scan_zombies,
             // OAuth
             commands::oauth::start_oauth_flow,
+            commands::oauth::poll_oauth_login,
+            commands::oauth::cancel_oauth_flow,
+            commands::oauth::prepare_oauth_url,
+
             // 系统检测
             commands::env::check_system_env_conflicts,
             // 降维指纹核心库 (Ide Account Pool)
             commands::ide_account::get_all_ide_accounts,
             commands::ide_account::import_ide_accounts,
             commands::ide_account::delete_ide_account,
+            commands::ide_account::update_ide_account_tags,
+            commands::ide_account::update_api_key_tags,
+            // 本地 IDE 账号扫描器
+            commands::ide_scanner::scan_ide_accounts_from_local,
+            commands::ide_scanner::import_from_custom_db,
+            commands::ide_scanner::import_v1_accounts,
             // 重装沙盒启动器
             commands::sandbox::launch_tool_sandboxed,
             // 局域网兵工厂分发

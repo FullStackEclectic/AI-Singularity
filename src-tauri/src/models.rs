@@ -24,6 +24,15 @@ pub enum Platform {
     AzureOpenAI,
     SiliconFlow,
     OpenRouter,
+    Groq,
+    Mistral,
+    XAi,
+    Cohere,
+    Perplexity,
+    TogetherAi,
+    Ollama,
+    HuggingFace,
+    Replicate,
     Copilot,     // GitHub Copilot OAuth
     Auth0IDE,    // 高阶白嫖设备指纹伪装池
     Custom,      // 自定义 OpenAI 兼容
@@ -47,6 +56,15 @@ impl Platform {
             Platform::AzureOpenAI => "Azure OpenAI",
             Platform::SiliconFlow => "SiliconFlow",
             Platform::OpenRouter  => "OpenRouter",
+            Platform::Groq        => "Groq",
+            Platform::Mistral     => "Mistral AI",
+            Platform::XAi         => "xAI (Grok)",
+            Platform::Cohere      => "Cohere",
+            Platform::Perplexity  => "Perplexity",
+            Platform::TogetherAi  => "Together AI",
+            Platform::Ollama      => "Ollama",
+            Platform::HuggingFace => "Hugging Face",
+            Platform::Replicate   => "Replicate",
             Platform::Copilot    => "GitHub Copilot",
             Platform::Auth0IDE   => "超级白嫖指纹池",
             Platform::Custom     => "自定义接口",
@@ -442,6 +460,10 @@ pub struct IdeAccount {
     
     /// 当该账号支持高阶的限流逻辑（如 Claude 的按次限购）时，脱水保存其配额额度。
     pub quota_json: Option<String>,
+
+    /// 用户自定义标签（JSON 字符串存储，如 ["vip","生产"]）
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 // ============================================================

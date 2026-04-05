@@ -18,6 +18,15 @@ export type Platform =
   | "azure_open_a_i"
   | "silicon_flow"
   | "open_router"
+  | "groq"
+  | "mistral"
+  | "x_ai"
+  | "cohere"
+  | "perplexity"
+  | "together_ai"
+  | "ollama"
+  | "hugging_face"
+  | "replicate"
   | "copilot"
   | "custom";
 
@@ -37,6 +46,15 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   azure_open_a_i: "Azure OpenAI",
   silicon_flow:   "SiliconFlow",
   open_router:    "OpenRouter",
+  groq:           "Groq",
+  mistral:        "Mistral AI",
+  x_ai:           "xAI (Grok)",
+  cohere:         "Cohere",
+  perplexity:     "Perplexity",
+  together_ai:    "Together AI",
+  ollama:         "Ollama",
+  hugging_face:   "Hugging Face",
+  replicate:      "Replicate",
   copilot:        "GitHub Copilot",
   custom:         "自定义接口",
 };
@@ -154,6 +172,8 @@ export interface ApiKey {
   last_checked_at?: string;
   /** 轮询优先级：数值越大越优先（默认100） */
   priority: number;
+  /** 用户自定义标签 */
+  tags?: string[];
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -287,4 +307,8 @@ export interface IdeAccount {
   created_at: string;
   updated_at: string;
   last_used: string;
+  /** 用户自定义标签 */
+  tags?: string[];
+  /** 用户自定义标注（备注名）*/
+  label?: string;
 }

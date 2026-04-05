@@ -1,0 +1,515 @@
+/* ──────────────────────────────────────────────────────────
+   AddAccountWizard — 重构版 CSS
+   ────────────────────────────────────────────────────────── */
+
+/* ── 遮罩与容器 ──────────────────────────────────────────── */
+.wiz-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wiz-panel {
+  background: var(--bg-card, #1a1d27);
+  border: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  border-radius: 16px;
+  width: 92vw;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04);
+  animation: wiz-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+
+@keyframes wiz-in {
+  from { opacity: 0; transform: scale(0.95) translateY(12px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.wiz-header {
+  padding: 1.1rem 1.4rem;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.wiz-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+}
+
+.wiz-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  transition: all 0.15s;
+}
+.wiz-close-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+
+/* ── 渠道来源选择器 ─────────────────────────────────────── */
+.wiz-channel-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.6rem 1rem;
+  background: rgba(0,0,0,0.18);
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+
+.wiz-channel-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wiz-channel-select {
+  flex: 1;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 7px;
+  color: var(--text-primary, #fff);
+  font-size: 0.84rem;
+  padding: 0.32rem 0.55rem;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.wiz-channel-select:focus { border-color: rgba(56,189,248,0.5); }
+.wiz-channel-select option { background: #1e2130; }
+
+/* ── 模式选择按钮行 ─────────────────────────────────────── */
+.wiz-mode-row {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  background: rgba(0,0,0,0.12);
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+
+.wiz-mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.38);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.wiz-mode-btn:hover { color: rgba(255,255,255,0.72); background: rgba(255,255,255,0.04); }
+.wiz-mode-btn.active {
+  background: rgba(56,189,248,0.12);
+  color: #38bdf8;
+  border-color: rgba(56,189,248,0.22);
+  font-weight: 600;
+}
+
+/* ── Tab 导航 ───────────────────────────────────────────── */
+.wiz-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 6px 8px;
+  background: rgba(0,0,0,0.14);
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  flex-shrink: 0;
+}
+
+.wiz-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0.45rem 0.5rem;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(255,255,255,0.38);
+  font-size: 0.82rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.wiz-tab:hover { color: rgba(255,255,255,0.72); background: rgba(255,255,255,0.04); }
+.wiz-tab.active {
+  background: rgba(255,255,255,0.07);
+  color: #fff;
+  border-color: rgba(255,255,255,0.1);
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+/* ── Status Alert ───────────────────────────────────────── */
+.wiz-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.6rem 0.85rem;
+  border-radius: 8px;
+  font-size: 0.856rem;
+  margin: 0.75rem 1rem 0;
+  flex-shrink: 0;
+}
+.wiz-status.status-info    { background: rgba(56,189,248,0.1);  color: #38bdf8; border: 1px solid rgba(56,189,248,0.2); }
+.wiz-status.status-success { background: rgba(16,185,129,0.1);  color: #10b981; border: 1px solid rgba(16,185,129,0.2); }
+.wiz-status.status-error   { background: rgba(239,68,68,0.1);   color: #ef4444; border: 1px solid rgba(239,68,68,0.2); }
+
+.spin { animation: spin 1s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tab 内容区域 ───────────────────────────────────────── */
+.wiz-tab-content {
+  padding: 1rem 1.2rem;
+  overflow-y: auto;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ── OAuth Tab — Device Flow ────────────────────────────── */
+.wiz-oauth-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 0.9rem;
+  padding: 1.5rem 0;
+}
+
+.wiz-oauth-icon {
+  color: rgba(56,189,248,0.5);
+}
+
+.wiz-oauth-desc {
+  font-size: 0.87rem;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+  max-width: 330px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+/* Device Flow Card */
+.wiz-device-flow {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.wiz-user-code-block {
+  text-align: center;
+}
+
+.wiz-uc-label {
+  font-size: 0.78rem;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  margin-bottom: 6px;
+  text-align: left;
+}
+
+.wiz-user-code {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(56,189,248,0.08);
+  border: 1px solid rgba(56,189,248,0.25);
+  border-radius: 10px;
+  padding: 0.65rem 1.1rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-family: monospace;
+  letter-spacing: 0.18em;
+  color: #38bdf8;
+}
+
+.wiz-copy-code-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(56,189,248,0.6);
+  padding: 2px;
+  transition: color 0.15s;
+}
+.wiz-copy-code-btn:hover { color: #38bdf8; }
+
+
+
+.wiz-url-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+  overflow: hidden;
+}
+
+.wiz-url-text {
+  flex: 1;
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: var(--text-secondary, rgba(255,255,255,0.65));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wiz-icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, rgba(255,255,255,0.4));
+  padding: 2px 4px;
+  border-radius: 5px;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.wiz-icon-btn:hover { background: rgba(255,255,255,0.07); color: #fff; }
+
+/* Poll status row */
+.wiz-poll-status { min-height: 28px; }
+
+.wiz-poll-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.82rem;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+}
+
+.wiz-poll-row.error { color: #ef4444; }
+
+.wiz-link-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #38bdf8;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  transition: background 0.15s;
+}
+.wiz-link-btn:hover { background: rgba(56,189,248,0.1); }
+
+.wiz-retry-btn {
+  align-self: flex-start;
+  font-size: 0.8rem;
+}
+
+/* ── Textarea ───────────────────────────────────────────── */
+.wiz-textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-family: monospace;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  padding: 0.7rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.wiz-textarea:focus { border-color: rgba(56,189,248,0.4); }
+.wiz-textarea::placeholder { color: rgba(255,255,255,0.22); }
+
+/* ── Import Tab ─────────────────────────────────────────── */
+.wiz-import-tab { gap: 0; }
+
+.wiz-import-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 0;
+}
+
+.wiz-import-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary, #fff);
+  margin: 0;
+}
+
+.wiz-import-desc {
+  font-size: 0.82rem;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+  line-height: 1.55;
+  margin: 0;
+}
+.wiz-import-desc code {
+  font-family: monospace;
+  background: rgba(255,255,255,0.06);
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: #b0c4ff;
+}
+
+.wiz-import-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-primary, #fff);
+  font-size: 0.84rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.wiz-import-btn:hover:not(:disabled) {
+  background: rgba(56,189,248,0.09);
+  border-color: rgba(56,189,248,0.3);
+  color: #38bdf8;
+}
+.wiz-import-btn.secondary:hover:not(:disabled) {
+  background: rgba(139,92,246,0.09);
+  border-color: rgba(139,92,246,0.3);
+  color: #a78bfa;
+}
+.wiz-import-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.wiz-import-divider {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--text-muted, rgba(255,255,255,0.3));
+  padding: 0.25rem 0;
+  position: relative;
+}
+.wiz-import-divider::before,
+.wiz-import-divider::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  width: 42%;
+  height: 1px;
+  background: rgba(255,255,255,0.06);
+}
+.wiz-import-divider::before { left: 0; }
+.wiz-import-divider::after  { right: 0; }
+
+/* ── Buttons ────────────────────────────────────────────── */
+.wiz-btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0.65rem 1.25rem;
+  border-radius: 9px;
+  border: none;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 16px rgba(56,189,248,0.2);
+}
+.wiz-btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(56,189,248,0.3);
+}
+.wiz-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+.wiz-btn-ghost {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.45rem 0.85rem;
+  border-radius: 7px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.wiz-btn-ghost:hover:not(:disabled) { background: rgba(255,255,255,0.05); color: #fff; }
+.wiz-btn-ghost:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── API Key Form ───────────────────────────────────────── */
+.wiz-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wiz-field-label {
+  font-size: 0.79rem;
+  font-weight: 600;
+  color: var(--text-secondary, rgba(255,255,255,0.55));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wiz-select,
+.wiz-input {
+  width: 100%;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 8px;
+  color: var(--text-primary, #fff);
+  font-size: 0.87rem;
+  padding: 0.55rem 0.75rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+.wiz-select:focus,
+.wiz-input:focus    { border-color: rgba(56,189,248,0.45); }
+.wiz-select option  { background: #1e2130; }
+.wiz-input::placeholder { color: rgba(255,255,255,0.22); }
+
+.wiz-field-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.76rem;
+  color: var(--text-muted, rgba(255,255,255,0.35));
+  margin-top: 2px;
+}
+
+/* Legacy class aliases (backward compat) */
+.wizard-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(10px); z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.wizard-modal   { background: var(--bg-card, #1a1d27); border: 1px solid var(--border-color, rgba(255,255,255,0.08)); border-radius: 16px; width: 92vw; max-width: 560px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,0.45); overflow: hidden; }

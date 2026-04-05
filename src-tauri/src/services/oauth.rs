@@ -1,75 +1,194 @@
-use tauri::{AppHandle, Emitter};
-use tiny_http::{Server, Response};
-use std::thread;
-use url::Url;
+use tauri::AppHandle;
+use std::sync::Mutex;
+use std::collections::HashMap;
+use std::time::{Duration, Instant};
+use serde::{Deserialize, Serialize};
+
+// ── Device Flow 会话结构 ──────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+pub struct DeviceFlowStartResponse {
+    pub login_id:          String,
+    pub user_code:         String,
+    pub verification_uri:  String,
+    pub expires_in:        u64,
+    pub interval_seconds:  u64,
+}
+
+#[derive(Debug, Clone)]
+struct DeviceFlowSession {
+    device_code:   String,
+    expires_at:    Instant,
+    cancelled:     bool,
+}
+
+// ── GitHub Device Flow API 响应 ───────────────────────────────────────────────
+
+#[derive(Deserialize)]
+struct GhDeviceCodeResponse {
+    device_code:      String,
+    user_code:        String,
+    verification_uri: String,
+    expires_in:       u64,
+    interval:         u64,
+}
+
+#[derive(Deserialize)]
+struct GhTokenResponse {
+    access_token: Option<String>,
+    error:        Option<String>,
+}
+
+// ── 全局 Session 注册表 ───────────────────────────────────────────────────────
+
+static SESSION_MAP: Mutex<Option<HashMap<String, DeviceFlowSession>>> = Mutex::new(None);
+
+fn with_sessions<F, R>(f: F) -> R
+where
+    F: FnOnce(&mut HashMap<String, DeviceFlowSession>) -> R,
+{
+    let mut guard = SESSION_MAP.lock().unwrap();
+    if guard.is_none() {
+        *guard = Some(HashMap::new());
+    }
+    f(guard.as_mut().unwrap())
+}
+
+// ── OauthManager ─────────────────────────────────────────────────────────────
 
 pub struct OauthManager;
 
 impl OauthManager {
-    /// 启动本地监听端口，等待回调
-    pub fn start_oauth_flow(app: AppHandle, provider: String) -> Result<String, String> {
-        let port = 11223;
-        
-        // 由于安全原因我们应该避免端口被重复占用，
-        // 如果端口被占用，tiny_http 会启动失败，此时可以重试一个随机端口
-        let server = match Server::http(format!("127.0.0.1:{}", port)) {
-            Ok(s) => s,
-            Err(e) => return Err(format!("无法绑定端口: {}", e)),
-        };
-        
-        // 构造云端授权 URL
-        // 因为这是一个本地应用跨层授权的演示，此处内置一个 Github 应用的占位参数
-        let client_id = if provider.to_lowercase() == "github copilot" {
-            "Iv1.0123456789abcdef" // 实际需替换为您申请的 OAuth Client ID
-        } else {
-            "generic_client_id"
-        };
-        
-        let auth_url = format!(
-            "https://github.com/login/oauth/authorize?client_id={}&redirect_uri=http://127.0.0.1:{}&scope=read:user",
-            client_id, port
-        );
+    /// 启动 GitHub Device Flow 授权（异步）
+    pub async fn start_oauth_flow(
+        _app: AppHandle,
+        _provider: String,
+    ) -> Result<DeviceFlowStartResponse, String> {
+        // GitHub OAuth App Client ID（需替换为实际申请的）
+        let client_id = "Iv23liRzHiTiFiMGb9nd";
 
-        // 我们开启一条独立线程来接收并阻塞等待请求
-        thread::spawn(move || {
-            // tiny_http 服务器阻塞循环
-            for request in server.incoming_requests() {
-                let url_str = format!("http://localhost{}", request.url());
-                if let Ok(url) = Url::parse(&url_str) {
-                    let mut code = None;
-                    for (k, v) in url.query_pairs() {
-                        if k == "code" {
-                            code = Some(v.into_owned());
-                        }
-                    }
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(15))
+            .build()
+            .map_err(|e| format!("HTTP 客户端构建失败: {}", e))?;
 
-                    if let Some(c) = code {
-                        // 发送成功事件到前端的 Tauri Emitter
-                        let _ = app.emit("oauth_success", c);
-                        
-                        let html = r#"
-                        <html>
-                            <head><meta charset="utf-8"></head>
-                            <body>
-                                <h2>🎉 授权成功！您可以关闭该标签页并返回 AI Singularity 了。</h2>
-                                <script>setTimeout(() => window.close(), 3000);</script>
-                            </body>
-                        </html>
-                        "#;
-                        let response = Response::from_string(html)
-                            .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"text/html; charset=UTF-8"[..]).unwrap());
-                        let _ = request.respond(response);
-                        
-                        // 拿到后即销毁服务
-                        break;
-                    }
-                }
-                let response = Response::from_string("等待回调参数 code...");
-                let _ = request.respond(response);
+        let resp = client
+            .post("https://github.com/login/device/code")
+            .header("Accept", "application/json")
+            .form(&[("client_id", client_id), ("scope", "read:user")])
+            .send()
+            .await
+            .map_err(|e| format!("请求 Device Code 失败（请检查网络连接）: {}", e))?;
+
+        let body: GhDeviceCodeResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("解析 Device Code 响应失败: {}", e))?;
+
+        let login_id = uuid::Uuid::new_v4().to_string();
+        let session = DeviceFlowSession {
+            device_code:   body.device_code.clone(),
+            expires_at:    Instant::now() + Duration::from_secs(body.expires_in),
+            cancelled:     false,
+        };
+
+        with_sessions(|map| map.insert(login_id.clone(), session));
+
+        Ok(DeviceFlowStartResponse {
+            login_id,
+            user_code:        body.user_code,
+            verification_uri: body.verification_uri,
+            expires_in:       body.expires_in,
+            interval_seconds: body.interval,
+        })
+    }
+
+    /// 轮询授权状态（前端每 interval_seconds 调用一次，异步）
+    /// - Ok(Some(token)) → 成功
+    /// - Ok(None)        → 继续等待
+    /// - Err(msg)        → 失败/超时/取消
+    pub async fn poll_oauth_login(login_id: String) -> Result<Option<String>, String> {
+        let (device_code, expired, cancelled) = with_sessions(|map| {
+            if let Some(s) = map.get(&login_id) {
+                (
+                    s.device_code.clone(),
+                    s.expires_at < Instant::now(),
+                    s.cancelled,
+                )
+            } else {
+                ("".to_string(), true, true)
             }
         });
-        
-        // 将产生的安全跳转 URL 发放给前端，由前端呼出浏览器
-        Ok(auth_url)
+
+        if cancelled {
+            return Err("授权已取消".to_string());
+        }
+        if expired {
+            with_sessions(|map| map.remove(&login_id));
+            return Err("授权码已过期，请重新启动授权".to_string());
+        }
+
+        let client_id = "Iv23liRzHiTiFiMGb9nd";
+
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(15))
+            .build()
+            .map_err(|e| format!("HTTP 客户端构建失败: {}", e))?;
+
+        let resp = client
+            .post("https://github.com/login/oauth/access_token")
+            .header("Accept", "application/json")
+            .form(&[
+                ("client_id", client_id),
+                ("device_code", device_code.as_str()),
+                ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+            ])
+            .send()
+            .await
+            .map_err(|e| format!("轮询请求失败: {}", e))?;
+
+        let token_resp: GhTokenResponse = resp
+            .json()
+            .await
+            .map_err(|e| format!("解析轮询响应失败: {}", e))?;
+
+        if let Some(token) = token_resp.access_token {
+            if !token.is_empty() {
+                with_sessions(|map| map.remove(&login_id));
+                return Ok(Some(token));
+            }
+        }
+
+        match token_resp.error.as_deref() {
+            Some("authorization_pending") | Some("slow_down") | None => Ok(None),
+            Some("expired_token") => {
+                with_sessions(|map| map.remove(&login_id));
+                Err("授权码已过期".to_string())
+            }
+            Some("access_denied") => {
+                with_sessions(|map| map.remove(&login_id));
+                Err("用户拒绝了授权请求".to_string())
+            }
+            Some(other) => {
+                with_sessions(|map| map.remove(&login_id));
+                Err(format!("授权失败: {}", other))
+            }
+        }
+    }
+
+    /// 取消授权
+    pub fn cancel_oauth_flow(login_id: Option<String>) -> Result<(), String> {
+        with_sessions(|map| {
+            match &login_id {
+                Some(id) => { map.remove(id); }
+                None     => { map.clear(); }
+            }
+        });
+        Ok(())
+    }
+
+    /// 等同于 start_oauth_flow（Antigravity-Manager 兼容接口）
+    pub async fn prepare_oauth_url(app: AppHandle) -> Result<DeviceFlowStartResponse, String> {
+        Self::start_oauth_flow(app, "antigravity".to_string()).await
     }
 }

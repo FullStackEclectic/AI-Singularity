@@ -24,7 +24,7 @@ impl HealthCheckDaemon {
 
     /// 在后台作为独立任务启动
     pub fn start(self, interval_minutes: u64) {
-        tokio::spawn(async move {
+        tauri::async_runtime::spawn(async move {
             tracing::info!(
                 "守护进程已启动：API Key 主动健康探活 (每 {} 分钟执行一次)",
                 interval_minutes

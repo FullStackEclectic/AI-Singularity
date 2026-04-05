@@ -18,3 +18,4 @@ pub mod tools;
 pub mod injector;
 pub mod user_token;
 pub mod analytics;
+pub mod ide_scanner;

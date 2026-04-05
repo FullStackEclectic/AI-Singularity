@@ -256,6 +256,17 @@ impl Database {
             )?;
         }
 
+        // ── Migration 7: 账号标签（tags）字段 ─────────────────────────────────
+        if current_version < 7 {
+            let _ = conn.execute_batch(
+                "ALTER TABLE ide_accounts ADD COLUMN tags TEXT;
+                 ALTER TABLE api_keys ADD COLUMN tags TEXT;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (7, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 
@@ -313,7 +324,7 @@ impl Database {
             "SELECT 
                 id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
                 status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
-                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used
+                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used, tags
              FROM ide_accounts 
              WHERE origin_platform = ? AND status = 'active' AND is_proxy_disabled = 0",
             &[&origin_platform],
@@ -340,6 +351,11 @@ impl Database {
                     _ => crate::models::AccountStatus::Active,
                 };
 
+                let tags_json: Option<String> = row.get(18).ok();
+                let tags: Vec<String> = tags_json
+                    .and_then(|j| serde_json::from_str(&j).ok())
+                    .unwrap_or_default();
+
                 Ok(crate::models::IdeAccount {
                     id: row.get(0)?,
                     email: row.get(1)?,
@@ -359,6 +375,7 @@ impl Database {
                     last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
                     device_profile: profile,
                     quota_json: row.get(14)?,
+                    tags,
                 })
             },
         )
@@ -385,7 +402,7 @@ impl Database {
             "SELECT 
                 id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
                 status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
-                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used
+                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used, tags
              FROM ide_accounts ORDER BY created_at DESC",
             &[],
             |row| {
@@ -411,6 +428,11 @@ impl Database {
                     _ => crate::models::AccountStatus::Active,
                 };
 
+                let tags_json: Option<String> = row.get(18).ok();
+                let tags: Vec<String> = tags_json
+                    .and_then(|j| serde_json::from_str(&j).ok())
+                    .unwrap_or_default();
+
                 Ok(crate::models::IdeAccount {
                     id: row.get(0)?,
                     email: row.get(1)?,
@@ -430,6 +452,7 @@ impl Database {
                     last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
                     device_profile: profile,
                     quota_json: row.get(14)?,
+                    tags,
                 })
             },
         )
@@ -513,5 +536,21 @@ impl Database {
         if ide_rows > 0 {
             tracing::info!("♻️ [降维预警解除] 成功复活了 {} 个高优 IDE 伪装节点的 Rate Limit", ide_rows);
         }
+    }
+
+    /// 更新 IDE 账号标签（tags JSON 数组）
+    pub fn update_ide_account_tags(&self, id: &str, tags_json: &str) -> SqlResult<usize> {
+        self.execute(
+            "UPDATE ide_accounts SET tags = ?, updated_at = datetime('now') WHERE id = ?",
+            &[&tags_json, &id],
+        )
+    }
+
+    /// 更新 API Key 标签
+    pub fn update_api_key_tags(&self, id: &str, tags_json: &str) -> SqlResult<usize> {
+        self.execute(
+            "UPDATE api_keys SET tags = ? WHERE id = ?",
+            &[&tags_json, &id],
+        )
     }
 }

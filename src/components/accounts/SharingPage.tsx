@@ -1,9 +1,9 @@
 import { useState, useEffect } from "react";
 import { api } from "../../lib/api";
 import { Shield, Key, Network, Users, Clock, AlertTriangle, Plus, Trash2, Power, Eye, EyeOff, Save, X } from "lucide-react";
-import "./UserTokenPage.css";
+import "./SharingPage.css";
 
-export default function UserTokenPage() {
+export default function SharingPage() {
   const [tokens, setTokens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -42,11 +42,9 @@ export default function UserTokenPage() {
   const calculateExpiresAt = () => {
     if (expiresType === "never") return null;
     if (expiresType === "relative") {
-       // We store relative expiration in seconds
        const days = parseInt(expiresDays, 10) || 7;
        return days * 24 * 3600;
     }
-    // "absolute" can be added if needed, for simplicity we only expose relative in this MVP UI
     return null;
   };
 
@@ -74,7 +72,7 @@ export default function UserTokenPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定要收回这个 Token 吗？下级设备将立刻断网。")) return;
+    if (!confirm("确定要收回这个 Token 吗？使用该 Token 的设备将立刻失去连接。")) return;
     try {
       await api.userTokens.delete(id);
       fetchTokens();
@@ -101,14 +99,14 @@ export default function UserTokenPage() {
   };
 
   return (
-    <div className="user-token-page cyber-scanline">
+    <div className="sharing-page">
       <header className="page-header">
         <div className="header-left">
-          <Shield className="header-icon cyber-glitch" />
-          <h1>下线分发矩阵</h1>
+          <Shield className="header-icon" />
+          <h1>分享与下发</h1>
         </div>
         <button className="primary-button" onClick={() => setShowForm(!showForm)}>
-          <Plus size={16} /> 创建新信标 (Sub-Token)
+          <Plus size={16} /> 创建分享 Token
         </button>
       </header>
 
@@ -117,12 +115,12 @@ export default function UserTokenPage() {
           <h3><Key size={16}/> 颁发新访问权</h3>
           <div className="form-grid">
             <div className="form-group">
-              <label>使用者代号</label>
-              <input value={username} onChange={e => setUsername(e.target.value)} placeholder="e.g. Neo" />
+              <label>使用者名称</label>
+              <input value={username} onChange={e => setUsername(e.target.value)} placeholder="如：我的朋友小明" />
             </div>
             <div className="form-group">
               <label>备注描述</label>
-              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="用途..." />
+              <input value={description} onChange={e => setDescription(e.target.value)} placeholder="用途说明..." />
             </div>
             <div className="form-group">
               <label>过期机制</label>
@@ -138,16 +136,16 @@ export default function UserTokenPage() {
               </div>
             )}
             <div className="form-group">
-              <label>最大IP并发绑定 (0为不限)</label>
+              <label>最大绑定IP (0为不限制)</label>
               <input type="number" value={maxIps} onChange={e => setMaxIps(e.target.value)} />
             </div>
             <div className="form-group row-group">
               <div className="flex-1">
-                <label>宵禁开始 (HH:MM)</label>
+                <label>不可用开始时间 (HH:MM)</label>
                 <input type="time" value={curfewStart} onChange={e => setCurfewStart(e.target.value)} />
               </div>
               <div className="flex-1">
-                <label>宵禁结束 (HH:MM)</label>
+                <label>不可用结束时间 (HH:MM)</label>
                 <input type="time" value={curfewEnd} onChange={e => setCurfewEnd(e.target.value)} />
               </div>
             </div>
@@ -156,8 +154,8 @@ export default function UserTokenPage() {
             <button className="secondary-button" onClick={() => setShowForm(false)}>
               <X size={14} /> 取消
             </button>
-            <button className="primary-button cyber-btn" onClick={handleCreate}>
-              <Save size={14} /> 颁发证书
+            <button className="primary-button" onClick={handleCreate}>
+              <Save size={14} /> 创建颁发
             </button>
           </div>
         </div>
@@ -165,8 +163,8 @@ export default function UserTokenPage() {
 
       {loading ? (
         <div className="loading-state">
-          <div className="cyber-spinner"></div>
-          <span>扫描分发矩阵中...</span>
+          <div className="spinner"></div>
+          <span>加载数据中...</span>
         </div>
       ) : (
         <div className="token-list">
@@ -182,7 +180,7 @@ export default function UserTokenPage() {
                   <button onClick={() => handleToggleEnabled(token)} className={`status-toggle ${token.enabled ? 'on' : 'off'}`} title={token.enabled ? "冻结" : "解冻"}>
                     <Power size={18} />
                   </button>
-                  <button onClick={() => handleDelete(token.id)} className="delete-btn" title="回收">
+                  <button onClick={() => handleDelete(token.id)} className="delete-btn" title="回收撤销">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -190,7 +188,7 @@ export default function UserTokenPage() {
               
               <div className="card-body">
                 <div className="token-field">
-                  <span className="label">Access Token:</span>
+                  <span className="label">下发 Token:</span>
                   <div className="token-value-wrap">
                     <code>{visibleTokens[token.id] ? token.token : "sk-ag-••••••••••••••••••••••••••••"}</code>
                     <button onClick={() => toggleTokenVisibility(token.id)}>
@@ -202,33 +200,33 @@ export default function UserTokenPage() {
                 <div className="metrics-grid">
                   <div className="metric">
                     <span className="metric-icon"><Network size={14}/></span>
-                    <span className="metric-val">{token.max_ips === 0 ? '无限制' : `限 ${token.max_ips} IP`}</span>
+                    <span className="metric-val">{token.max_ips === 0 ? '不限 IP' : `限制 ${token.max_ips} IP`}</span>
                   </div>
                   {(token.curfew_start || token.curfew_end) && (
                     <div className="metric warn">
                       <span className="metric-icon"><AlertTriangle size={14}/></span>
-                      <span className="metric-val">宵禁 {token.curfew_start || '00:00'} - {token.curfew_end || '23:59'}</span>
+                      <span className="metric-val">此时不可用: {token.curfew_start || '00:00'} - {token.curfew_end || '23:59'}</span>
                     </div>
                   )}
                   <div className="metric">
                     <span className="metric-icon"><Clock size={14}/></span>
-                    <span className="metric-val">建于: {formatTimestamp(token.created_at)}</span>
+                    <span className="metric-val">创建于: {formatTimestamp(token.created_at)}</span>
                   </div>
                 </div>
 
                 <div className="usage-stats">
                   <div className="stat-pill">
-                    <span className="label">总请求数</span>
+                    <span className="label">请求次数</span>
                     <span className="value">{token.total_requests}</span>
                   </div>
                   <div className="stat-pill highlight">
-                    <span className="label">总 Token 消耗</span>
+                    <span className="label">Token 消耗量</span>
                     <span className="value">{token.total_tokens_used.toLocaleString()}</span>
                   </div>
                   <div className="stat-pill">
-                    <span className="label">近期活跃</span>
+                    <span className="label">近期活跃时间</span>
                     <span className="value">
-                      {token.last_used_at ? formatTimestamp(token.last_used_at) : '未激活'}
+                      {token.last_used_at ? formatTimestamp(token.last_used_at) : '暂未连接'}
                     </span>
                   </div>
                 </div>
@@ -238,8 +236,8 @@ export default function UserTokenPage() {
           {tokens.length === 0 && (
             <div className="empty-state">
               <Network size={48} className="empty-icon" />
-              <p>暂无下线分发记录</p>
-              <span>通过下发 Token，您可以将单机版算力输出给其他设备或团队使用。</span>
+              <p>暂无下线分享记录</p>
+              <span>通过下发受控 Token，您可以轻松把算力分享给其他程序或朋友。</span>
             </div>
           )}
         </div>

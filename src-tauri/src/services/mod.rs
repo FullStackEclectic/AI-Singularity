@@ -20,3 +20,4 @@ pub mod ide_injector;
 pub mod user_token;
 pub mod vscode_paths;
 pub mod analytics;
+pub mod ide_scanner;
