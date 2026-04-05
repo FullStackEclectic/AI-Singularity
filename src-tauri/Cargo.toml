@@ -76,6 +76,7 @@ async-stream = "0.3.6"
 reqwest-eventsource = "0.6.0"
 async-trait = "0.1.89"
 tokio-stream = "0.1.18"
+url = "2.5.8"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52.0"

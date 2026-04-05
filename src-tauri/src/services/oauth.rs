@@ -80,9 +80,19 @@ impl OauthManager {
             .await
             .map_err(|e| format!("请求 Device Code 失败（请检查网络连接）: {}", e))?;
 
-        let body: GhDeviceCodeResponse = resp
-            .json()
-            .await
+        let text = resp.text().await.map_err(|e| format!("读取响应失败: {}", e))?;
+        
+        if text.contains("\"error\"") {
+            let err_body: serde_json::Value = serde_json::from_str(&text).unwrap_or_default();
+            if let Some(msg) = err_body.get("error").and_then(|v| v.as_str()) {
+                if msg == "Not Found" {
+                    return Err("GitHub OAuth App 不存在或未启用 Device Flow。请开发者在 oauth.rs 源码中填入真实的 Client ID！".to_string());
+                }
+                return Err(format!("GitHub API 拒绝了请求: {}", msg));
+            }
+        }
+
+        let body: GhDeviceCodeResponse = serde_json::from_str(&text)
             .map_err(|e| format!("解析 Device Code 响应失败: {}", e))?;
 
         let login_id = uuid::Uuid::new_v4().to_string();

@@ -1,11 +1,3 @@
-/* 整体主题变量覆盖 */
-.cyberpunk-theme {
-  --color-cyan: #0ff;
-  --color-purple: #b538ff;
-  --color-emerald: #10b981;
-  --color-orange: #f59e0b;
-}
-
 .dashboard { 
   height: 100%; 
   display: flex; 
@@ -16,67 +8,10 @@
 .dashboard-body {
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-6) var(--space-8);
+  padding: var(--space-3) var(--space-6) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
-}
-
-/* 动效：脉冲发光 */
-@keyframes pulseGlow {
-  0% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.1); }
-  50% { box-shadow: 0 0 15px rgba(0, 255, 255, 0.3); }
-  100% { box-shadow: 0 0 5px rgba(0, 255, 255, 0.1); }
-}
-
-@keyframes glitch {
-  0% { transform: translate(0) }
-  20% { transform: translate(-2px, 2px) }
-  40% { transform: translate(-2px, -2px) }
-  60% { transform: translate(2px, 2px) }
-  80% { transform: translate(2px, -2px) }
-  100% { transform: translate(0) }
-}
-
-.cyber-glitch {
-  position: relative;
-  display: inline-block;
-  color: var(--color-cyan);
-  text-shadow: 0 0 8px rgba(0,255,255,0.4);
-}
-.cyber-glitch::before, .cyber-glitch::after {
-  content: attr(data-text);
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-}
-.cyber-glitch::before {
-  left: 2px;
-  text-shadow: -1px 0 red;
-  clip: rect(24px, 550px, 90px, 0);
-  animation: glitch-anim-2 3s infinite linear alternate-reverse;
-}
-.cyber-glitch::after {
-  left: -2px;
-  text-shadow: -1px 0 blue;
-  clip: rect(85px, 550px, 140px, 0);
-  animation: glitch-anim 2.5s infinite linear alternate-reverse;
-}
-
-/* 卡片玻璃态基础 */
-.glassmorphism {
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
-}
-
-.glow-border-bottom {
-  border-bottom: 1px solid rgba(0, 255, 255, 0.2);
-  box-shadow: 0 4px 6px -1px rgba(0, 255, 255, 0.05);
+  gap: var(--space-4);
 }
 
 /* 顶部关键指标栏 */
@@ -86,31 +21,15 @@
   gap: var(--space-4);
 }
 
-.stat-card.loading {
-  opacity: 0.5;
-}
-
 .stat-card {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
   padding: var(--space-5);
-  position: relative;
-  overflow: hidden;
 }
 
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0; width: 100%; height: 2px;
-  background: var(--color-cyan);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 0.3s ease;
-}
-
-.stat-card:hover::before {
-  transform: scaleX(1);
+.stat-card.loading {
+  opacity: 0.6;
 }
 
 .stat-icon {
@@ -121,18 +40,15 @@
 .stat-value {
   font-size: 32px;
   font-weight: 700;
-  font-family: 'JetBrains Mono', 'Courier New', monospace;
-  letter-spacing: -0.5px;
-}
-
-.neon-text {
-  text-shadow: 0 0 5px currentColor;
+  font-family: var(--font-display);
+  color: var(--color-text-primary);
+  letter-spacing: -0.02em;
 }
 
 .stat-label {
   font-size: 13px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
+  font-weight: 500;
+  color: var(--color-text-muted);
 }
 
 /* 图表网格系统 */
@@ -143,32 +59,27 @@
 }
 
 .chart-panel {
-  padding: var(--space-5);
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  position: relative;
 }
 
 .span-2 {
   grid-column: span 2;
 }
 
-.border-cyan { border-left: 3px solid var(--color-cyan); }
-.border-emerald { border-left: 3px solid var(--color-emerald); }
-.border-orange { border-left: 3px solid var(--color-orange); }
-
 .chart-title {
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--color-text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   margin: 0;
 }
 
 /* Recharts 覆写 */
 .recharts-cartesian-axis-tick-value {
-  fill: #94a3b8;
-  font-family: 'JetBrains Mono', monospace;
+  fill: var(--color-text-muted);
+  font-family: var(--font-sans);
   font-size: 11px;
 }

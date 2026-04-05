@@ -1,0 +1,211 @@
+﻿cargo :     Checking ai-singularity v0.1.0 (C:\Code\ta
+rui\AI-Singularity\src-tauri)
+所在位置 行:1 字符: 1
++ cargo check 2>&1 | Out-File -Encoding utf8 rust_utf8
+.txt
++ ~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (    Chec 
+   king ai...rity\src-tauri):String) [], RemoteExcep  
+  tion
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+error[E0433]: failed to resolve: use of unresolved mod
+ule or unlinked crate `url`
+   --> src\proxy\server.rs:799:27
+    |
+799 |     let encoded: String = url::form_urlencoded::
+byte_serialize(prompt.as_bytes()).collect();
+    |                           ^^^ use of unresolved 
+module or unlinked crate `url`
+    |
+    = help: if you wanted to use a crate named `url`, 
+use `cargo add url` to add it to your `Cargo.toml`
+
+warning: unused import: `anyhow::Result`
+ --> src\db.rs:1:5
+  |
+1 | use anyhow::Result;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(u
+nused)]`) on by default
+
+warning: unused imports: `Request`, `Response`, and `b
+ody::Body`
+  --> src\proxy\server.rs:11:5
+   |
+11 |     body::Body,
+   |     ^^^^^^^^^^
+12 |     extract::State,
+13 |     http::{Request, Response, StatusCode},
+   |            ^^^^^^^  ^^^^^^^^
+
+warning: unused import: `Stream`
+  --> src\proxy\server.rs:18:34
+   |
+18 | use futures::stream::{StreamExt, Stream};
+   |                                  ^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\balance_tracker.rs:1:5
+  |
+1 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused imports: `error`, `info`, and `warn`
+ --> src\services\balance_tracker.rs:5:15
+  |
+5 | use tracing::{info, warn, error};
+  |               ^^^^  ^^^^  ^^^^^
+
+warning: unused import: `AppError`
+ --> src\services\balance_tracker.rs:9:20
+  |
+9 | use crate::error::{AppError, AppResult};
+  |                    ^^^^^^^^
+
+warning: unused import: `ProviderCategory`
+ --> src\services\provider.rs:2:47
+  |
+2 | use crate::models::{ProviderConfig, Platform, Prov
+iderCategory};
+  |                                               ^^^^
+^^^^^^^^^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\mcp.rs:6:5
+  |
+6 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `KeyStatus`
+ --> src\services\alert.rs:2:44
+  |
+2 | use crate::models::{AlertItem, AlertLevel, KeyStat
+us};
+  |                                            ^^^^^^^
+^^
+
+warning: unused import: `rusqlite::params`
+ --> src\services\alert.rs:4:5
+  |
+4 | use rusqlite::params;
+  |     ^^^^^^^^^^^^^^^^
+
+warning: unused import: `warn`
+ --> src\services\skill.rs:5:21
+  |
+5 | use tracing::{info, warn, error};
+  |                     ^^^^
+
+warning: unused import: `Path`
+ --> src\services\session_manager.rs:3:26
+  |
+3 | use std::path::{PathBuf, Path};
+  |                          ^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\user_token.rs:6:5
+  |
+6 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+
+warning: unused import: `models::ApiKey`
+ --> src\store.rs:1:13
+  |
+1 | use crate::{models::ApiKey, AppError, AppResult};
+  |             ^^^^^^^^^^^^^^
+
+warning: unused imports: `AeadCore`, `Aead`, `Aes256Gc
+m`, `Nonce`, and `OsRng`
+ --> src\store.rs:3:12
+  |
+3 |     aead::{Aead, AeadCore, KeyInit, OsRng},
+  |            ^^^^  ^^^^^^^^           ^^^^^
+4 |     Aes256Gcm, Nonce,
+  |     ^^^^^^^^^  ^^^^^
+
+warning: unused imports: `Engine` and `engine::general
+_purpose::STANDARD`
+ --> src\store.rs:6:14
+  |
+6 | use base64::{engine::general_purpose::STANDARD, En
+gine};
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  ^^
+^^^^
+
+warning: use of deprecated type alias `std::panic::Pan
+icInfo`: use `PanicHookInfo` instead
+ --> src\panic_hook.rs:5:17
+  |
+5 | use std::panic::PanicInfo;
+  |                 ^^^^^^^^^
+  |
+  = note: `#[warn(deprecated)]` on by default
+
+warning: use of deprecated type alias `std::panic::Pan
+icInfo`: use `PanicHookInfo` instead
+  --> src\panic_hook.rs:12:54
+   |
+12 |     std::panic::set_hook(Box::new(move |panic_inf
+o: &PanicInfo<'_>| {
+   |                                                  
+    ^^^^^^^^^
+
+error[E0063]: missing field `tags` in initializer of `
+IdeAccount`
+  --> src\commands\injector.rs:32:16
+   |
+32 |             Ok(IdeAccount {
+   |                ^^^^^^^^^^ missing `tags`
+
+warning: unused import: `KeyInit`
+ --> src\store.rs:3:28
+  |
+3 |     aead::{Aead, AeadCore, KeyInit, OsRng},
+  |                            ^^^^^^^
+
+warning: unused variable: `db`
+  --> src\commands\proxy.rs:21:5
+   |
+21 |     db: State<'_, Database>,
+   |     ^^ help: if this is intentional, prefix it wi
+th an underscore: `_db`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[war
+n(unused)]`) on by default
+
+warning: unused variable: `name`
+  --> src\services\session_manager.rs:46:17
+   |
+46 |             let name = process.name().to_string_l
+ossy().to_string().to_lowercase();
+   |                 ^^^^ help: if this is intentional
+, prefix it with an underscore: `_name`
+
+warning: variable does not need to be mutable
+  --> src\services\user_token.rs:23:13
+   |
+23 |         let mut id = Uuid::new_v4().to_string();
+   |             ----^^
+   |             |
+   |             help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` (part of `#[warn(unus
+ed)]`) on by default
+
+warning: variable does not need to be mutable
+  --> src\services\user_token.rs:24:13
+   |
+24 |         let mut token_str = Self::generate_sk_tok
+en();
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+Some errors have detailed explanations: E0063, E0433.
+For more information about an error, try `rustc --expl
+ain E0063`.
+warning: `ai-singularity` (lib) generated 23 warnings
+error: could not compile `ai-singularity` (lib) due to
+ 2 previous errors; 23 warnings emitted

@@ -45,6 +45,7 @@ pub async fn force_inject_ide(account_id: String, db: State<'_, Database>) -> Ap
                 last_used: chrono::Utc::now(),
                 device_profile: serde_json::from_str(&profile_json).unwrap_or(None),
                 quota_json: None,
+                tags: vec![],
             })
         }
     ).map(|a| {
