@@ -37,3 +37,10 @@ pub fn delete_provider(id: String, db: State<'_, Database>, app: AppHandle) -> A
     crate::tray::update_tray_menu(&app);
     Ok(())
 }
+
+#[tauri::command]
+pub fn update_providers_order(ids: Vec<String>, db: State<'_, Database>, app: AppHandle) -> AppResult<()> {
+    ProviderService::new(&*db).reorder_providers(ids)?;
+    crate::tray::update_tray_menu(&app);
+    Ok(())
+}

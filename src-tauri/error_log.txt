@@ -1,83 +1,4 @@
     Checking ai-singularity v0.1.0 (D:\Code\Tauri\AI Singularity\src-tauri)
-error[E0412]: cannot find type `Arc` in this scope
-  --> src\proxy\server.rs:23:17
-   |
-23 |     pub router: Arc<Router>,
-   |                 ^^^ not found in this scope
-   |
-help: consider importing this struct
-   |
- 1 + use std::sync::Arc;
-   |
-
-error[E0412]: cannot find type `Arc` in this scope
-  --> src\proxy\server.rs:24:13
-   |
-24 |     pub db: Arc<Database>,
-   |             ^^^ not found in this scope
-   |
-help: consider importing this struct
-   |
- 1 + use std::sync::Arc;
-   |
-
-error[E0412]: cannot find type `Arc` in this scope
-  --> src\proxy\server.rs:26:23
-   |
-26 |     pub account_pool: Arc<AccountPoolManager>,
-   |                       ^^^ not found in this scope
-   |
-help: consider importing this struct
-   |
- 1 + use std::sync::Arc;
-   |
-
-error[E0412]: cannot find type `Arc` in this scope
-  --> src\proxy\server.rs:35:20
-   |
-35 |     pub fn new(db: Arc<Database>, port: u16) -> Self {
-   |                    ^^^ not found in this scope
-   |
-help: consider importing this struct
-   |
- 1 + use std::sync::Arc;
-   |
-
-error[E0433]: failed to resolve: use of undeclared type `Arc`
-  --> src\proxy\server.rs:39:25
-   |
-39 |                 router: Arc::new(Router::new(db.clone())),
-   |                         ^^^ use of undeclared type `Arc`
-   |
-help: consider importing this struct
-   |
- 1 + use std::sync::Arc;
-   |
-
-error[E0433]: failed to resolve: use of undeclared type `Arc`
-  --> src\proxy\server.rs:40:31
-   |
-40 |                 account_pool: Arc::new(AccountPoolManager::new(db.clone())),
-   |                               ^^^ use of undeclared type `Arc`
-   |
-help: consider importing this struct
-   |
- 1 + use std::sync::Arc;
-   |
-
-error[E0433]: failed to resolve: use of undeclared type `TcpListener`
-  --> src\proxy\server.rs:57:24
-   |
-57 |         let listener = TcpListener::bind(&addr).await?;
-   |                        ^^^^^^^^^^^ use of undeclared type `TcpListener`
-   |
-help: consider importing one of these structs
-   |
- 1 + use std::net::TcpListener;
-   |
- 1 + use tokio::net::TcpListener;
-   |
-
 warning: unused import: `anyhow::Result`
  --> src\db.rs:1:5
   |
@@ -94,6 +15,12 @@ warning: unused imports: `Request`, `Response`, and `body::Body`
 12 |     extract::State,
 13 |     http::{Request, Response, StatusCode},
    |            ^^^^^^^  ^^^^^^^^
+
+warning: unused import: `Stream`
+  --> src\proxy\server.rs:18:34
+   |
+18 | use futures::stream::{StreamExt, Stream};
+   |                                  ^^^^^^
 
 warning: unused import: `std::sync::Arc`
  --> src\services\balance_tracker.rs:1:5
@@ -125,12 +52,6 @@ warning: unused import: `std::sync::Arc`
 6 | use std::sync::Arc;
   |     ^^^^^^^^^^^^^^
 
-warning: unused import: `std::sync::Arc`
- --> src\services\prompts.rs:5:5
-  |
-5 | use std::sync::Arc;
-  |     ^^^^^^^^^^^^^^
-
 warning: unused import: `KeyStatus`
  --> src\services\alert.rs:2:44
   |
@@ -148,6 +69,18 @@ warning: unused import: `warn`
   |
 5 | use tracing::{info, warn, error};
   |                     ^^^^
+
+warning: unused import: `Path`
+ --> src\services\session_manager.rs:3:26
+  |
+3 | use std::path::{PathBuf, Path};
+  |                          ^^^^
+
+warning: unused import: `std::sync::Arc`
+ --> src\services\user_token.rs:6:5
+  |
+6 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
 
 warning: unused import: `models::ApiKey`
  --> src\store.rs:1:13
@@ -183,22 +116,57 @@ warning: use of deprecated type alias `std::panic::PanicInfo`: use `PanicHookInf
 12 |     std::panic::set_hook(Box::new(move |panic_info: &PanicInfo<'_>| {
    |                                                      ^^^^^^^^^
 
-error[E0308]: mismatched types
-   --> src\proxy\server.rs:235:37
-    |
-235 | ...                   &prompt_tokens,
-    |                       ^^^^^^^^^^^^^^ expected `&String`, found `&i64`
-    |
-    = note: expected reference `&std::string::String`
-               found reference `&i64`
+warning: unused variable: `db`
+  --> src\commands\proxy.rs:21:5
+   |
+21 |     db: State<'_, Database>,
+   |     ^^ help: if this is intentional, prefix it with an underscore: `_db`
+   |
+   = note: `#[warn(unused_variables)]` on by default
 
-warning: unused variable: `state`
-   --> src\proxy\server.rs:399:35
+warning: unreachable pattern
+   --> src\services\oauth.rs:848:17
     |
-399 | async fn handle_list_models(State(state): State<ProxyState>) -> impl IntoResponse {
-    |                                   ^^^^^ help: if this is intentional, prefix it with an underscore: `_state`
+818 |                 _ => {
+    |                 - matches any value
+...
+848 |                 "codex" => {
+    |                 ^^^^^^^ no value can reach this
     |
-    = note: `#[warn(unused_variables)]` on by default
+    = note: `#[warn(unreachable_patterns)]` on by default
+
+warning: unreachable pattern
+   --> src\services\oauth.rs:875:17
+    |
+818 |                 _ => {
+    |                 - matches any value
+...
+875 |                 "kiro" => {
+    |                 ^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> src\services\oauth.rs:904:17
+    |
+818 |                 _ => {
+    |                 - matches any value
+...
+904 |                 "trae" => {
+    |                 ^^^^^^ no value can reach this
+
+warning: unreachable pattern
+   --> src\services\oauth.rs:930:17
+    |
+818 |                 _ => {
+    |                 - matches any value
+...
+930 |                 "zed" => {
+    |                 ^^^^^ no value can reach this
+
+error[E0063]: missing field `sort_order` in initializer of `ProviderConfig`
+  --> src\services\stream_check.rs:36:17
+   |
+36 |                 ProviderConfig {
+   |                 ^^^^^^^^^^^^^^ missing `sort_order`
 
 warning: unused import: `KeyInit`
  --> src\store.rs:3:28
@@ -206,7 +174,30 @@ warning: unused import: `KeyInit`
 3 |     aead::{Aead, AeadCore, KeyInit, OsRng},
   |                            ^^^^^^^
 
-Some errors have detailed explanations: E0308, E0412, E0433.
-For more information about an error, try `rustc --explain E0308`.
-warning: `ai-singularity` (lib) generated 18 warnings
-error: could not compile `ai-singularity` (lib) due to 8 previous errors; 18 warnings emitted
+warning: unused variable: `name`
+  --> src\services\session_manager.rs:46:17
+   |
+46 |             let name = process.name().to_string_lossy().to_string().to_lowercase();
+   |                 ^^^^ help: if this is intentional, prefix it with an underscore: `_name`
+
+warning: variable does not need to be mutable
+  --> src\services\user_token.rs:23:13
+   |
+23 |         let mut id = Uuid::new_v4().to_string();
+   |             ----^^
+   |             |
+   |             help: remove this `mut`
+   |
+   = note: `#[warn(unused_mut)]` on by default
+
+warning: variable does not need to be mutable
+  --> src\services\user_token.rs:24:13
+   |
+24 |         let mut token_str = Self::generate_sk_token();
+   |             ----^^^^^^^^^
+   |             |
+   |             help: remove this `mut`
+
+For more information about this error, try `rustc --explain E0063`.
+warning: `ai-singularity` (lib) generated 27 warnings
+error: could not compile `ai-singularity` (lib) due to 1 previous error; 27 warnings emitted

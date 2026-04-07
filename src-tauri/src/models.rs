@@ -186,6 +186,9 @@ pub struct ProviderConfig {
     pub notes: Option<String>,
     /// 扩展配置（JSON，存储各工具特定参数）
     pub extra_config: Option<String>,
+    /// 列表排序优先级，默认为0，数值越小越靠前
+    #[serde(default)]
+    pub sort_order: i32,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -224,6 +227,9 @@ pub struct ApiKey {
     /// 轮询优先级：数值越大越优先（默认 100）
     #[serde(default = "default_priority")]
     pub priority: i64,
+    /// 用户自定义标签（JSON 字符串存储，如 ["vip","生产"]）
+    #[serde(default)]
+    pub tags: Option<Vec<String>>,
 }
 
 fn default_priority() -> i64 { 100 }
@@ -367,7 +373,7 @@ pub struct AlertItem {
 }
 
 // ============================================================
-// SpeedTest
+// SpeedTest & Stream Check
 // ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -376,6 +382,17 @@ pub struct SpeedTestResult {
     pub endpoint: String,
     pub latency_ms: Option<u64>,
     pub status: String, // "ok" | "timeout" | "error"
+}
+
+/// 流式连通性检测结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")] // 前端使用驼峰命名
+pub struct StreamCheckResult {
+    pub status: String, // "operational", "degraded", "failed"
+    pub success: bool,
+    pub message: String,
+    pub response_time_ms: Option<u64>,
+    pub model_used: String,
 }
 
 // ============================================================
@@ -487,6 +504,39 @@ pub struct UserToken {
     pub created_at: i64,
     pub updated_at: i64,
     pub last_used_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TokenScope {
+    #[serde(default = "default_scope")]
+    pub scope: String, // "global" | "channel" | "tag" | "single"
+    pub desc: Option<String>,
+    #[serde(default)]
+    pub channels: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    pub single_account: Option<String>,
+}
+
+fn default_scope() -> String { "global".to_string() }
+
+impl UserToken {
+    pub fn parse_scope(&self) -> TokenScope {
+        if let Some(desc) = &self.description {
+            if desc.starts_with('{') && desc.contains("\"scope\"") {
+                if let Ok(scope) = serde_json::from_str::<TokenScope>(desc) {
+                    return scope;
+                }
+            }
+        }
+        TokenScope {
+            scope: "global".to_string(),
+            desc: self.description.clone(),
+            channels: vec![],
+            tags: vec![],
+            single_account: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

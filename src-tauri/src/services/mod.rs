@@ -21,3 +21,6 @@ pub mod user_token;
 pub mod vscode_paths;
 pub mod analytics;
 pub mod ide_scanner;
+pub mod model_mapping;
+pub mod tunnel;
+pub mod stream_check;

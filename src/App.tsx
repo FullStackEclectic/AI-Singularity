@@ -4,19 +4,20 @@ import DashboardPage from "./components/dashboard/DashboardPage";
 import ModelsPage from "./components/models/ModelsPage";
 import ProxyPage from "./components/proxy/ProxyPage";
 import SettingsPage from "./components/settings/SettingsPage";
-import ProvidersPage from "./components/providers/ProvidersPage";
+import ToolSyncPage from "./components/providers/ToolSyncPage";
 import McpPage from "./components/mcp/McpPage";
 import SkillsPage from "./components/skills/SkillsPage";
 import PromptsPage from "./components/prompts/PromptsPage";
 import SpeedTestPage from "./components/speedtest/SpeedTestPage";
 import AnalyticsPage from "./components/analytics/AnalyticsPage";
 import SessionsPage from "./components/sessions/SessionsPage";
-import AccountsContainerPage from "./components/accounts/AccountsContainerPage";
+import UnifiedAccountsList from "./components/accounts/UnifiedAccountsList";
+import SharingPage from "./components/accounts/SharingPage";
 import ToolDepotPage from "./components/tools/ToolDepotPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import "./App.css";
 
-export type NavPage = "dashboard" | "accounts" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings";
+export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings";
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -80,10 +81,11 @@ export default function App() {
   const renderPage = () => {
     switch (activePage) {
       case "dashboard":  return <DashboardPage />;
-      case "accounts":   return <AccountsContainerPage />;
+      case "accounts":   return <UnifiedAccountsList />;
+      case "sharing":    return <SharingPage />;
       case "models":     return <ModelsPage />;
       case "proxy":      return <ProxyPage />;
-      case "providers":  return <ProvidersPage />;
+      case "providers":  return <ToolSyncPage />;
       case "mcp":        return <McpPage />;
       case "skills":     return <SkillsPage />;
       case "tools":      return <ToolDepotPage />;

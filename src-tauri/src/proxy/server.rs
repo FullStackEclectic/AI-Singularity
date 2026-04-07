@@ -187,10 +187,44 @@ async fn handle_chat_completions(
         .unwrap_or("unknown")
         .to_string();
     
+    let target_scope = if let Some(auth) = auth_header {
+        if auth.starts_with("Bearer sk-ag-") {
+            let token_str = &auth[7..];
+            let token_service = crate::services::user_token::UserTokenService::new(&state.db);
+            if let Ok(Some(ut)) = token_service.get_token_by_str(token_str) {
+                ut.parse_scope()
+            } else {
+                crate::models::TokenScope {
+                    scope: "global".to_string(),
+                    desc: None,
+                    channels: vec![],
+                    tags: vec![],
+                    single_account: None,
+                }
+            }
+        } else {
+            crate::models::TokenScope {
+                scope: "global".to_string(),
+                desc: None,
+                channels: vec![],
+                tags: vec![],
+                single_account: None,
+            }
+        }
+    } else {
+        crate::models::TokenScope {
+            scope: "global".to_string(),
+            desc: None,
+            channels: vec![],
+            tags: vec![],
+            single_account: None,
+        }
+    };
+
     // 跨模态特征指令截杀 (Image Intercept)
     if let Some(img_prompt) = extract_image_prompt(&body.messages) {
         tracing::info!("🎨 检测到绘图指令跨模态截留: {}", img_prompt);
-        if let Some(target) = state.router.pick_best_key(Some("gemini")) {
+        if let Some(target) = state.router.pick_best_key(Some("gemini"), &target_scope) {
             match forward_to_gemini_imagen3(&state.http_client, &target.secret, &img_prompt).await {
                 Ok(resp) => return (StatusCode::OK, Json(resp)).into_response(),
                 Err(e) => tracing::warn!("Gemini Imagen 3 失败: {}, 降级为外部公开代理绘图", e),
@@ -202,39 +236,33 @@ async fn handle_chat_completions(
 
     let is_stream = body.stream.unwrap_or(false);
     let mut current_model = body.model.clone();
-    let mut attempts = 0;
+    
+    // --- 动态模型映射 (Model Mappings) 拦截 ---
+    if let Ok(mappings) = crate::services::model_mapping::ModelMappingService::new(&state.db).get_all() {
+        for m in mappings {
+            if m.is_active && current_model.eq_ignore_ascii_case(&m.source_model) {
+                tracing::info!("🔄 模型重写触发: {} => {}", current_model, m.target_model);
+                current_model = m.target_model;
+                break;
+            }
+        }
+    }
 
-    loop {
+    let mut attempts = 0;    loop {
         attempts += 1;
         let platform_str = get_platform_for_model(&current_model);
 
-        // 1. 拦截层：如果在支持高级指纹欺骗的应用环境下（例如 ClaudeCode, Cursor），优先走池化网络
-        let target_res = if client_app.to_lowercase().contains("claude") || client_app.to_lowercase().contains("cursor") {
-            if let Some(ide_account) = state.account_pool.get_next_available_account("claude_code") {
-                Some(ForwardTarget {
-                    secret: ide_account.token.access_token.clone(),
-                    base_url: None, // IDE proxy URL should be set internally or bypass
-                    platform: Platform::Auth0IDE, // 需要新增 Auth0IDE 平台支持或复用 Anthropic
-                    key_id: ide_account.id.clone(),
-                    device_profile: ide_account.device_profile.clone(),
-                })
-            } else {
-                None
-            }
-        } else {
-            None
-        };
+        // 使用重构后的 pick_best_key，传入平台限制以及分发规则作用域 (Scope)
+        let target_res = state.router.pick_best_key(platform_str, &target_scope);
         
-        // 降级：如果池化网络没货，走基础 API Key 网关
         let target = if let Some(t) = target_res {
-            t
-        } else if let Some(basic_target) = state.router.pick_best_key(platform_str) {
             ForwardTarget {
-                secret: basic_target.secret,
-                base_url: basic_target.base_url,
-                platform: basic_target.platform,
-                key_id: basic_target.key_id,
-                device_profile: None,
+                secret: t.secret,
+                base_url: t.base_url,
+                platform: t.platform,
+                key_id: t.key_id,
+                // 由于目前的重构将 device_profile 提取留在了后续的独立服务逻辑，暂时填充为 none，后续深度劫持池里再补充
+                device_profile: None, 
             }
         } else {
             if attempts == 1 {
@@ -247,7 +275,7 @@ async fn handle_chat_completions(
             }
             return (
                 StatusCode::SERVICE_UNAVAILABLE,
-                Json(json!({"error": {"message": format!("降维打击网关失败：无任何可用令牌，且无法进行备灾 {}", current_model), "type": "no_keys"}})),
+                Json(json!({"error": {"message": format!("降维打击网关失败：无任何可用令牌满足当前 Scope [{}] 的分发规则，且无法进行灾备 {}", target_scope.scope, current_model), "type": "no_keys_in_scope"}})),
             ).into_response();
         };
 
@@ -329,17 +357,22 @@ async fn handle_chat_completions(
                 let err_str = e.to_string();
                 
                 // 标记 Key 失败状态以便路由更新
-                if target.platform == Platform::Auth0IDE {
+                if target.platform == Platform::Auth0IDE || target.device_profile.is_some() {
+                    // 对于 IDE account，目前可以认为是走的 ide account 逻辑。严格来说我们在 router 能区分，不过目前 server 只根据 device proxy。
+                    // 但是因为现在的 router 其实隐藏了来源，最好在 mark_key_status 里面根据 ID 前缀判断，或者再 router 改一下抛出。
+                    // 我们前面已经改了 mark_key_status，需要传 boolis_ide_account。对于 Auth0IDE，或者在我们的设计中如果 key_id 通常是 ide_accounts 的，可以判断。
+                    // 最好如果 device_profile 存在或者 platform 是 IDE 的传入 true。
+                    // 这里为了简化，原代码其实也是拆分的，现在我们统一传：
                     if err_str.contains("401") || err_str.contains("403") {
-                        state.account_pool.report_account_dead(&target.key_id, "HTTP 403 Forbidden");
+                        state.router.mark_key_status(&target.key_id, true, "forbidden");
                     } else if err_str.contains("429") {
-                        state.account_pool.report_account_rate_limited(&target.key_id);
+                        state.router.mark_key_status(&target.key_id, true, "rate_limited");
                     }
                 } else {
                     if err_str.contains("401") || err_str.contains("403") {
-                        state.router.mark_key_status(&target.key_id, "invalid");
+                        state.router.mark_key_status(&target.key_id, false, "invalid");
                     } else if err_str.contains("429") {
-                        state.router.mark_key_status(&target.key_id, "rate_limit");
+                        state.router.mark_key_status(&target.key_id, false, "rate_limit");
                     }
                 }
 

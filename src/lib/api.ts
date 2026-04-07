@@ -51,6 +51,8 @@ export const api = {
     update: (provider: any): Promise<void>      => invoke("update_provider", { provider }),
     switch: (id: string): Promise<void>         => invoke("switch_provider", { id }),
     delete: (id: string): Promise<void>         => invoke("delete_provider", { id }),
+    updateOrder: (ids: string[]): Promise<void> => invoke("update_providers_order", { ids }),
+    streamCheck: (id: string): Promise<any>     => invoke("stream_check_provider", { providerId: id }),
   },
 
   mcp: {

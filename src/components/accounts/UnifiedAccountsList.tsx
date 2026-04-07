@@ -1,150 +1,136 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { api } from "../../lib/api";
 import { PLATFORM_LABELS, STATUS_LABELS } from "../../types";
 import type { ApiKey, IdeAccount, Balance } from "../../types";
 import AddAccountWizard from "./AddAccountWizard";
-import GroupManagerModal from "./GroupManagerModal";
-import { TagBadgeList } from "./TagEditorPopover";
-import { getGroups, type AccountGroup } from "../../lib/groupService";
 import { isPrivacyMode, setPrivacyMode, maskEmail, maskToken } from "../../lib/privacyMode";
+import { 
+  Database, Server, ShieldCheck, Box, 
+  Search, Eye, EyeOff, RefreshCw, Plus, X, MonitorPlay, Share
+} from "lucide-react";
 import "./UnifiedAccountsList.css";
 
-// ─── 工具函数 ──────────────────────────────────────────────────────────────────
+// ─── 类型与辅助 ──────────────────────────────────────────────────────────
 
-function getTagFiltersFromAccounts(ideAccs: IdeAccount[], keys: ApiKey[]): string[] {
-  const all = new Set<string>();
-  ideAccs.forEach((a) => (a.tags ?? []).forEach((t) => all.add(t)));
-  keys.forEach((k) => (k.tags ?? []).forEach((t) => all.add(t)));
-  return Array.from(all).sort();
+type ChannelType = "api" | "ide" | "all";
+interface ChannelMeta {
+  id: string;      // 例如 "all", "api_open_ai", "ide_vscode"
+  type: ChannelType;
+  label: string;
+  count: number;
 }
 
-// ─── 主组件 ────────────────────────────────────────────────────────────────────
+type UnifiedAccountItem = 
+  | { type: "api"; data: ApiKey; balance?: Balance }
+  | { type: "ide"; data: IdeAccount };
+
+// ─── 数据视图呈现组件 ────────────────────────────────────────────────────
 
 export default function UnifiedAccountsList() {
   const qc = useQueryClient();
+  const parentRef = useRef<HTMLDivElement>(null);
 
-  // ---------- UI State ----------
+  // ---------- UI 状态 ----------
   const [showAddWizard, setShowAddWizard] = useState(false);
-  const [showGroupManager, setShowGroupManager] = useState(false);
   const [privacy, setPrivacy] = useState(isPrivacyMode);
 
-  // 过滤状态
+  // ---------- 过滤与侧边栏状态 ----------
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeGroupId, setActiveGroupId] = useState<string | null>(null); // null = 全部
-  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
+  const [activeChannelId, setActiveChannelId] = useState<string>("all");
 
-  // 分组数据（由 GroupManagerModal 刷新触发）
-  const [groups, setGroups] = useState<AccountGroup[]>(() => getGroups());
-
-  const handleGroupsChanged = useCallback(() => {
-    setGroups(getGroups());
-  }, []);
-
-  // ---------- Data ----------
-  const { data: keys = [], isLoading: keysLoading } = useQuery({
-    queryKey: ["keys"],
-    queryFn: api.keys.list,
-  });
-
-  const { data: balances = [] } = useQuery({
-    queryKey: ["balances"],
-    queryFn: api.balance.listAll,
-    staleTime: 1000 * 60 * 5,
-  });
+  // ---------- Server 数据加载 ----------
+  const { data: keys = [], isLoading: keysLoading } = useQuery({ queryKey: ["keys"], queryFn: api.keys.list });
+  const { data: balances = [] } = useQuery({ queryKey: ["balances"], queryFn: api.balance.listAll, staleTime: 1000 * 60 * 5 });
   const balanceMap = Object.fromEntries(balances.map((b) => [b.key_id, b]));
-
-  const { data: ideAccs = [], isLoading: ideLoading } = useQuery({
-    queryKey: ["ideAccounts"],
-    queryFn: api.ideAccounts.list,
-  });
+  const { data: ideAccs = [], isLoading: ideLoading } = useQuery({ queryKey: ["ideAccounts"], queryFn: api.ideAccounts.list });
 
   const isLoading = keysLoading || ideLoading;
 
   // ---------- Mutations ----------
-  const deleteKeyMut = useMutation({
-    mutationFn: api.keys.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }),
-  });
-  const checkKeyMut = useMutation({
-    mutationFn: api.keys.check,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }),
-  });
-  const refreshBalanceMut = useMutation({
-    mutationFn: (id: string) => api.balance.refreshOne(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["balances"] }),
-  });
-  const deleteIdeMut = useMutation({
-    mutationFn: api.ideAccounts.delete,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["ideAccounts"] }),
+  const deleteKeyMut = useMutation({ mutationFn: api.keys.delete, onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }) });
+  const checkKeyMut = useMutation({ mutationFn: api.keys.check, onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] }) });
+  const refreshBalMut = useMutation({ mutationFn: (id: string) => api.balance.refreshOne(id), onSuccess: () => qc.invalidateQueries({ queryKey: ["balances"] }) });
+  const deleteIdeMut = useMutation({ mutationFn: api.ideAccounts.delete, onSuccess: () => qc.invalidateQueries({ queryKey: ["ideAccounts"] }) });
+  const checkAllKeysMut = useMutation({
+    mutationFn: async (list: ApiKey[]) => {
+      for (const k of list) await api.keys.check(k.id);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["keys"] })
   });
 
-  // ---------- Filtering ----------
-  const allTagOptions = useMemo(() => getTagFiltersFromAccounts(ideAccs, keys), [ideAccs, keys]);
+  // ---------- 侧边栏聚合 (Channels) 计算 ----------
+  const channels = useMemo(() => {
+    const apiMap = new Map<string, number>();
+    const ideMap = new Map<string, number>();
 
-  const filteredIdeAccs = useMemo(() => {
-    let list = ideAccs;
+    keys.forEach(k => apiMap.set(k.platform, (apiMap.get(k.platform) || 0) + 1));
+    ideAccs.forEach(a => ideMap.set(a.origin_platform, (ideMap.get(a.origin_platform) || 0) + 1));
 
-    // 分组过滤
-    if (activeGroupId) {
-      const groupAccIds = groups.find((g) => g.id === activeGroupId)?.accountIds ?? [];
-      list = list.filter((a) => groupAccIds.includes(a.id));
+    const chs: ChannelMeta[] = [
+      { id: "all", type: "all", label: "全部资产大盘", count: keys.length + ideAccs.length }
+    ];
+
+    // Standard APIs
+    const apiChs: ChannelMeta[] = Array.from(apiMap.entries()).map(([plat, count]) => ({
+      id: `api_${plat}`, type: "api" as ChannelType, count,
+      label: PLATFORM_LABELS[plat as keyof typeof PLATFORM_LABELS] || plat
+    })).sort((a, b) => b.count - a.count);
+
+    // IDE Fingerprints
+    const ideChs: ChannelMeta[] = Array.from(ideMap.entries()).map(([plat, count]) => ({
+      id: `ide_${plat}`, type: "ide" as ChannelType, count,
+      label: plat
+    })).sort((a, b) => b.count - a.count);
+
+    return { all: chs[0], apiChs, ideChs };
+  }, [keys, ideAccs]);
+
+  // ---------- 高密统一列表视图过筛 ----------
+  const displayItems = useMemo(() => {
+    let rawItems: UnifiedAccountItem[] = [];
+
+    // 根据左侧 Channel 过滤
+    if (activeChannelId === "all") {
+      rawItems = [
+        ...keys.map((k): UnifiedAccountItem => ({ type: "api", data: k, balance: balanceMap[k.id] })),
+        ...ideAccs.map((a): UnifiedAccountItem => ({ type: "ide", data: a }))
+      ];
+    } else if (activeChannelId.startsWith("api_")) {
+      const plat = activeChannelId.replace("api_", "");
+      rawItems = keys.filter(k => k.platform === plat).map(k => ({ type: "api", data: k, balance: balanceMap[k.id] }));
+    } else if (activeChannelId.startsWith("ide_")) {
+      const plat = activeChannelId.replace("ide_", "");
+      rawItems = ideAccs.filter(a => a.origin_platform === plat).map(a => ({ type: "ide", data: a }));
     }
 
-    // 标签过滤
-    if (selectedTags.size > 0) {
-      list = list.filter((a) => (a.tags ?? []).some((t) => selectedTags.has(t)));
-    }
-
-    // 搜索过滤
+    // 根据搜索字符串二次过滤
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (a) =>
-          a.email.toLowerCase().includes(q) ||
-          a.origin_platform.toLowerCase().includes(q) ||
-          (a.tags ?? []).some((t) => t.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  }, [ideAccs, activeGroupId, selectedTags, searchQuery, groups]);
-
-  const filteredKeys = useMemo(() => {
-    let list = keys;
-
-    if (activeGroupId) {
-      const groupAccIds = groups.find((g) => g.id === activeGroupId)?.accountIds ?? [];
-      list = list.filter((k) => groupAccIds.includes(k.id));
+      rawItems = rawItems.filter(item => {
+        if (item.type === "api") {
+          return item.data.name.toLowerCase().includes(q) || item.data.platform.toLowerCase().includes(q);
+        } else {
+          return item.data.email.toLowerCase().includes(q) || item.data.origin_platform.toLowerCase().includes(q);
+        }
+      });
     }
 
-    if (selectedTags.size > 0) {
-      list = list.filter((k) => (k.tags ?? []).some((t) => selectedTags.has(t)));
-    }
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (k) =>
-          k.name.toLowerCase().includes(q) ||
-          k.platform.toLowerCase().includes(q) ||
-          (k.tags ?? []).some((t) => t.toLowerCase().includes(q))
-      );
-    }
-    return list;
-  }, [keys, activeGroupId, selectedTags, searchQuery, groups]);
-
-  const noAccounts = keys.length === 0 && ideAccs.length === 0;
-  const validCount =
-    keys.filter((k) => k.status === "valid").length +
-    ideAccs.filter((a) => a.status === "active").length;
-
-  const toggleTag = (tag: string) => {
-    setSelectedTags((prev) => {
-      const next = new Set(prev);
-      next.has(tag) ? next.delete(tag) : next.add(tag);
-      return next;
+    // 默认按最后使用或状态排序
+    return rawItems.sort((a, b) => {
+      const getT = (i: UnifiedAccountItem) => i.type === "api" ? new Date(i.data.created_at).getTime() : new Date((i.data as IdeAccount).last_used).getTime();
+      return getT(b) - getT(a); 
     });
-  };
+  }, [keys, ideAccs, balanceMap, activeChannelId, searchQuery]);
+
+  // ---------- 虚拟列表引擎初始化 ----------
+  const rowVirtualizer = useVirtualizer({
+    count: displayItems.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 52, // 单行高度预估 52px
+    overscan: 10,
+  });
 
   const togglePrivacy = () => {
     const next = !privacy;
@@ -152,180 +138,222 @@ export default function UnifiedAccountsList() {
     setPrivacyMode(next);
   };
 
+  const activeChannelName = channels.all.id === activeChannelId ? "系统全局资产" : 
+                            [...channels.apiChs, ...channels.ideChs].find(c => c.id === activeChannelId)?.label || "未知渠道";
+
+  const totalFilteredCount = displayItems.length;
+
   return (
     <div className="unified-accounts-page">
-      {/* ─── Header ─────────────────────────────────────────────────── */}
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">
-            <span style={{ color: "var(--accent-primary)" }}>🔌</span> 接入账号
-          </h1>
-          <p className="page-subtitle">
-            管理正在为系统提供底层算力的各类账号及凭证，包括标准 API 以及 IDE 辅助插件账户。
-          </p>
-        </div>
-        <div className="header-actions">
-          <button
-            className={`btn btn-icon-label ${privacy ? "active" : ""}`}
-            onClick={togglePrivacy}
-            title={privacy ? "关闭隐私模式" : "开启隐私模式"}
-          >
-            {privacy ? "🙈" : "👁️"}
-            <span>{privacy ? "隐私中" : "隐私"}</span>
-          </button>
-          <button
-            className="btn btn-outline"
-            onClick={() => setShowGroupManager(true)}
-            title="管理分组"
-          >
-            📁 分组
-          </button>
-          <button
-            className="btn btn-outline"
-            onClick={() => keys.forEach((k) => checkKeyMut.mutate(k.id))}
-            disabled={keys.length === 0 || checkKeyMut.isPending}
-          >
-            ⟳ 探测
-          </button>
-          <button className="btn btn-primary" onClick={() => setShowAddWizard(true)}>
-            ＋ 添加账号
-          </button>
-        </div>
-      </div>
-
-      {/* ─── Stats Bar ───────────────────────────────────────────────── */}
-      <div className="stats-bar">
-        <div className="stat-item">
-          <span className="label">接入总数</span>
-          <span className="value">{keys.length + ideAccs.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="label text-success">正常运作</span>
-          <span className="value text-success">{validCount}</span>
-        </div>
-        <div className="stat-item">
-          <span className="label">标准 API</span>
-          <span className="value">{keys.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="label">IDE 账号</span>
-          <span className="value">{ideAccs.length}</span>
-        </div>
-        <div className="stat-item">
-          <span className="label">分组</span>
-          <span className="value">{groups.length}</span>
-        </div>
-      </div>
-
-      {/* ─── Filter Bar ──────────────────────────────────────────────── */}
-      <div className="filter-bar">
-        {/* 搜索框 */}
-        <div className="search-box">
-          <span className="search-icon">🔍</span>
-          <input
-            className="search-input"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索账号..."
-          />
-          {searchQuery && (
-            <button className="search-clear" onClick={() => setSearchQuery("")}>✕</button>
-          )}
+      
+      {/* ─── 左侧轨道分栏 ─────────────────────────────── */}
+      <div className="unified-sidebar">
+        <div className="sidebar-brand">
+          <Database size={20} color="var(--accent-primary, #2563eb)" />
+          <span>资产仓库</span>
         </div>
 
-        {/* 分组过滤 Tab */}
-        <div className="group-tabs">
-          <button
-            className={`group-tab ${activeGroupId === null ? "active" : ""}`}
-            onClick={() => setActiveGroupId(null)}
+        <div className="sidebar-section">
+          <div 
+            className={`channel-nav-item ${activeChannelId === "all" ? "active" : ""}`}
+            onClick={() => setActiveChannelId("all")}
           >
-            全部 <span className="tab-count">{keys.length + ideAccs.length}</span>
-          </button>
-          {groups.map((g) => (
-            <button
-              key={g.id}
-              className={`group-tab ${activeGroupId === g.id ? "active" : ""}`}
-              onClick={() => setActiveGroupId(g.id === activeGroupId ? null : g.id)}
-            >
-              {g.name}
-              <span className="tab-count">{g.accountIds.length}</span>
-            </button>
-          ))}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Box size={14}/> 全部账号</div>
+            <span className="channel-count">{channels.all.count}</span>
+          </div>
         </div>
 
-        {/* 标签过滤 */}
-        {allTagOptions.length > 0 && (
-          <div className="tag-filter-bar">
-            {allTagOptions.map((tag) => (
-              <button
-                key={tag}
-                className={`tag-filter-chip ${selectedTags.has(tag) ? "selected" : ""}`}
-                onClick={() => toggleTag(tag)}
+        {channels.apiChs.length > 0 && (
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">官方 API 渠道</div>
+            {channels.apiChs.map(c => (
+              <div 
+                key={c.id} 
+                className={`channel-nav-item ${activeChannelId === c.id ? "active" : ""}`}
+                onClick={() => setActiveChannelId(c.id)}
               >
-                {tag}
-              </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Server size={14}/> {c.label}</div>
+                <span className="channel-count">{c.count}</span>
+              </div>
             ))}
-            {selectedTags.size > 0 && (
-              <button
-                className="tag-filter-clear"
-                onClick={() => setSelectedTags(new Set())}
+          </div>
+        )}
+
+        {channels.ideChs.length > 0 && (
+          <div className="sidebar-section">
+            <div className="sidebar-section-title">IDE 沙盒池</div>
+            {channels.ideChs.map(c => (
+              <div 
+                key={c.id} 
+                className={`channel-nav-item ${activeChannelId === c.id ? "active" : ""}`}
+                onClick={() => setActiveChannelId(c.id)}
               >
-                清除过滤
-              </button>
-            )}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><ShieldCheck size={14}/> {c.label}</div>
+                <span className="channel-count">{c.count}</span>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* ─── Account List ────────────────────────────────────────────── */}
-      {isLoading ? (
-        <div className="empty-state">
-          <div className="animate-spin" style={{ fontSize: 24, marginBottom: "1rem" }}>⟳</div>
-          <span>加载中...</span>
-        </div>
-      ) : noAccounts ? (
-        <div className="empty-state">
-          <h3 style={{ margin: "0 0 0.5rem 0", color: "var(--text-primary)" }}>暂无接入账号</h3>
-          <p style={{ margin: "0 0 1.5rem 0" }}>没有探测到任何可用的算力凭证，系统能力受限。</p>
-          <button className="btn btn-primary" onClick={() => setShowAddWizard(true)}>
-            立即添加账号
-          </button>
-        </div>
-      ) : filteredIdeAccs.length === 0 && filteredKeys.length === 0 ? (
-        <div className="empty-state">
-          <p style={{ margin: 0, color: "var(--text-muted)" }}>没有匹配的账号，请调整过滤条件。</p>
-        </div>
-      ) : (
-        <div className="accounts-grid">
-          {/* Standard API Keys */}
-          {filteredKeys.map((key) => (
-            <StandardKeyCard
-              key={key.id}
-              apiKey={key}
-              balance={balanceMap[key.id]}
-              onCheck={() => checkKeyMut.mutate(key.id)}
-              onDelete={() => deleteKeyMut.mutate(key.id)}
-              onRefreshBalance={() => refreshBalanceMut.mutate(key.id)}
-              isChecking={checkKeyMut.isPending}
-              privacy={privacy}
-              groups={groups.filter((g) => g.accountIds.includes(key.id))}
-            />
-          ))}
+      {/* ─── 右侧巨型工作区 ───────────────────────────── */}
+      <div className="unified-main">
+        {/* Header区 */}
+        <div className="main-header">
+          <div className="main-title-area">
+            <h1 className="main-title">{activeChannelName}</h1>
+            <p className="main-subtitle">已筛选 {totalFilteredCount} 条可用账单记录</p>
+          </div>
 
-          {/* IDE Fingerprint Accounts */}
-          {filteredIdeAccs.map((acc) => (
-            <IdeAccountCard
-              key={acc.id}
-              account={acc}
-              onDelete={() => deleteIdeMut.mutate(acc.id)}
-              privacy={privacy}
-              groups={groups.filter((g) => g.accountIds.includes(acc.id))}
-            />
-          ))}
+          <div className="header-actions">
+            <button className={`btn-icon-label ${privacy ? "active" : ""}`} onClick={togglePrivacy}>
+              {privacy ? <EyeOff size={15}/> : <Eye size={15}/>} {privacy ? "隐私开启" : "明文显示"}
+            </button>
+            <button className="btn-outline" onClick={() => {
+                const keys = displayItems.map(i => i.data).filter(d => 'platform' in d) as ApiKey[];
+                if(keys.length > 0) checkAllKeysMut.mutate(keys);
+              }}
+              disabled={checkAllKeysMut.isPending}
+            >
+              <RefreshCw size={15} className={checkAllKeysMut.isPending ? "spin" : ""} /> 
+              {checkAllKeysMut.isPending ? "全量探测中" : "一键探测筛选键"}
+            </button>
+            <button className="btn-primary" onClick={() => setShowAddWizard(true)}>
+              <Plus size={15} /> 添加资产
+            </button>
+          </div>
         </div>
-      )}
 
-      {/* ─── Modals ───────────────────────────────────────────────────── */}
+        {/* 顶部搜挂区 */}
+        <div className="filter-bar">
+          <div className="search-box">
+            <Search size={14} className="search-icon" />
+            <input 
+              className="search-input" 
+              placeholder={`在 ${activeChannelName} 中搜索 UID、名字或标签...`}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && <X size={14} className="search-clear" onClick={() => setSearchQuery("")} style={{cursor: 'pointer'}} />}
+          </div>
+        </div>
+
+        {/* 万级虚拟列表 */}
+        <div className="table-container" ref={parentRef}>
+          {/* Table Header (Sticky) */}
+          <div className="data-table-header">
+            <div className="col-id">标识符 (UID)</div>
+            <div className="col-platform">渠道类型</div>
+            <div className="col-status">状态</div>
+            <div className="col-balance">剩余额度</div>
+            <div className="col-time">最后使用/心跳</div>
+            <div className="col-actions">高危操作</div>
+          </div>
+
+          {isLoading ? (
+            <div className="empty-state">
+              <RefreshCw size={24} className="spin" />
+              <span>核心数据网络拉取中...</span>
+            </div>
+          ) : displayItems.length === 0 ? (
+            <div className="empty-state">
+              <Box size={32} opacity={0.5} />
+              <span>当前汇聚池为空或被筛选掉</span>
+            </div>
+          ) : (
+            <div className="virtual-list-inner" style={{ height: `${rowVirtualizer.getTotalSize()}px` }}>
+              {rowVirtualizer.getVirtualItems().map(virtualRow => {
+                const item = displayItems[virtualRow.index];
+                return (
+                  <div
+                    key={virtualRow.index}
+                    className="data-table-row"
+                    data-index={virtualRow.index}
+                    style={{
+                      height: `${virtualRow.size}px`,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                  >
+                    {/* ID & Name */}
+                    <div className="col-id row-identity table-cell-ellipsis">
+                      <div className="row-icon">
+                        {item.type === "api" ? <Server size={14} /> : <ShieldCheck size={14} />}
+                      </div>
+                      <span title={item.type === "api" ? item.data.name : item.data.email}>
+                        {privacy 
+                          ? (item.type === "api" ? maskToken(item.data.key_preview) : maskEmail(item.data.email))
+                          : (item.type === "api" ? item.data.name : item.data.email)
+                        }
+                      </span>
+                    </div>
+
+                    {/* Platform */}
+                    <div className="col-platform table-cell-ellipsis text-muted">
+                      {item.type === "api" ? (PLATFORM_LABELS[item.data.platform as keyof typeof PLATFORM_LABELS] || item.data.platform) : item.data.origin_platform}
+                    </div>
+
+                    {/* Status */}
+                    <div className="col-status">
+                      <StatusCell item={item} />
+                    </div>
+
+                    {/* Balance */}
+                    <div className="col-balance table-cell-ellipsis">
+                      {item.type === "api" && item.balance ? (
+                        <span className="text-success" style={{ fontWeight: 600 }}>
+                           {privacy ? "***" : (item.balance.balance_usd != null ? `$${item.balance.balance_usd.toFixed(2)}` : `¥${item.balance.balance_cny?.toFixed(2) || '0.00'}`)}
+                        </span>
+                      ) : <span className="text-muted">—</span>}
+                    </div>
+
+                    {/* Time */}
+                    <div className="col-time table-cell-ellipsis">
+                      {item.type === "api" 
+                        ? (item.data.created_at ? new Date(item.data.created_at).toLocaleString() : "未知")
+                        : ((item.data as IdeAccount).last_used ? new Date((item.data as IdeAccount).last_used).toLocaleString() : "从未调用")
+                      }
+                    </div>
+
+                    {/* Actions */}
+                    <div className="col-actions">
+                      <button className="btn-row-action" onClick={async () => {
+                        if(confirm(`是否为 ${item.type==='api'?item.data.name:item.data.email} 单独签发透传 Token？`)){
+                          try {
+                            await api.userTokens.create({
+                              username: `[极速生成] ${item.type==='api'?item.data.name:item.data.email}`,
+                              description: JSON.stringify({ desc: "单点直连专用", scope: "single", single_account: item.data.id }),
+                              expires_type: "never", expires_at: null, max_ips: 0, curfew_start: null, curfew_end: null
+                            });
+                            alert(`已为您生成底座专属直连 Token，请切换至【分享额度】页面进行查看和提取！`);
+                          }catch(e){ alert("生成失败: "+e); }
+                        }
+                      }} title="快速生成分享 Token"><Share size={14}/></button>
+
+                      {item.type === "api" ? (
+                        <>
+                          <button className="btn-row-action" onClick={() => refreshBalMut.mutate(item.data.id)} title="刷新余额"><RefreshCw size={14}/></button>
+                          <button className="btn-row-action" onClick={() => checkKeyMut.mutate(item.data.id)} title="探测连通性"><MonitorPlay size={14}/></button>
+                          <button className="btn-row-action danger" onClick={() => { if(confirm("删除密钥？")) deleteKeyMut.mutate(item.data.id); }} title="彻底销毁"><X size={14}/></button>
+                        </>
+                      ) : (
+                        <>
+                          <button className="btn-row-action" onClick={async () => {
+                            if(confirm(`强制下发配置 ${item.data.email}？`)){
+                              api.ideAccounts.forceInject(item.data.id).then(()=>alert("注射成功")).catch(e=>alert(e));
+                            }
+                          }} title="作为全局底层配置注射"><MonitorPlay size={14}/></button>
+                          <button className="btn-row-action danger" onClick={() => { if(confirm("删除指纹？")) deleteIdeMut.mutate(item.data.id); }} title="拔除资产"><X size={14}/></button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
       {showAddWizard && (
         <AddAccountWizard
           onClose={() => setShowAddWizard(false)}
@@ -336,255 +364,24 @@ export default function UnifiedAccountsList() {
           }}
         />
       )}
-
-      {showGroupManager && (
-        <GroupManagerModal
-          ideAccounts={ideAccs}
-          apiKeys={keys}
-          onClose={() => setShowGroupManager(false)}
-          onGroupsChanged={handleGroupsChanged}
-        />
-      )}
     </div>
   );
 }
 
-// ─── Standard API Key Card ────────────────────────────────────────────────────
-
-function StandardKeyCard({
-  apiKey,
-  balance,
-  onCheck,
-  onDelete,
-  onRefreshBalance,
-  isChecking,
-  privacy,
-  groups,
-}: {
-  apiKey: ApiKey;
-  balance?: Balance;
-  onCheck: () => void;
-  onDelete: () => void;
-  onRefreshBalance: () => void;
-  isChecking: boolean;
-  privacy: boolean;
-  groups: AccountGroup[];
-}) {
-  const statusClass =
-    apiKey.status === "valid"
-      ? "valid"
-      : apiKey.status === "banned" || apiKey.status === "invalid" || apiKey.status === "expired"
-      ? "invalid"
-      : isChecking
-      ? "checking"
-      : "unknown";
-
-  const balanceText = (() => {
-    if (!balance) return null;
-    if (balance.balance_usd != null) return `$${balance.balance_usd.toFixed(2)}`;
-    if (balance.balance_cny != null) return `¥${balance.balance_cny.toFixed(2)}`;
-    return null;
-  })();
-
-  return (
-    <div className="account-card">
-      <div className="account-card-header">
-        <div>
-          <div className="card-title-row">
-            <span className={`status-dot ${statusClass}`} />
-            <span className="name">{apiKey.name}</span>
-            <span className="card-type-badge text-muted">标准接口</span>
-          </div>
-          <div className="text-muted" style={{ fontSize: "0.8rem" }}>
-            {PLATFORM_LABELS[apiKey.platform] || apiKey.platform}
-          </div>
-        </div>
-      </div>
-
-      <div className="account-card-body">
-        <div className="preview-code">
-          {privacy ? maskToken(apiKey.key_preview) : apiKey.key_preview}
-        </div>
-
-        {apiKey.base_url && (
-          <div className="card-row">
-            <span className="label">接口地址</span>
-            <span>{apiKey.base_url}</span>
-          </div>
-        )}
-
-        <div className="card-row">
-          <span className="label">状态</span>
-          <span
-            className={`text-${
-              statusClass === "valid"
-                ? "success"
-                : statusClass === "invalid"
-                ? "danger"
-                : "muted"
-            }`}
-          >
-            {isChecking ? "检测中..." : STATUS_LABELS[apiKey.status] || "未知"}
-          </span>
-        </div>
-
-        {balanceText && (
-          <div className="card-row">
-            <span className="label">账户余额</span>
-            <span style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-              {privacy ? "***" : balanceText}
-              <button className="btn-icon" onClick={onRefreshBalance} style={{ padding: 0 }} title="刷新余额">
-                ⟳
-              </button>
-            </span>
-          </div>
-        )}
-
-        {/* 标签 */}
-        <div className="card-row" style={{ alignItems: "flex-start" }}>
-          <span className="label">标签</span>
-          <TagBadgeList tags={apiKey.tags} accountId={apiKey.id} accountType="api" />
-        </div>
-
-        {/* 分组 */}
-        {groups.length > 0 && (
-          <div className="card-row">
-            <span className="label">分组</span>
-            <span className="groups-inline">
-              {groups.map((g) => (
-                <span key={g.id} className="group-badge">{g.name}</span>
-              ))}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="account-card-footer">
-        <div className="priority-info text-muted" style={{ fontSize: "0.8rem" }}>
-          优先级: {apiKey.priority ?? 100}
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button className="btn-icon" onClick={onCheck} title="连通性测试">⟳</button>
-          <button className="btn-icon danger" onClick={onDelete} title="删除">✕</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── IDE Fingerprint Account Card ────────────────────────────────────────────
-
-function IdeAccountCard({
-  account,
-  onDelete,
-  privacy,
-  groups,
-}: {
-  account: IdeAccount;
-  onDelete: () => void;
-  privacy: boolean;
-  groups: AccountGroup[];
-}) {
-  const statusClass =
-    account.status === "active"
-      ? "active"
-      : account.status === "forbidden"
-      ? "invalid"
-      : "rate_limited";
-
-  const displayEmail = privacy ? maskEmail(account.email) : account.email;
-
-  return (
-    <div className="account-card">
-      <div className="account-card-header">
-        <div>
-          <div className="card-title-row">
-            <span className={`status-dot ${statusClass}`} />
-            <span className="name">{displayEmail}</span>
-            <span className="card-type-badge text-muted">插件账号</span>
-          </div>
-          <div className="text-muted" style={{ fontSize: "0.8rem" }}>
-            {account.origin_platform} 环境池
-          </div>
-        </div>
-      </div>
-
-      <div className="account-card-body">
-        <div className="card-row">
-          <span className="label">状态</span>
-          <span
-            className={`text-${
-              statusClass === "active"
-                ? "success"
-                : statusClass === "invalid"
-                ? "danger"
-                : "warning"
-            }`}
-          >
-            {account.status.toUpperCase()}
-          </span>
-        </div>
-
-        {account.disabled_reason && (
-          <div className="card-row">
-            <span className="label">不可用原因</span>
-            <span className="text-danger" style={{ maxWidth: "180px", textAlign: "right" }}>
-              {account.disabled_reason}
-            </span>
-          </div>
-        )}
-
-        <div className="card-row">
-          <span className="label">设备指纹</span>
-          <span>{account.device_profile ? "已启用" : "未挂载"}</span>
-        </div>
-
-        {/* 标签 */}
-        <div className="card-row" style={{ alignItems: "flex-start" }}>
-          <span className="label">标签</span>
-          <TagBadgeList tags={account.tags} accountId={account.id} accountType="ide" />
-        </div>
-
-        {/* 分组 */}
-        {groups.length > 0 && (
-          <div className="card-row">
-            <span className="label">分组</span>
-            <span className="groups-inline">
-              {groups.map((g) => (
-                <span key={g.id} className="group-badge">{g.name}</span>
-              ))}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <div className="account-card-footer">
-        <div className="text-muted" style={{ fontSize: "0.8rem" }}>
-          心跳: {new Date(account.last_used).toLocaleString()}
-        </div>
-        <div style={{ display: "flex", gap: "8px" }}>
-          <button
-            className="btn btn-outline"
-            style={{ padding: "2px 8px", fontSize: "11px" }}
-            onClick={async () => {
-              if (window.confirm(`确认要强制配置此账号 (${account.email}) 到本地吗？`)) {
-                try {
-                  await api.ideAccounts.forceInject(account.id);
-                  alert("替换完成！IDE配置已被更新。");
-                } catch (e: any) {
-                  alert("替换失败：" + e.toString());
-                }
-              }
-            }}
-            title="强行作为底层运行账户"
-          >
-            强制配置
-          </button>
-          <button className="btn-icon danger" onClick={onDelete} title="删除">
-            ✕
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+// 辅助子组件：状态渲染器
+function StatusCell({ item }: { item: UnifiedAccountItem }) {
+  if (item.type === "api") {
+    const st = item.data.status;
+    let cls = "unknown", text = STATUS_LABELS[st] || st;
+    if (st === "valid") cls = "valid";
+    else if (st === "banned" || st === "invalid" || st === "expired") cls = "invalid";
+    return <span className={`status-badge ${cls}`}>{text}</span>;
+  } else {
+    const st = item.data.status;
+    let cls = "unknown", text = st.toUpperCase();
+    if (st === "active") cls = "valid";
+    else if (st === "forbidden") cls = "invalid";
+    else if (st === "rate_limited" || (st as any) === "rate_limit") cls = "warning";
+    return <span className={`status-badge ${cls}`}>{text}</span>;
+  }
 }

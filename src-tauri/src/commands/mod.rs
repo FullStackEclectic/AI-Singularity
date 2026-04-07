@@ -19,3 +19,4 @@ pub mod injector;
 pub mod user_token;
 pub mod analytics;
 pub mod ide_scanner;
+pub mod stream_check;

@@ -27,6 +27,16 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_deep_link::init())
+        .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
+            // 当其他实例试图启动（携带伪协议链接时）触发此回调
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            // 发布包含启动参数（通常是 DeepLink URL）的事件给前端或者其他服务
+            use tauri::Emitter;
+            let _ = app.emit("deep-link-received", args);
+        }))
         .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // 初始化数据库
@@ -121,6 +131,7 @@ pub fn run() {
             commands::provider::update_provider,
             commands::provider::switch_provider,
             commands::provider::delete_provider,
+            commands::provider::update_providers_order,
             commands::mcp::get_mcps,
             commands::mcp::add_mcp,
             commands::mcp::toggle_mcp,
@@ -133,6 +144,8 @@ pub fn run() {
             commands::prompts::sync_prompt_to_tool,
             // 告警 & 测速
             commands::alert::get_alerts,
+            commands::speedtest::run_speedtest,
+            commands::stream_check::stream_check_provider,
             // 配置备份
             commands::backup::export_config,
             commands::backup::import_config,
@@ -177,6 +190,14 @@ pub fn run() {
             commands::user_token::delete_user_token,
             // 监控大盘数据
             commands::analytics::get_dashboard_metrics,
+            // 模型重映射 (Model Mappings)
+            crate::services::model_mapping::list_model_mappings,
+            crate::services::model_mapping::upsert_model_mapping,
+            crate::services::model_mapping::delete_model_mapping,
+            // 边缘内网穿透 (Cloudflared Tunnel)
+            crate::services::tunnel::start_tunnel,
+            crate::services::tunnel::stop_tunnel,
+            crate::services::tunnel::filter_tunnel_status,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

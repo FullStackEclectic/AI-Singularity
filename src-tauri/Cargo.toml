@@ -26,6 +26,7 @@ tauri-plugin-process = "2"
 tauri-plugin-store = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-deep-link = "2"
+tauri-plugin-single-instance = "2"
 tauri-plugin-updater = "2"
 
 # Serialization
@@ -54,6 +55,7 @@ cbc = "0.1"
 pbkdf2 = "0.12"
 sha1 = "0.10"
 rand = "0.8"
+sha2 = "0.10"
 base64 = "0.22"
 
 # Error handling
@@ -67,6 +69,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 futures = "0.3"
 dirs = "5"
+urlencoding = "2"
 
 # File Watcher
 notify = "6.1.1"
@@ -77,6 +80,8 @@ reqwest-eventsource = "0.6.0"
 async-trait = "0.1.89"
 tokio-stream = "0.1.18"
 url = "2.5.8"
+regex = "1.12.3"
+lazy_static = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52.0"

@@ -50,6 +50,8 @@ export interface ProviderPreset {
   requiresOAuth?: boolean
   /** 备注提示（显示在表单底部） */
   notes?: string
+  /** 特化的底层配置快照（如 OpenCode 的 JSON 预设） */
+  settingsConfig?: any
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

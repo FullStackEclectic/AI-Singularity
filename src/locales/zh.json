@@ -3,7 +3,7 @@
     "dashboard": "系统总览",
     "accounts": "账号与资产",
     "keys": "API 密钥",
-    "providers": "模型供应商",
+    "providers": "终端配置",
     "mcp": "上下文扩展 (MCP)",
     "skills": "技能中心",
     "tools": "局域工具池",

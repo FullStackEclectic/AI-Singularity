@@ -62,6 +62,18 @@ const IDE_ORIGINS = [
 type IdeOrigin = typeof IDE_ORIGINS[number]["value"];
 
 // ─────────────────────────────────────────────────────────────
+// 渠道分类（与后端 services/oauth.rs 保持一致）
+// ─────────────────────────────────────────────────────────────
+/** B 类：Device Flow — 需要展示 user_code */
+const DEVICE_FLOW_PROVIDERS: readonly string[] = ["github_copilot"];
+/** C 类：只能文件导入，不支持 OAuth */
+const IMPORT_ONLY_PROVIDERS: readonly string[] = ["claude_code", "claude_desktop", "vscode", "opencode", "generic_ide"];
+
+const isDeviceFlow    = (p: string) => DEVICE_FLOW_PROVIDERS.includes(p);
+const isImportOnly    = (p: string) => IMPORT_ONLY_PROVIDERS.includes(p);
+const isBrowserOAuth  = (p: string) => !isDeviceFlow(p) && !isImportOnly(p);
+
+// ─────────────────────────────────────────────────────────────
 // StatusAlert helper
 // ─────────────────────────────────────────────────────────────
 function StatusAlert({ status, message }: { status: Status; message: string }) {
@@ -123,6 +135,48 @@ async function importScannedAccounts(
     await new Promise(r => setTimeout(r, 60));
   }
   return { ok, fail };
+}
+
+// ─────────────────────────────────────────────────────────────
+// 自定义高定下拉选择器 (取代原生 select)
+// ─────────────────────────────────────────────────────────────
+function CustomChannelSelect({ value, options, onChange }: { value: IdeOrigin; options: readonly { value: IdeOrigin; label: string; desc: string }[]; onChange: (v: IdeOrigin) => void }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selected = options.find(o => o.value === value) || options[0];
+
+  return (
+    <div className="wiz-custom-select-container">
+      <div 
+        className={`wiz-custom-select-trigger ${isOpen ? "open" : ""}`}
+        onClick={() => setIsOpen(!isOpen)}
+      >
+        <div className="wiz-custom-select-val">
+          <span className="wiz-cs-label">{selected.label}</span>
+          <span className="wiz-cs-desc">{selected.desc}</span>
+        </div>
+        <div className="wiz-cs-arrow" />
+      </div>
+
+      {isOpen && (
+        <>
+          <div className="wiz-cs-overlay" onClick={() => setIsOpen(false)} />
+          <div className="wiz-cs-menu">
+            {options.map(o => (
+              <div
+                key={o.value}
+                className={`wiz-cs-option ${o.value === value ? "selected" : ""}`}
+                onClick={() => { onChange(o.value); setIsOpen(false); }}
+              >
+                <div className="wiz-cs-opt-label">{o.label}</div>
+                <div className="wiz-cs-opt-desc">{o.desc}</div>
+                {o.value === value && <Check size={14} className="wiz-cs-check" />}
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -227,22 +281,24 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
     pollIntervalRef.current = setInterval(async () => {
       if (!loginIdRef.current) { clearPoll(); return; }
       try {
-        const result = await invoke<{ done: boolean; token?: string }>(
+        const result = await invoke<{ done: boolean; token?: string; email?: string; name?: string }>(
           "poll_oauth_login",
           { loginId: loginIdRef.current }
         );
         if (result.done && result.token) {
           clearPoll();
           setOauthPolling(false);
-          // 授权成功后把 token 作为 access_token 导入
           const origin = ideOrigin;
+          // 优先使用后端返回的真实 email，否则用渠道+时间戳占位
+          const accountEmail = result.email
+            || `${origin}-${Date.now()}@oauth.local`;
           await api.ideAccounts.import([{
             id:              `oauth-${Date.now()}`,
-            email:           `oauth-${Date.now()}@local`,
+            email:           accountEmail,
             origin_platform: origin,
             token: {
               access_token:  result.token,
-              refresh_token: "oauth_imported",
+              refresh_token: result.token,   // Google 类直接存 refresh_token
               expires_in:    3600,
               token_type:    "Bearer",
               updated_at:    new Date().toISOString(),
@@ -260,7 +316,8 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
             last_used:  new Date().toISOString(),
           }]);
           setStatus("success");
-          setMessage("OAuth 授权成功！账号已导入。");
+          const displayEmail = result.email ? `（${result.email}）` : "";
+          setMessage(`OAuth 授权成功！账号已导入${displayEmail}。`);
           loginIdRef.current = null;
           setTimeout(() => onSuccess(), 1200);
         }
@@ -478,6 +535,9 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
     setSandboxTab(tab);
     resetStatus();
     setTokenInput("");
+    if (tab === "oauth" && isImportOnly(ideOrigin)) {
+      setIdeOrigin("antigravity");
+    }
   };
 
   // mode 切换
@@ -503,20 +563,6 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
           <button className="wiz-close-btn" onClick={onClose}>✕</button>
         </div>
 
-        {/* 渠道来源选择器 */}
-        <div className="wiz-channel-row">
-          <label className="wiz-channel-label">渠道来源</label>
-          <select
-            className="wiz-channel-select"
-            value={ideOrigin}
-            onChange={e => setIdeOrigin(e.target.value as IdeOrigin)}
-          >
-            {IDE_ORIGINS.map(o => (
-              <option key={o.value} value={o.value}>{o.label} — {o.desc}</option>
-            ))}
-          </select>
-        </div>
-
         {/* 模式选择 */}
         <div className="wiz-mode-row">
           <button
@@ -538,6 +584,15 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
         {/* ────────────── SANDBOX 模式 ────────────── */}
         {mode === "sandbox" && (
           <>
+            {/* 渠道来源选择器 */}
+            <div className="wiz-channel-row">
+              <label className="wiz-channel-label">渠道来源</label>
+              <CustomChannelSelect 
+                value={ideOrigin} 
+                options={sandboxTab === "oauth" ? IDE_ORIGINS.filter(o => !isImportOnly(o.value)) : IDE_ORIGINS}
+                onChange={setIdeOrigin} 
+              />
+            </div>
             {/* Tab 导航 */}
             <div className="wiz-tabs">
               {(["oauth", "token", "import"] as SandboxTab[]).map(tab => {
@@ -562,17 +617,56 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
               <div className="wiz-tab-content">
                 {!deviceFlow && !oauthPreparing && (
                   <div className="wiz-oauth-empty">
-                    <Globe size={40} className="wiz-oauth-icon" />
-                    <p className="wiz-oauth-desc">
-                      使用 Device Flow 授权，无需回调端口。点击下方按钮获取验证码。
-                    </p>
-                    <button
-                      className="wiz-btn-primary"
-                      onClick={handleStartDeviceFlow}
-                      disabled={status === "success"}
-                    >
-                      <Globe size={16} /> 获取授权验证码
-                    </button>
+
+                    {/* C 类：仅支持导入 */}
+                    {isImportOnly(ideOrigin) && (
+                      <>
+                        <ShieldCheck size={40} className="wiz-oauth-icon" style={{ color: "var(--warning, #f59e0b)" }} />
+                        <p className="wiz-oauth-desc">
+                          <strong>{IDE_ORIGINS.find(o => o.value === ideOrigin)?.label}</strong> 渠道不支持 OAuth 授权流程。<br />
+                          请切换到「Token 粘贴」或「导入账号」Tab 导入凭证。
+                        </p>
+                        <button className="wiz-btn-ghost" onClick={() => handleTabChange("import")}>
+                          <Database size={16} /> 前往导入 Tab
+                        </button>
+                      </>
+                    )}
+
+                    {/* A 类：浏览器自动回调 */}
+                    {isBrowserOAuth(ideOrigin) && (
+                      <>
+                        <Globe size={40} className="wiz-oauth-icon" />
+                        <p className="wiz-oauth-desc">
+                          点击下方按钮，将自动打开浏览器进行 OAuth 授权。<br />
+                          授权完成后浏览器页面会自动关闭，账号将自动导入。
+                        </p>
+                        <button
+                          className="wiz-btn-primary"
+                          onClick={handleStartDeviceFlow}
+                          disabled={status === "success"}
+                        >
+                          <Globe size={16} /> 开启 OAuth 授权
+                        </button>
+                      </>
+                    )}
+
+                    {/* B 类：Device Flow */}
+                    {isDeviceFlow(ideOrigin) && (
+                      <>
+                        <Key size={40} className="wiz-oauth-icon" />
+                        <p className="wiz-oauth-desc">
+                          点击下方按钮获取授权码，然后在弹出的授权页面中输入验证码完成授权。
+                        </p>
+                        <button
+                          className="wiz-btn-primary"
+                          onClick={handleStartDeviceFlow}
+                          disabled={status === "success"}
+                        >
+                          <Key size={16} /> 获取授权验证码
+                        </button>
+                      </>
+                    )}
+
                   </div>
                 )}
 
@@ -585,20 +679,25 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
 
                 {deviceFlow && !oauthPreparing && (
                   <div className="wiz-device-flow">
-                    {/* 用户验证码 */}
-                    <div className="wiz-user-code-block">
-                      <p className="wiz-uc-label">在浏览器中输入此验证码：</p>
-                      <div className="wiz-user-code">
-                        {deviceFlow.user_code}
-                        <button className="wiz-copy-code-btn" onClick={handleCopyUserCode} title="复制验证码">
-                          {oauthUserCodeCopied ? <Check size={14} /> : <Copy size={14} />}
-                        </button>
-                      </div>
-                    </div>
 
-                    {/* 验证链接 */}
+                    {/* B 类（github_copilot）：展示 user_code + 跳转链接 */}
+                    {deviceFlow.user_code && (
+                      <div className="wiz-user-code-block">
+                        <p className="wiz-uc-label">在授权页面输入此验证码：</p>
+                        <div className="wiz-user-code">
+                          {deviceFlow.user_code}
+                          <button className="wiz-copy-code-btn" onClick={handleCopyUserCode} title="复制验证码">
+                            {oauthUserCodeCopied ? <Check size={14} /> : <Copy size={14} />}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 验证链接（所有渠道都显示） */}
                     <div className="wiz-verification-url">
-                      <p className="wiz-uc-label">验证链接：</p>
+                      <p className="wiz-uc-label">
+                        {deviceFlow.user_code ? "授权链接：" : "正在等待浏览器授权回调..."}
+                      </p>
                       <div className="wiz-url-row">
                         <code className="wiz-url-text">{deviceFlow.verification_uri}</code>
                         <button className="wiz-icon-btn" onClick={handleCopyOAuthUrl} title="复制链接">
@@ -614,29 +713,33 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
                     <div className="wiz-poll-status">
                       {oauthPolling && !oauthTimedOut && (
                         <div className="wiz-poll-row">
-                          <Loader2 size={14} className="spin" />
-                          <span>等待您在浏览器中完成授权...</span>
+                          <div className="wiz-poll-pulse" />
+                          <span>
+                            {deviceFlow.user_code
+                              ? "等待您在浏览器中输入验证码并完成授权..."
+                              : "等待浏览器授权回调，完成后将自动导入..."
+                            }
+                          </span>
                         </div>
                       )}
                       {oauthTimedOut && (
                         <div className="wiz-poll-row error">
                           <XCircle size={14} />
-                          <span>验证码已过期</span>
+                          <span>授权已超时</span>
                           <button className="wiz-link-btn" onClick={handleStartDeviceFlow}>
-                            <RotateCw size={12} /> 重新获取
+                            <RotateCw size={12} /> 重新发起
                           </button>
                         </div>
                       )}
                     </div>
 
-                    {/* 重新获取按钮（非过期时也显示） */}
                     {!oauthTimedOut && (
                       <button
                         className="wiz-btn-ghost wiz-retry-btn"
                         onClick={handleStartDeviceFlow}
                         disabled={oauthPreparing}
                       >
-                        <RotateCw size={14} /> 重新获取验证码
+                        <RotateCw size={14} /> 重新发起授权
                       </button>
                     )}
                   </div>

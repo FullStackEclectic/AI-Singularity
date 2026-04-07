@@ -15,13 +15,13 @@ export default function AccountsContainerPage() {
           className={activeTab === "managed" ? "active" : ""} 
           onClick={() => setActiveTab("managed")}
         >
-           算力接入账号
+           渠道资产 (Channels)
         </button>
         <button 
           className={activeTab === "shared" ? "active" : ""} 
           onClick={() => setActiveTab("shared")}
         >
-           分享凭证下发
+           分享额度 (Tokens)
         </button>
       </div>
 

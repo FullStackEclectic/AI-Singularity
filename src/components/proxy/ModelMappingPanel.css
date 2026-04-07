@@ -1,0 +1,55 @@
+.model-mapping-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.mapping-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--color-surface-hover);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+}
+
+.mapping-arrow {
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: 16px;
+}
+
+.mapping-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mapping-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  transition: opacity 0.2s;
+}
+
+.mapping-item.disabled {
+  opacity: 0.5;
+}
+
+.mapping-info {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.mapping-actions {
+  display: flex;
+  gap: var(--space-2);
+}

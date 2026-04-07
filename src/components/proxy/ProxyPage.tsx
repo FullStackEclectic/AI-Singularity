@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import type { IdeAccount } from "../../types";
 import PlaygroundPanel from "./PlaygroundPanel";
+import ModelMappingPanel from "./ModelMappingPanel";
+import CloudflaredTunnelPanel from "./CloudflaredTunnelPanel";
 import "./ProxyPage.css";
 
 interface ProxyStatus {
@@ -96,6 +98,8 @@ export default function ProxyPage() {
           </div>
         </div>
 
+        <CloudflaredTunnelPanel localPort={port} />
+
         {/* Session Radar Grid */}
         <div className="cyber-grid">
           <div className="cyber-card">
@@ -144,6 +148,18 @@ export default function ProxyPage() {
             </div>
           </div>
         </div>
+
+        {/* Model Mapping Rule Grid */}
+        <div className="cyber-card" style={{ marginTop: "var(--space-4)" }}>
+          <h2 className="cyber-section-title">
+            <span className="pulse-dot"></span> MODEL_MAPPING // 模型降维转录映射
+          </h2>
+          <div className="text-muted" style={{fontSize: 12, marginBottom: 'var(--space-3)'}}>
+             在此配置底层拦截映射。当客户端强行请求某一模型时，触发透明重写机制。
+          </div>
+          <ModelMappingPanel />
+        </div>
+
         {/* Playground */}
         <div className="cyber-card" style={{ marginTop: "var(--space-4)" }}>
           <h2 className="cyber-section-title">SIGNAL_TEST // API 连通性测试沙盒</h2>

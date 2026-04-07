@@ -131,6 +131,7 @@ export interface ProviderConfig {
   api_key_url?: string;
   notes?: string;
   extra_config?: string;
+  sort_order?: number; // Sorting priority (smaller = first)
   created_at: string;
   updated_at: string;
 }
@@ -311,4 +312,79 @@ export interface IdeAccount {
   tags?: string[];
   /** 用户自定义标注（备注名）*/
   label?: string;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 渠道专属模型配置（存储在 ProviderConfig.extra_config 字段中）
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface ClaudeToolConfig {
+  /** 主模型 — 对应 ANTHROPIC_MODEL */
+  model?: string;
+  /** Haiku 小模型 — 对应 ANTHROPIC_DEFAULT_HAIKU_MODEL */
+  haikuModel?: string;
+  /** Sonnet 中模型 — 对应 ANTHROPIC_DEFAULT_SONNET_MODEL */
+  sonnetModel?: string;
+  /** Opus 大模型 — 对应 ANTHROPIC_DEFAULT_OPUS_MODEL */
+  opusModel?: string;
+}
+
+export interface CodexToolConfig {
+  /** 对应 codex config.toml 中的 model */
+  model?: string;
+  /** 推理强度 — "high" | "medium" | "low" */
+  reasoningEffort?: string;
+}
+
+export interface GeminiToolConfig {
+  /** 对应 GEMINI_MODEL */
+  model?: string;
+}
+
+export interface OpenCodeToolConfig {
+  model?: string;
+}
+
+export interface OpenClawToolConfig {
+  model?: string;
+}
+
+export interface AiderToolConfig {
+  model?: string;
+}
+
+/**
+ * 渠道专属配置集合，序列化为 JSON 存入 ProviderConfig.extra_config
+ * key 与 ToolTarget 保持一致
+ */
+export interface ToolSpecificConfigs {
+  claude_code?: ClaudeToolConfig;
+  codex?: CodexToolConfig;
+  gemini_cli?: GeminiToolConfig;
+  open_code?: OpenCodeToolConfig;
+  open_claw?: OpenClawToolConfig;
+  aider?: AiderToolConfig;
+}
+
+/** 从 ProviderConfig.extra_config 解析渠道专属配置 */
+export function parseToolSpecificConfigs(provider: ProviderConfig): ToolSpecificConfigs {
+  try {
+    if (!provider.extra_config) return {};
+    const parsed = JSON.parse(provider.extra_config);
+    return (parsed.tool_configs as ToolSpecificConfigs) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+/** 将渠道专属配置序列化，合并进 extra_config JSON 字符串 */
+export function serializeToolSpecificConfigs(
+  existingExtraConfig: string | undefined,
+  configs: ToolSpecificConfigs,
+): string {
+  let base: Record<string, unknown> = {};
+  try {
+    if (existingExtraConfig) base = JSON.parse(existingExtraConfig);
+  } catch { /* ignore */ }
+  return JSON.stringify({ ...base, tool_configs: configs });
 }

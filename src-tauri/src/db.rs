@@ -267,6 +267,33 @@ impl Database {
             )?;
         }
 
+        // ── Migration 8: 高级网关特性 - 自定义模型映射表 (Custom Model Mappings) ─────────────
+        if current_version < 8 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS model_mappings (
+                    id              TEXT PRIMARY KEY,
+                    source_model    TEXT NOT NULL,
+                    target_model    TEXT NOT NULL,
+                    is_active       BOOLEAN NOT NULL DEFAULT 1,
+                    created_at      TEXT NOT NULL,
+                    updated_at      TEXT NOT NULL
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (8, datetime('now'));",
+            )?;
+        }
+
+        // ── Migration 9: Providers 拖拽排序属性 ─────────────
+        if current_version < 9 {
+            let _ = conn.execute_batch(
+                "ALTER TABLE providers ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (9, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 

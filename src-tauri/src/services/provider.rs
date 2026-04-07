@@ -17,9 +17,9 @@ impl<'a> ProviderService<'a> {
     pub fn list_providers(&self) -> AppResult<Vec<ProviderConfig>> {
         let sql = "SELECT id, name, platform, category, base_url, api_key_id, model_name,
                           is_active, tool_targets, icon, icon_color, website_url, api_key_url,
-                          notes, extra_config, created_at, updated_at
+                          notes, extra_config, created_at, updated_at, sort_order
                    FROM providers
-                   ORDER BY created_at ASC";
+                   ORDER BY sort_order ASC, created_at ASC";
         self.db.query_rows(sql, &[], |row| {
             let platform_str: String = row.get(2)?;
             let platform = serde_json::from_str(&format!("\"{}\"", platform_str))
@@ -47,6 +47,7 @@ impl<'a> ProviderService<'a> {
                 api_key_url:  row.get(12)?,
                 notes:        row.get(13)?,
                 extra_config: row.get(14)?,
+                sort_order:   row.get(17).unwrap_or(0),
                 created_at:   created_at_str.parse().unwrap_or_else(|_| Utc::now()),
                 updated_at:   updated_at_str.parse().unwrap_or_else(|_| Utc::now()),
             })
@@ -69,8 +70,8 @@ impl<'a> ProviderService<'a> {
             "INSERT INTO providers
              (id, name, platform, category, base_url, api_key_id, model_name,
               is_active, tool_targets, icon, icon_color, website_url, api_key_url,
-              notes, extra_config, created_at, updated_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
+              notes, extra_config, sort_order, created_at, updated_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18)",
             params![
                 provider.id,
                 provider.name,
@@ -87,6 +88,7 @@ impl<'a> ProviderService<'a> {
                 provider.api_key_url,
                 provider.notes,
                 provider.extra_config,
+                provider.sort_order,
                 provider.created_at.to_rfc3339(),
                 provider.updated_at.to_rfc3339(),
             ],
@@ -153,6 +155,17 @@ impl<'a> ProviderService<'a> {
         )?;
 
         SyncService::new(self.db).sync_all();
+        Ok(())
+    }
+
+    /// 重新排列 Provider
+    pub fn reorder_providers(&self, ordered_ids: Vec<String>) -> AppResult<()> {
+        for (index, id) in ordered_ids.iter().enumerate() {
+            self.db.execute(
+                "UPDATE providers SET sort_order = ?1 WHERE id = ?2",
+                &[&(index as i32), id],
+            )?;
+        }
         Ok(())
     }
 }

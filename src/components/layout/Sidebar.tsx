@@ -16,35 +16,37 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
     ],
   },
   {
-    title: "账号管理",
+    title: "核心网关 (Gateway)",
     items: [
-      { id: "accounts", icon: "👤", label: "账号与资产" },
+      { id: "accounts", icon: "👤", label: "账号与资产库" },
+      { id: "sharing", icon: "🔑", label: "分享发卡与额度" },
+      { id: "proxy", icon: "↔", label: "本地路由与隧道" },
+      // 注：此处预留 P1 的『高级规则 / 模型映射』，待下个阶段加入
     ],
   },
   {
-    title: "AI 工具",
+    title: "系统统计 (Analytics)",
     items: [
-      { id: "providers", icon: "⚡", label: "Provider" },
-      { id: "skills", icon: "🛠️", label: "Skills 技能" },
-      { id: "mcp", icon: "🔌", label: "MCP Server" },
-      { id: "tools", icon: "⏬", label: "大模型局域兵工厂" },
-      { id: "prompts", icon: "📝", label: "系统配置" },
+      { id: "analytics", icon: "📊", label: "用量看板" },
+      { id: "sessions", icon: "💬", label: "流转日志" },
+      { id: "speedtest", icon: "⚡", label: "节点测速" },
     ],
   },
   {
-    title: "代理网关",
+    title: "本地研发赋能 (Local Tools)",
     items: [
-      { id: "proxy", icon: "↔", label: "本地代理" },
+      { id: "providers", icon: "🔌", label: "终端配置" },
+      { id: "mcp", icon: "🔌", label: "MCP 扩展" },
+      { id: "skills", icon: "🛠️", label: "技能包" },
+      { id: "tools", icon: "⏬", label: "本地兵工厂" },
+      { id: "prompts", icon: "📝", label: "全局注入与 Prompt" },
     ],
   },
   {
-    title: "信息",
+    title: "平台",
     items: [
-      { id: "analytics", icon: "📊", label: "余额看板" },
-      { id: "sessions", icon: "💬", label: "会话历史" },
-      { id: "speedtest", icon: "⚡", label: "延迟测速" },
-      { id: "models",    icon: "🤖", label: "模型目录" },
-      { id: "settings",  icon: "⚙", label: "设置" },
+      { id: "models", icon: "🤖", label: "模型字典库" },
+      { id: "settings", icon: "⚙", label: "全局设置" },
     ],
   },
 ];
@@ -76,10 +78,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
           <div key={gi} className="sidebar-group">
             {group.title && (
               <div className="sidebar-group-title">
-                {group.title === "账号管理" ? t("sidebar.groups.account") :
-                 group.title === "AI 工具" ? t("sidebar.groups.tools") :
-                 group.title === "代理网关" ? t("sidebar.groups.proxy") :
-                 group.title === "信息" ? t("sidebar.groups.info") : group.title}
+                 {group.title}
               </div>
             )}
             {group.items.map((item) => (

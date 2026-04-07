@@ -14,6 +14,9 @@ import {
   type ProviderPreset,
   type ProviderCategory,
 } from "../../data/providerPresets";
+import { api } from "../../lib/api";
+import { ProviderAdvancedConfig, type ProviderExtraConfig } from "./ProviderAdvancedConfig";
+import { JsonConfigEditor } from "./JsonConfigEditor";
 import "./ProvidersPage.css";
 
 const ALL_TOOLS: ToolTarget[] = ["claude_code", "codex", "gemini_cli", "open_code", "open_claw", "aider"];
@@ -253,16 +256,19 @@ interface ProviderFormState {
   website_url: string;
   api_key_url: string;
   notes: string;
+  extra_config: string; // JSON string payload for Advanced settings
 }
 
-function ProviderModal({
+export function ProviderModal({
   initialProvider,
   onClose,
   onSuccess,
+  fixedTool,
 }: {
   initialProvider?: ProviderConfig;
   onClose: () => void;
   onSuccess: () => void;
+  fixedTool?: ToolTarget;
 }) {
   const { add, update } = useProviderStore();
 
@@ -285,12 +291,13 @@ function ProviderModal({
         website_url:   initialProvider.website_url ?? "",
         api_key_url:   initialProvider.api_key_url ?? "",
         notes:         initialProvider.notes ?? "",
+        extra_config:  initialProvider.extra_config ?? "{}",
       };
     }
     return {
       name: "", platform: "custom", base_url: "", model_name: "",
-      api_key_value: "", tool_targets: ["claude_code"],
-      website_url: "", api_key_url: "", notes: "",
+      api_key_value: "", tool_targets: fixedTool ? [fixedTool] : ["claude_code"],
+      website_url: "", api_key_url: "", notes: "", extra_config: "{}"
     };
   });
 
@@ -301,16 +308,26 @@ function ProviderModal({
 
   const groupedPresets = useMemo(() => groupPresetsByCategory(), []);
   const filteredPresets = useMemo(() => {
-    const base = selectedCategory === "all"
+    let base = selectedCategory === "all"
       ? PROVIDER_PRESETS
       : groupedPresets[selectedCategory] ?? [];
+      
+    // 终端根本没有那么多概念，只为它们保留与其原生协议匹配的最硬核官方原厂源
+    if (fixedTool === "claude_code") {
+      base = base.filter(p => p.presetId === "anthropic-official" || p.presetId.includes("bedrock"));
+    } else if (fixedTool === "codex" || fixedTool === "open_code") {
+      base = base.filter(p => p.presetId === "openai-official" || p.presetId === "azure-openai");
+    } else if (fixedTool === "gemini_cli") {
+      base = base.filter(p => p.presetId === "google-gemini-official");
+    }
+
     if (!presetSearch.trim()) return base;
     const q = presetSearch.toLowerCase();
     return base.filter(p =>
       p.name.toLowerCase().includes(q) ||
       (p.defaultBaseUrl?.toLowerCase().includes(q) ?? false),
     );
-  }, [selectedCategory, presetSearch, groupedPresets]);
+  }, [selectedCategory, presetSearch, groupedPresets, fixedTool]);
 
   const applyPreset = (preset: ProviderPreset) => {
     setForm(f => ({
@@ -322,9 +339,16 @@ function ProviderModal({
       website_url: preset.websiteUrl ?? "",
       api_key_url: preset.apiKeyUrl ?? "",
       notes:      preset.notes ?? "",
+      extra_config: preset.settingsConfig ? JSON.stringify(preset.settingsConfig, null, 2) : "{}",
     }));
     setStep("form");
   };
+
+  // 临时解析额外的 advanced 面板状态
+  let advancedCfg: ProviderExtraConfig = {};
+  try {
+    advancedCfg = JSON.parse(form.extra_config || "{}");
+  } catch(e) {}
 
   // ── 表单提交 ──────────────────────────────────────────────────────────────
 
@@ -336,10 +360,24 @@ function ProviderModal({
     setIsSubmitting(true);
     setError("");
     try {
+      let finalApiKeyId = initialProvider?.api_key_id ?? undefined;
+      
+      // 如果用户在表单上输入了 API Key，静默托管入库中心并在 Provider 关联指针。
+      if (form.api_key_value.trim()) {
+        const newKey = await api.keys.add({
+          name: form.name.trim() + " (Auto Key)",
+          platform: form.platform,
+          secret: form.api_key_value.trim(),
+          base_url: form.base_url.trim() || undefined,
+        });
+        finalApiKeyId = newKey.id;
+      }
+
       const payload: any = {
         id:           initialProvider?.id ?? "",
         name:         form.name.trim(),
         platform:     form.platform,
+        api_key_id:   finalApiKeyId,
         base_url:     form.base_url.trim() || null,
         model_name:   form.model_name.trim(),
         is_active:    initialProvider?.is_active ?? false,
@@ -347,6 +385,7 @@ function ProviderModal({
         website_url:  form.website_url.trim() || null,
         api_key_url:  form.api_key_url.trim() || null,
         notes:        form.notes.trim() || null,
+        extra_config: form.extra_config.trim() || "{}",
         created_at:   initialProvider?.created_at ?? "",
         updated_at:   "",
       };
@@ -378,7 +417,7 @@ function ProviderModal({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal modal-wide" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>{isEditing ? "编辑 Provider" : (step === "preset" ? "选择预设模板" : "新增 Provider")}</h2>
+          <h2>{isEditing ? `编辑 ${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : ""}节点配置` : (step === "preset" ? `${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : "全局"}通道快速模板` : `新增 ${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : ""}节点`)}</h2>
           <button className="btn btn-icon" onClick={onClose}>✕</button>
         </div>
 
@@ -472,6 +511,19 @@ function ProviderModal({
               />
               <p className="form-hint">留空使用平台默认地址（Anthropic 官方无需填写）</p>
             </div>
+            
+            <div className="form-row">
+              <label className="form-label">API Key 凭证</label>
+              <input
+                type="password"
+                className="form-input font-mono"
+                placeholder={isEditing ? "(留空保持原凭证不变)" : "sk-..."}
+                value={form.api_key_value}
+                onChange={e => setForm({ ...form, api_key_value: e.target.value })}
+              />
+              <p className="form-hint">提交后将被加密保存至凭证中心</p>
+            </div>
+
             <div className="form-row flex-row-2">
               <div>
                 <label className="form-label">默认模型</label>
@@ -492,42 +544,61 @@ function ProviderModal({
               )}
             </div>
 
-            {/* 同步目标 */}
-            <div className="form-section-title">同步到哪些工具 *</div>
-            <p className="form-hint" style={{ marginTop: -8, marginBottom: 10 }}>
-              激活此 Provider 时，将自动写入以下工具的配置文件
-            </p>
-            <div className="tool-targets-grid">
-              {ALL_TOOLS.map(tool => (
-                <label key={tool} className={`tool-target-chip ${form.tool_targets.includes(tool) ? "checked" : ""}`}>
-                  <input
-                    type="checkbox"
-                    checked={form.tool_targets.includes(tool)}
-                    onChange={() => toggleTool(tool)}
-                    style={{ display: "none" }}
-                  />
-                  <span className="tool-chip-icon">{TOOL_ICONS[tool]}</span>
-                  <div>
-                    <div className="tool-chip-name">{TOOL_TARGET_LABELS[tool]}</div>
-                    <div className="tool-chip-path">{TOOL_TARGET_CONFIG_PATH[tool]}</div>
-                  </div>
-                  {form.tool_targets.includes(tool) && <span className="tool-chip-check">✓</span>}
-                </label>
-              ))}
-            </div>
+            {/* 当处于 OpenCode 或 特殊节点时，暴露出底层的 Json Config 编辑器 */}
+            {form.platform === "custom" || form.platform === "open_router" || fixedTool === "open_code" || fixedTool === "open_claw" ? (
+              <div style={{ marginTop: 24, marginBottom: 16 }}>
+                 <JsonConfigEditor 
+                    value={form.extra_config} 
+                    onChange={val => setForm({ ...form, extra_config: val })}
+                 />
+              </div>
+            ) : (
+              <ProviderAdvancedConfig 
+                 value={advancedCfg}
+                 onChange={cfg => setForm({ ...form, extra_config: JSON.stringify(cfg, null, 2) })}
+              />
+            )}
 
             {/* 备注 */}
-            <div className="form-row">
+            <div className="form-row" style={{ marginTop: 12 }}>
               <label className="form-label">备注（可选）</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="备注信息…"
+                placeholder="备用、测试或者特定项目的专属账单节点？"
                 value={form.notes}
                 onChange={e => setForm({ ...form, notes: e.target.value })}
                 style={{ resize: "vertical" }}
               />
             </div>
+
+            {/* 同步目标 */}
+            {!fixedTool && (
+              <>
+                <div className="form-section-title">同步到哪些工具 *</div>
+                <p className="form-hint" style={{ marginTop: -8, marginBottom: 10 }}>
+                  激活此 Provider 时，将自动写入以下工具的配置文件
+                </p>
+                <div className="tool-targets-grid">
+                  {ALL_TOOLS.map(tool => (
+                    <label key={tool} className={`tool-target-chip ${form.tool_targets.includes(tool) ? "checked" : ""}`}>
+                      <input
+                        type="checkbox"
+                        checked={form.tool_targets.includes(tool)}
+                        onChange={() => toggleTool(tool)}
+                        style={{ display: "none" }}
+                      />
+                      <span className="tool-chip-icon">{TOOL_ICONS[tool]}</span>
+                      <div>
+                        <div className="tool-chip-name">{TOOL_TARGET_LABELS[tool]}</div>
+                        <div className="tool-chip-path">{TOOL_TARGET_CONFIG_PATH[tool]}</div>
+                      </div>
+                      {form.tool_targets.includes(tool) && <span className="tool-chip-check">✓</span>}
+                    </label>
+                  ))}
+                </div>
+              </>
+            )}
 
             {error && <div className="form-error">{error}</div>}
 

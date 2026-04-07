@@ -39,6 +39,11 @@
     ]
   },
   "plugins": {
+    "deep-link": {
+      "desktop": {
+        "schemes": ["aisingularity"]
+      }
+    },
     "updater": {
       "endpoints": [
         "https://api.github.com/repos/tarui/AI-Singularity/releases/latest"
