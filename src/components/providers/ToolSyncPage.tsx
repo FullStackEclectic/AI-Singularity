@@ -5,7 +5,7 @@ import { TOOL_TARGET_LABELS, TOOL_TARGET_CONFIG_PATH, parseToolTargets, parseToo
 import ConfigPreview from "./ConfigPreview";
 import { ProviderModal } from "./ProviderModal";
 import { api } from "../../lib/api";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, Edit2, Trash2 } from "lucide-react";
 import "./ToolSyncPage.css";
 import "./ProviderModal.css";
 
@@ -81,9 +81,13 @@ function ProviderRow({
         )}
         
         {/* 操作区 */}
-        <div style={{ display: "flex", gap: "8px" }} className="row-actions" onClick={e => e.stopPropagation()}>
-          <button className="btn btn-ghost btn-sm" onClick={onEdit}>修改</button>
-          <button className="btn btn-danger-ghost btn-sm" onClick={onDelete}>删除</button>
+        <div style={{ display: "flex", gap: "4px" }} className="row-actions" onClick={e => e.stopPropagation()}>
+          <button className="action-icon-btn" onClick={onEdit} title="修改配置">
+            <Edit2 size={15} />
+          </button>
+          <button className="action-icon-btn danger-icon" onClick={onDelete} title="删除源">
+            <Trash2 size={15} />
+          </button>
         </div>
       </div>
     </div>
@@ -171,9 +175,7 @@ export default function ToolSyncPage() {
         
         {/* 精美的顶部 Tabs 区域 */}
         <div style={{ marginBottom: 32, flexShrink: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 12, textTransform: "uppercase", letterSpacing: "0.5px" }}>
-            选择需要注入配置的终端
-          </div>
+
           <div className="premium-tabs-container">
             {ALL_TOOLS.map(tool => {
               const isActive = activeTab === tool;
@@ -194,21 +196,22 @@ export default function ToolSyncPage() {
         {/* 下方 面板内容 */}
         <div style={{ flex: 1, paddingRight: 8, overflowY: "auto" }}>
           
-          {/* ActionBar */}
-          <div style={{ display: "flex", justifyItems: "center", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+          {/* ActionBar -> Premium Info Banner */}
+          <div className="info-banner animate-fade-in">
             <div>
-              <h2 style={{ margin: "0 0 6px 0", fontSize: 18, fontWeight: 600, display: "flex", alignItems: "center", gap: 12 }}>
-                当前通道：{TOOL_TARGET_LABELS[activeTab]}
-              </h2>
-              <div style={{ fontSize: 13, color: "var(--color-text-tertiary)", fontFamily: "monospace", display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="banner-title">
+                <span style={{ fontSize: "1.2rem" }}>{TOOL_ICONS[activeTab]}</span>
+                当前终端：{TOOL_TARGET_LABELS[activeTab]}
+              </div>
+              <div style={{ fontSize: 13, color: "var(--color-text-secondary)", fontFamily: "monospace", display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
                 注入锚点:
-                <span style={{ background: "var(--color-surface)", padding: "2px 8px", borderRadius: 6, border: "1px solid var(--color-border)", color: "var(--color-text-secondary)" }}>
+                <span style={{ background: "rgba(15, 23, 42, 0.04)", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(15, 23, 42, 0.08)", color: "var(--color-text)" }}>
                   {TOOL_TARGET_CONFIG_PATH[activeTab]}
                 </span>
               </div>
             </div>
-            <div style={{ display: "flex", gap: "12px", height: "40px" }}>
-              <button className="btn btn-primary premium-btn" onClick={() => setShowProviderModal(true)}>
+            <div>
+              <button className="btn btn-primary premium-btn" style={{ boxShadow: "0 4px 14px rgba(37, 99, 235, 0.2)" }} onClick={() => setShowProviderModal(true)}>
                 ＋ 新增配置源
               </button>
             </div>
@@ -249,20 +252,23 @@ export default function ToolSyncPage() {
             </div>
 
             {/* 右侧：配置文件预览 */}
-            {activeProvider && (
-              <div style={{ width: "450px", flexShrink: 0, position: "sticky", top: 0 }}>
-                <div style={{ 
-                  background: "var(--color-surface)", 
-                  borderRadius: 16, 
-                  border: "1px solid var(--color-border)", 
-                  overflow: "hidden",
-                  boxShadow: "0 12px 32px rgba(0,0,0,0.06)"
-                }}>
-                  <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", background: "var(--color-bg-primary)" }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "var(--color-text-secondary)", letterSpacing: "0.5px" }}>
-                      实际注入配置文件预览
-                    </div>
+            <div style={{ width: "450px", flexShrink: 0, position: "sticky", top: 0 }}>
+              <div style={{ 
+                background: "var(--color-surface)", 
+                borderRadius: 16, 
+                border: "1px solid var(--color-border)", 
+                overflow: "hidden",
+                boxShadow: "0 12px 32px rgba(15,23,42,0.06)"
+              }}>
+                <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", background: "rgba(15, 23, 42, 0.01)" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600, color: "var(--color-text)", letterSpacing: "0.2px" }}>
+                    📝 注入配置预览
                   </div>
+                  <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 4 }}>
+                    切换左侧 Provider 实时预览即将写入本地的内容
+                  </div>
+                </div>
+                {activeProvider ? (
                   <ConfigPreview
                     baseUrl={activeProvider.base_url || "https://api.anthropic.com"}
                     apiKey={activeProvider.api_key_id ? "sk-ais-*********" : ""}
@@ -271,9 +277,15 @@ export default function ToolSyncPage() {
                       [activeTab]: parseToolSpecificConfigs(activeProvider)[activeTab]
                     }}
                   />
-                </div>
+                ) : (
+                  <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-tertiary)" }}>
+                    <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.5 }}>⚡</div>
+                    <div style={{ fontSize: 13 }}>未激活任何配置</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>请在左侧添加并激活配置源</div>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>

@@ -94,6 +94,19 @@ impl Router {
         let api_where = where_api_keys.join(" AND ");
         let ide_where = where_ide_accs.join(" AND ");
 
+        // 读取由高级控制板投递的引擎配置
+        let order_clause = if let Ok(engine_cfg) = crate::commands::proxy::ENGINE_CONFIG.read() {
+            if engine_cfg.scheduling.mode.eq_ignore_ascii_case("balance") {
+                // 轮询模式：优先挑选最近没怎么使用的
+                "ORDER BY last_checked_at ASC"
+            } else {
+                // 优先级模式 或其他：优先级为主，最近没使用的次之
+                "ORDER BY priority DESC, last_checked_at ASC"
+            }
+        } else {
+            "ORDER BY priority DESC, last_checked_at DESC"
+        };
+
         // 终极聚合 SQL，将两个异构数据源统一为 标准 RouteTarget 模型输出
         // id | source_type | platform | base_url | access_token | priority 
         let sql = format!(
@@ -102,8 +115,8 @@ impl Router {
              UNION ALL
              SELECT id, 'ide_account' AS source_type, origin_platform AS platform, '' AS base_url, access_token, 80 AS priority, last_used AS last_checked_at
              FROM ide_accounts WHERE {}
-             ORDER BY priority DESC, last_checked_at DESC LIMIT 1",
-            api_where, ide_where
+             {} LIMIT 1",
+            api_where, ide_where, order_clause
         );
 
         let result_row: Option<(String, String, String, Option<String>, String)> = self.db.query_one(

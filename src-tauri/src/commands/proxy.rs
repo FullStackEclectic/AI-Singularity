@@ -3,6 +3,13 @@ use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tauri::{AppHandle, Manager, State};
+use std::sync::RwLock;
+use lazy_static::lazy_static;
+use crate::models::EngineConfig;
+
+lazy_static! {
+    pub static ref ENGINE_CONFIG: RwLock<EngineConfig> = RwLock::new(EngineConfig::default());
+}
 
 static PROXY_RUNNING: AtomicBool = AtomicBool::new(false);
 static PROXY_PORT: std::sync::atomic::AtomicU16 = std::sync::atomic::AtomicU16::new(8765);
@@ -68,4 +75,14 @@ pub async fn get_proxy_status(port: Option<u16>) -> Result<ProxyStatus, AppError
         port,
         endpoint: format!("http://127.0.0.1:{}/v1", port),
     })
+}
+
+/// 同步前端 Proxy Engine 配置到后端运行时
+#[tauri::command]
+pub async fn sync_proxy_engine_config(config: EngineConfig) -> Result<(), AppError> {
+    if let Ok(mut lock) = ENGINE_CONFIG.write() {
+        tracing::info!("📡 收到前端高级引擎配置同步: {:?}", config);
+        *lock = config;
+    }
+    Ok(())
 }

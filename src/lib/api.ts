@@ -20,6 +20,19 @@ export const api = {
     checkConflicts: (appName: string): Promise<EnvConflict[]> => invoke("check_system_env_conflicts", { appName }),
   },
 
+  proxy: {
+    syncEngineConfig: (config: any): Promise<void> => invoke("sync_proxy_engine_config", { config }),
+  },
+
+  security: {
+    getAccessLogs: (limit?: number): Promise<any[]> => invoke("get_ip_access_logs", { limit }),
+    clearAccessLogs: (): Promise<void> => invoke("clear_ip_access_logs"),
+    getRules: (): Promise<any[]> => invoke("get_ip_rules"),
+    addRule: (ipCidr: string, ruleType: string, notes?: string): Promise<void> => invoke("add_ip_rule", { ipCidr, ruleType, notes }),
+    deleteRule: (id: string): Promise<void> => invoke("delete_ip_rule", { id }),
+    toggleRule: (id: string, active: boolean): Promise<void> => invoke("toggle_ip_rule", { id, active }),
+  },
+
   keys: {
     list:           (): Promise<ApiKey[]>              => invoke("list_keys"),
     add:            (req: AddKeyRequest): Promise<ApiKey> => invoke("add_key", { request: req }),

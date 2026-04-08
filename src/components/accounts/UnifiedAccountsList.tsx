@@ -41,7 +41,10 @@ export default function UnifiedAccountsList() {
   const [activeChannelId, setActiveChannelId] = useState<string>("all");
 
   // ---------- Server 数据加载 ----------
-  const { data: keys = [], isLoading: keysLoading } = useQuery({ queryKey: ["keys"], queryFn: api.keys.list });
+  const { data: rawKeys = [], isLoading: keysLoading } = useQuery({ queryKey: ["keys"], queryFn: api.keys.list });
+  // 过滤掉由终端配置同步模块自动托管的 "(Auto Key)"，不污染全局商业/核心资产池
+  const keys = useMemo(() => rawKeys.filter((k) => !k.name.endsWith("(Auto Key)")), [rawKeys]);
+  
   const { data: balances = [] } = useQuery({ queryKey: ["balances"], queryFn: api.balance.listAll, staleTime: 1000 * 60 * 5 });
   const balanceMap = Object.fromEntries(balances.map((b) => [b.key_id, b]));
   const { data: ideAccs = [], isLoading: ideLoading } = useQuery({ queryKey: ["ideAccounts"], queryFn: api.ideAccounts.list });

@@ -32,3 +32,9 @@ pub fn delete_user_token(db: State<'_, Database>, id: String) -> Result<(), Stri
     let service = UserTokenService::new(db.inner());
     service.delete_token(&id).map_err(|e| e.to_string())
 }
+
+#[tauri::command]
+pub fn get_user_token_summary(db: State<'_, Database>) -> Result<crate::models::UserTokenSummary, String> {
+    let service = UserTokenService::new(db.inner());
+    service.get_summary().map_err(|e| e.to_string())
+}

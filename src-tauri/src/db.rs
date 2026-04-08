@@ -304,6 +304,33 @@ impl Database {
             )?;
         }
 
+        // ── Migration 11: Security Firewall UI (IP Logs & Rules) ─────────────
+        if current_version < 11 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS ip_access_logs (
+                    id              TEXT PRIMARY KEY,
+                    ip_address      TEXT NOT NULL,
+                    endpoint        TEXT NOT NULL,
+                    token_id        TEXT,
+                    action_taken    TEXT NOT NULL,
+                    reason          TEXT,
+                    created_at      INTEGER NOT NULL
+                );
+                
+                CREATE TABLE IF NOT EXISTS ip_rules (
+                    id              TEXT PRIMARY KEY,
+                    ip_cidr         TEXT NOT NULL UNIQUE,
+                    rule_type       TEXT NOT NULL,
+                    notes           TEXT,
+                    is_active       BOOLEAN NOT NULL DEFAULT 1,
+                    created_at      INTEGER NOT NULL
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (11, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 

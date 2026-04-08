@@ -186,5 +186,29 @@ impl AnalyticsService {
             platform_costs,
         })
     }
+
+    pub fn log_token_usage(
+        db: &Database,
+        key_id: &str,
+        platform: &str,
+        model_name: &str,
+        client_app: &str,
+        prompt_tokens: i64,
+        completion_tokens: i64,
+        total_tokens: i64,
+    ) -> crate::error::AppResult<()> {
+        let id = uuid::Uuid::new_v4().to_string();
+        let created_at = chrono::Utc::now().to_rfc3339();
+        
+        let total_cost_usd = 0.0; // Needs pricing formula, using 0 for now
+        
+        db.execute(
+            "INSERT INTO token_usage_records (
+                id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at, total_cost_usd
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+            rusqlite::params![id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at, total_cost_usd]
+        )?;
+        Ok(())
+    }
 }
 

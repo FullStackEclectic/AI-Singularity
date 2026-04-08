@@ -13,6 +13,8 @@
     "speedtest": "延迟测速",
     "models": "大模型目录",
     "sessions": "会话历史",
+    "sharing": "发卡与额度",
+    "security": "哨站风控台",
     "settings": "系统设置",
     "groups": {
       "account": "账号管理",

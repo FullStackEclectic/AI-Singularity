@@ -131,6 +131,14 @@ pub fn run() {
             // 代理
             commands::proxy::start_proxy,
             commands::proxy::get_proxy_status,
+            commands::proxy::sync_proxy_engine_config,
+            // 风控与安全防火墙
+            commands::security::get_ip_access_logs,
+            commands::security::clear_ip_access_logs,
+            commands::security::get_ip_rules,
+            commands::security::add_ip_rule,
+            commands::security::delete_ip_rule,
+            commands::security::toggle_ip_rule,
             // Providers & MCP
             commands::provider::get_providers,
             commands::provider::add_provider,
@@ -199,6 +207,7 @@ pub fn run() {
             commands::user_token::get_all_user_tokens,
             commands::user_token::update_user_token,
             commands::user_token::delete_user_token,
+            commands::user_token::get_user_token_summary,
             // 监控大盘数据
             commands::analytics::get_dashboard_metrics,
             // 模型重映射 (Model Mappings)

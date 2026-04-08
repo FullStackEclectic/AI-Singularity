@@ -15,9 +15,10 @@ import UnifiedAccountsList from "./components/accounts/UnifiedAccountsList";
 import SharingPage from "./components/accounts/SharingPage";
 import ToolDepotPage from "./components/tools/ToolDepotPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
+import SecurityPage from "./components/security/SecurityPage";
 import "./App.css";
 
-export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings";
+export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings" | "security";
 
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -94,6 +95,7 @@ export default function App() {
       case "analytics":  return <AnalyticsPage />;
       case "sessions":   return <SessionsPage />;
       case "settings":   return <SettingsPage />;
+      case "security":   return <SecurityPage />;
       default:           return <ComingSoonPage name={activePage} />;
     }
   };

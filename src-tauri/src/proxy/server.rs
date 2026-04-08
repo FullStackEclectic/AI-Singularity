@@ -6,6 +6,7 @@ use crate::proxy::converter::{
     openai_to_anthropic, openai_to_gemini, anthropic_to_openai_response, gemini_to_openai_response,
     OpenAIRequest,
 };
+use crate::proxy::security::{SecurityShield, SecurityAction};
 use crate::proxy::router::Router;
 use axum::{
     body::Body,
@@ -37,6 +38,11 @@ pub struct ProxyServer {
 
 impl ProxyServer {
     pub fn new(db: Arc<Database>, port: u16) -> Self {
+        // 同步拉取安全防火墙的黑白名单规则
+        if let Err(e) = crate::proxy::security::SecurityShield::sync_rules(&db) {
+            tracing::warn!("⚠️ 启动时同步黑白名单规则失败: {}", e);
+        }
+
         Self {
             port,
             state: ProxyState {
@@ -169,6 +175,20 @@ async fn handle_chat_completions(
                         }
                     }
                     
+                    // IP 追踪与风控检查
+                    let incoming_ip = client_ip.0.ip().to_string();
+                    if let SecurityAction::Deny(reason) = SecurityShield::verify_max_ips(&ut.id, &incoming_ip, ut.max_ips) {
+                        let _db = state.db.clone();
+                        let _ip = incoming_ip.clone();
+                        let _ut_id = ut.id.clone();
+                        let _reason = reason.clone();
+                        tokio::spawn(async move {
+                            let svc = crate::services::security_db::SecurityDbService::new(&_db);
+                            let _ = svc.log_access(&_ip, "/v1/chat/completions", Some(&_ut_id), "deny", Some(&_reason));
+                        });
+                        return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": {"message": reason}}))).into_response();
+                    }
+                    
                     current_user_token = Some(ut.id);
                 }
                 _ => return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "无效的 AI Singularity 下发 Token"}}))).into_response(),
@@ -177,8 +197,52 @@ async fn handle_chat_completions(
     }
 
     // 限制外网无鉴权访问 (粗略防御)
+    let incoming_ip = client_ip.0.ip().to_string();
     if current_user_token.is_none() && !client_ip.0.ip().is_loopback() {
-         return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "外部 IP 必须携带合法的网关分发 Token (sk-ag-...)"}}))).into_response();
+        let _db = state.db.clone();
+        let _ip = incoming_ip.clone();
+        tokio::spawn(async move {
+            let svc = crate::services::security_db::SecurityDbService::new(&_db);
+            let _ = svc.log_access(&_ip, "/v1/chat/completions", None, "deny", Some("外部无鉴权访问"));
+        });
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "外部 IP 必须携带合法的网关分发 Token (sk-ag-...)"}}))).into_response();
+    }
+
+    // IP 黑白名单过滤盾 (Phase 5)
+    if let SecurityAction::Deny(reason) = SecurityShield::verify_ip_rule(&incoming_ip) {
+        let _db = state.db.clone();
+        let _ip = incoming_ip.clone();
+        let _ut = current_user_token.clone();
+        let _reason = reason.clone();
+        tokio::spawn(async move {
+            let svc = crate::services::security_db::SecurityDbService::new(&_db);
+            let _ = svc.log_access(&_ip, "/v1/chat/completions", _ut.as_deref(), "blacklisted", Some(&_reason));
+        });
+        return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": reason}}))).into_response();
+    }
+
+    // 全局请求频段限流盾
+    if let SecurityAction::Deny(reason) = SecurityShield::check_rate_limit(&incoming_ip, current_user_token.as_deref()) {
+        let _db = state.db.clone();
+        let _ip = incoming_ip.clone();
+        let _ut = current_user_token.clone();
+        let _reason = reason.clone();
+        tokio::spawn(async move {
+            let svc = crate::services::security_db::SecurityDbService::new(&_db);
+            let _ = svc.log_access(&_ip, "/v1/chat/completions", _ut.as_deref(), "rate_limit", Some(&_reason));
+        });
+        return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": {"message": reason}}))).into_response();
+    }
+    
+    // 如果全部绿灯放行通过，且是外部 IP 我们也可以简单记个日志作为流水
+    if !client_ip.0.ip().is_loopback() {
+        let _db = state.db.clone();
+        let _ip = incoming_ip.clone();
+        let _ut = current_user_token.clone();
+        tokio::spawn(async move {
+            let svc = crate::services::security_db::SecurityDbService::new(&_db);
+            let _ = svc.log_access(&_ip, "/v1/chat/completions", _ut.as_deref(), "allow", None);
+        });
     }
 
     let client_app = headers.get("x-client-app")
@@ -248,6 +312,35 @@ async fn handle_chat_completions(
         }
     }
 
+    // --- 高级思维链路与上下文降维压缩 (Advanced Thinking Context Compression) ---
+    if let Ok(cfg) = crate::commands::proxy::ENGINE_CONFIG.read() {
+        if cfg.advanced_thinking.enabled {
+            // 粗略以 3 字符 = 1 token 估算当前负载
+            let estimated_tokens: usize = body.messages.iter().map(|m| m.content.len()).sum::<usize>() / 3;
+            let budget = cfg.advanced_thinking.budget_limit as usize;
+            let threshold = (budget as f64 * cfg.advanced_thinking.compression_threshold) as usize;
+
+            if estimated_tokens > threshold && body.messages.len() > 4 {
+                tracing::info!("🧠 高级思维压缩触发: 当前预估 {} tokens，已超过阈值 {} (预算: {})", estimated_tokens, threshold, budget);
+                // 保留 System Prompts (第一个) 和最近的 3 条消息，丢弃中间的上下文
+                let mut compressed_msgs = vec![];
+                if let Some(sys) = body.messages.first() {
+                    compressed_msgs.push(sys.clone());
+                }
+                let len = body.messages.len();
+                // 中间塞入一条伪造的记忆压缩系统提示
+                compressed_msgs.push(crate::proxy::converter::OpenAIMessage {
+                    role: "system".to_string(),
+                    content: "[...Previous context compressed by AI Singularity Cognitive Engine...]".to_string(),
+                });
+                for msg in body.messages.into_iter().skip(len.saturating_sub(3)) {
+                    compressed_msgs.push(msg);
+                }
+                body.messages = compressed_msgs;
+            }
+        }
+    }
+
     let mut attempts = 0;    loop {
         attempts += 1;
         let platform_str = get_platform_for_model(&current_model);
@@ -287,6 +380,7 @@ async fn handle_chat_completions(
             platform: format!("{:?}", target.platform),
             model: current_model.clone(),
             client_app: client_app.clone(),
+            user_token_id: current_user_token.clone(),
         };
 
         let response_or_stream = if is_stream {
@@ -318,24 +412,7 @@ async fn handle_chat_completions(
                     let prompt_tokens = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
                     let completion_tokens = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
                     let total_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                    
-                    let cost = crate::services::pricing::PricingEngine::calculate_cost(&current_model, prompt_tokens, completion_tokens);
-                    let id = uuid::Uuid::new_v4().to_string();
-                    let _ = state.db.execute(
-                        "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, total_cost_usd, created_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
-                        &[
-                            &id,
-                            &target.key_id,
-                            &format!("{:?}", target.platform),
-                            &current_model,
-                            &client_app,
-                            &prompt_tokens,
-                            &completion_tokens,
-                            &total_tokens,
-                            &cost,
-                        ]
-                    );
+                    audit_ctx.write_usage(prompt_tokens, completion_tokens, total_tokens);
                 }
                 axum::response::Response::builder()
                     .status(StatusCode::OK)
@@ -383,8 +460,18 @@ async fn handle_chat_completions(
                     || err_str.contains("timeout");
 
                 if should_fallback {
-                    if attempts < 3 {
-                        tracing::warn!("⚠️ 节点 [{}] (平台: {:?}) 发生熔断 ({})，触发毫秒级切流 (已尝试: {})", target.key_id, target.platform, err_str.lines().next().unwrap_or(&err_str), attempts);
+                    let max_retries = if let Ok(cfg) = crate::commands::proxy::ENGINE_CONFIG.read() {
+                        if cfg.circuit_breaker.enabled {
+                            cfg.circuit_breaker.backoff_steps.len()
+                        } else {
+                            1 // disabled means do not extensively retry
+                        }
+                    } else {
+                        3
+                    };
+
+                    if attempts < max_retries {
+                        tracing::warn!("⚠️ 节点 [{}] (平台: {:?}) 发生熔断 ({})，触发毫秒级切流 (已尝试: {}/{})", target.key_id, target.platform, err_str.lines().next().unwrap_or(&err_str), attempts, max_retries);
                         continue;
                     }
                     if let Some(fallback) = get_fallback_model(&current_model) {
@@ -486,6 +573,7 @@ struct AuditContext {
     platform: String,
     model: String,
     client_app: String,
+    user_token_id: Option<String>,
 }
 
 impl AuditContext {
@@ -507,6 +595,13 @@ impl AuditContext {
                 &cost,
             ]
         );
+
+        // 如果该次请求是由某个外部下发的 UserToken 驱动的，更新它的流水消耗表
+        if let Some(ut_id) = &self.user_token_id {
+            // increment_token_usage 增加1次请求，增加总tokens
+            let token_service = crate::services::user_token::UserTokenService::new(&self.db);
+            let _ = token_service.increment_token_usage(ut_id, 1, total_tokens as i64);
+        }
     }
 }
 

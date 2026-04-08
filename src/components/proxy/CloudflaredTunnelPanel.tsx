@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { Globe, GlobeLock, Copy, CheckCircle2 } from "lucide-react";
 import "./CloudflaredTunnelPanel.css";
 
 export default function CloudflaredTunnelPanel({ localPort }: { localPort: number }) {
@@ -52,29 +53,30 @@ export default function CloudflaredTunnelPanel({ localPort }: { localPort: numbe
   const isActive = !!tunnelUrl;
 
   return (
-    <div className={`tunnel-panel ${isActive ? 'active' : ''}`}>
-      <div className="tunnel-header">
-        <div className="tunnel-info">
-           <h3>公网隧道互联</h3>
-           <p className="text-muted">基于 Cloudflared Zero Trust，一键将本地网关跨网分享给公网设备使用。</p>
+    <div className={`proxy-card ${isActive ? 'active' : ''}`} style={{ marginTop: 24, borderColor: isActive ? "var(--color-primary)" : undefined }}>
+      <div className="proxy-card-header" style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {isActive ? <Globe size={18} className="text-primary" /> : <GlobeLock size={18} className="text-muted" />}
+          <span>公网隧道穿透 (Cloudflared Tunnel)</span>
         </div>
         <button 
-          className={`cyber-btn cyber-btn-sm ${isActive ? 'active danger' : ''}`}
+          className={`btn btn-sm ${isActive ? 'btn-danger' : 'btn-primary'}`}
           onClick={() => toggleMut.mutate()}
           disabled={loading || toggleMut.isPending}
         >
-           {loading ? "CONNECTING..." : (isActive ? "SHUTDOWN" : "START TUNNEL")}
+           {loading ? "握手中..." : (isActive ? "关闭连接" : "开启公网穿透")}
         </button>
       </div>
+      <p style={{ margin: "0 0 16px 0", fontSize: 13, color: "var(--color-text-secondary)" }}>基于 Cloudflared Zero Trust，一键将本地网关跨网分享给公网设备使用。</p>
 
       {(isActive || loading) && (
-        <div className="tunnel-output glow-text">
-           {loading && !tunnelUrl && <span>Waiting for Cloudflared handshake...</span>}
+        <div className="info-banner" style={{ margin: 0, padding: "12px 16px" }}>
+           {loading && !tunnelUrl && <span style={{ fontSize: 13 }}>Waiting for Cloudflared handshake...</span>}
            {tunnelUrl && (
-             <div className="tunnel-url-box">
-                <code>{tunnelUrl}</code>
-                <button className="cyber-icon-btn" onClick={handleCopy}>
-                  {copied ? "COPIED!" : "COPY_URL"}
+             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <code style={{ fontSize: 14, fontFamily: "monospace", color: "var(--color-text)", fontWeight: 600 }}>{tunnelUrl}</code>
+                <button className={`btn ${copied ? "btn-success" : "btn-secondary"} btn-sm`} onClick={handleCopy}>
+                  {copied ? <><CheckCircle2 size={14}/> 已复制</> : <><Copy size={14}/> 复制链接</>}
                 </button>
              </div>
            )}

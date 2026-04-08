@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import { ArrowRight, Trash2, Power, PowerOff, Plus } from "lucide-react";
 import "./ModelMappingPanel.css";
 
 interface ModelMapping {
@@ -41,44 +42,49 @@ export default function ModelMappingPanel() {
 
   return (
     <div className="model-mapping-panel">
-      <div className="mapping-form">
+      <div className="mapping-form" style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
         <input 
           value={source} 
           onChange={e => setSource(e.target.value)} 
-          placeholder="拦截目标 (例: gpt-4)" 
-          className="cyber-input" 
+          placeholder="拦截来源 (例: gpt-4)" 
+          className="form-input" 
+          style={{ flex: 1 }}
         />
-        <span className="mapping-arrow">⭢</span>
+        <ArrowRight size={16} className="text-muted" />
         <input 
           value={target} 
           onChange={e => setTarget(e.target.value)} 
-          placeholder="重录目标 (例: gemini-1.5)" 
-          className="cyber-input" 
+          placeholder="转发目标 (例: gemini-1.5-pro)" 
+          className="form-input" 
+          style={{ flex: 1 }}
         />
         <button 
-          className="cyber-btn cyber-btn-sm" 
+          className="btn btn-primary" 
           onClick={() => addMut.mutate()} 
           disabled={!source || !target || addMut.isPending}
         >
-          {addMut.isPending ? "INJECTING..." : "ADD_RULE"}
+          {addMut.isPending ? "添加中..." : <><Plus size={16}/> 新增</>}
         </button>
       </div>
 
-      <div className="mapping-list">
-        {mappings.length === 0 && <div className="text-muted" style={{fontSize: 12}}>NO_ACTIVE_RULES_DETECTED</div>}
+      <div className="mapping-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
+        {mappings.length === 0 && <div className="text-muted" style={{fontSize: 13}}>暂未配置任何拦截映射规则</div>}
         {mappings.map(m => (
-          <div key={m.id} className={`mapping-item ${!m.is_active ? "disabled" : ""}`}>
-            <div className="mapping-info">
-              <span className="source-label">{m.source_model}</span>
-              <span className="mapping-arrow">⭢</span>
-              <span className="target-label" style={{color: 'var(--color-primary)'}}>{m.target_model}</span>
+          <div key={m.id} className={`protocol-item ${!m.is_active ? "opacity-50" : ""}`}>
+            <div className="protocol-meta" style={{ flex: 1 }}>
+              <span className="protocol-tag" style={{ minWidth: 100, textAlign: 'center' }}>{m.source_model}</span>
+              <ArrowRight size={14} className="text-muted" />
+              <span className="protocol-flow text-primary">{m.target_model}</span>
             </div>
-            <div className="mapping-actions">
-               <button className="cyber-icon-btn" onClick={() => toggleMut.mutate(m)}>
-                 {m.is_active ? "ON" : "OFF"}
+            <div className="mapping-actions" style={{ display: 'flex', gap: 8 }}>
+               <button 
+                 className={`btn-icon ${m.is_active ? "text-success" : "text-muted"}`} 
+                 onClick={() => toggleMut.mutate(m)}
+               >
+                 {m.is_active ? <Power size={16}/> : <PowerOff size={16}/>}
                </button>
-               <button className="cyber-icon-btn danger" onClick={() => delMut.mutate(m.id)}>
-                 DEL
+               <button className="btn-icon danger" onClick={() => delMut.mutate(m.id)}>
+                 <Trash2 size={16}/>
                </button>
             </div>
           </div>

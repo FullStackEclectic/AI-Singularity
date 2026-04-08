@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
+import { Server, Activity, Network, Zap, Settings, ShieldCheck, Check } from "lucide-react";
 import type { IdeAccount } from "../../types";
 import PlaygroundPanel from "./PlaygroundPanel";
 import ModelMappingPanel from "./ModelMappingPanel";
 import CloudflaredTunnelPanel from "./CloudflaredTunnelPanel";
+import ProxyEngineSettingsPanel from "./ProxyEngineSettingsPanel";
 import "./ProxyPage.css";
 
 interface ProxyStatus {
@@ -45,127 +47,129 @@ export default function ProxyPage() {
   };
 
   return (
-    <div className="proxy-page cyberpunk-theme">
-      <div className="page-header">
-        <div>
-          <h1 className="cyber-title">
-            <span className="cyber-glitch" data-text="Proxy Gateway">PROXY GATEWAY</span>
-            <span className="cyber-sub"> // 总控制台引擎</span>
+    <div className="proxy-page">
+      <div className="info-banner" style={{ background: "var(--color-surface)", marginBottom: 32 }}>
+        <div className="proxy-header-info">
+          <h1 className="proxy-title">
+            <Server size={24} className="text-primary" />
+            Proxy Gateway 总控制台引擎
           </h1>
-          <p className="page-subtitle glow-text">协议转录拦截 · 流级欺诈网络 · 降维指纹伪装</p>
+          <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)" }}>
+            承载协议转录拦截、流级劫持与本地端口投射的核心组件。
+          </p>
         </div>
-        <div className="proxy-status-indicator">
-          <div className={`radar-ping ${isRunning ? "active" : ""}`} />
-          <span className="cyber-status-text" style={{ fontSize: 14 }}>
-            {isRunning ? "[ 引擎运转中 ]" : "[ 引擎离线 ]"}
-          </span>
+        <div className="proxy-action-panel">
+          <div className="port-config" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--color-text-secondary)", marginRight: 16 }}>
+            <span>端口:</span>
+            <input
+              type="number"
+              className="form-input"
+              style={{ width: 80, padding: "4px 8px" }}
+              value={port}
+              onChange={(e) => setPort(Number(e.target.value))}
+              disabled={isRunning}
+            />
+          </div>
+          <button
+            className={`btn ${isRunning ? "btn-secondary" : "btn-primary"}`}
+            onClick={() => startMut.mutate()}
+            disabled={startMut.isPending || isRunning}
+            style={{ minWidth: 140 }}
+          >
+            {isRunning ? <><Check size={16}/> 引擎运转中</> : startMut.isPending ? "启动中..." : <><Zap size={16}/> 启动本地代理</>}
+          </button>
+          <div className={`proxy-status-pill ${isRunning ? "online" : "offline"}`}>
+            <span className="status-dot" />
+            {isRunning ? "ONLINE" : "OFFLINE"}
+          </div>
         </div>
       </div>
 
-      <div className="proxy-body">
-        {/* Core Control */}
-        <div className="cyber-card">
-          <div className="cyber-card-header">
-            <h2 className="cyber-section-title">CORE_CONTROL // 核心中枢</h2>
-            <button
-              className={`cyber-btn ${isRunning ? "active" : ""}`}
-              onClick={() => startMut.mutate()}
-              disabled={startMut.isPending || isRunning}
-            >
-              <span className="btn-icon">⚡</span>
-              {isRunning ? "NETWORK ONLINE" : startMut.isPending ? "INITIALIZING..." : "ENGAGE PROXY"}
-            </button>
-          </div>
+      <CloudflaredTunnelPanel localPort={port} />
 
-          <div className="cyber-endpoint-box">
-            <div className="endpoint-label">LOCAL_ENDPOINT:</div>
-            <div className="endpoint-code-row">
-              <code className="endpoint-url">{endpoint}</code>
-              <button className="cyber-icon-btn" onClick={handleCopy} title="复制地址">
-                {copied ? "COPIED" : "COPY"}
+      <div className="proxy-grid">
+        {/* Core Settings / Dashboard */}
+        <div className="proxy-card">
+          <div className="proxy-card-header">
+            <Activity size={18} className="proxy-card-header-icon" />
+            会话雷达监控 (Session Radar)
+          </div>
+          
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <div className="info-banner" style={{ margin: 0, padding: "12px 16px", background: "rgba(16, 185, 129, 0.04)" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>本地服务入口</div>
+                <div style={{ fontSize: 14, fontFamily: "monospace", color: "var(--color-text)", fontWeight: 600, marginTop: 4 }}>
+                  {endpoint}
+                </div>
+              </div>
+              <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
+                {copied ? "已复制" : "复制"}
               </button>
             </div>
-            <div className="port-config">
-              <span>PORT:</span>
-              <input
-                type="number"
-                className="cyber-input-mini"
-                value={port}
-                onChange={(e) => setPort(Number(e.target.value))}
-                disabled={isRunning}
-              />
-            </div>
-          </div>
-        </div>
 
-        <CloudflaredTunnelPanel localPort={port} />
-
-        {/* Session Radar Grid */}
-        <div className="cyber-grid">
-          <div className="cyber-card">
-            <h2 className="cyber-section-title">
-              <span className="pulse-dot"></span> SESSION_RADAR // 会话雷达
-            </h2>
-            <div className="radar-monitor">
-              <div className="radar-circle">
-                <div className="radar-sweep"></div>
-                {isRunning && <div className="radar-blip"></div>}
+            <div>
+              <div className="proxy-stat-row">
+                <span className="proxy-stat-label">可用池化凭据源</span>
+                <span className="proxy-stat-value">{validNodes} 活跃指纹</span>
               </div>
-              <div className="radar-stats">
-                <div className="stat-line">
-                  <span className="stat-label">GHOST_NODES_POOL:</span>
-                  <span className="stat-val highlight">{validNodes} ACTIVE</span>
-                </div>
-                <div className="stat-line">
-                  <span className="stat-label">INTERCEPT_MODE:</span>
-                  <span className="stat-val">DEEP_STREAM (SSE)</span>
-                </div>
-                <div className="stat-line">
-                  <span className="stat-label">IMAGE_BYPASS:</span>
-                  <span className="stat-val text-success">ENABLED (IMAGEN-3)</span>
-                </div>
+              <div className="proxy-stat-row">
+                <span className="proxy-stat-label">流体劫持模式 (Intercept)</span>
+                <span className="proxy-stat-value">Deep Stream / SSE</span>
+              </div>
+              <div className="proxy-stat-row">
+                <span className="proxy-stat-label">跨模态支持</span>
+                <span className="proxy-stat-value" style={{ color: "#10B981" }}>启用中 (Imagen-3)</span>
               </div>
             </div>
           </div>
+        </div>
 
-          <div className="cyber-card">
-            <h2 className="cyber-section-title">TRANSMUTATION // 协议转录</h2>
-            <div className="cyber-protocol-list">
-              {[
-                { flow: "OpenAI ↔ Anthropic", status: "ONLINE", type: "SSE_HIJACK" },
-                { flow: "OpenAI ↔ Gemini", status: "ONLINE", type: "NATIVE_MAP" },
-                { flow: "OpenAI ↔ DeepSeek", status: "ONLINE", type: "PASSTHROUGH" },
-                { flow: "Auth0IDE ↔ ClaudeCode", status: "STANDBY", type: "FINGERPRINT_FORGE" }
-              ].map((p, i) => (
-                <div key={i} className="cyber-protocol-item">
-                  <div className="protocol-flow">{p.flow}</div>
-                  <div className="protocol-meta">
-                    <span className="cyber-tag">{p.type}</span>
-                    <span className={`status-badge ${p.status === 'ONLINE' ? 'online' : 'standby'}`}>{p.status}</span>
-                  </div>
+        {/* Protocols */}
+        <div className="proxy-card">
+          <div className="proxy-card-header">
+            <Network size={18} className="proxy-card-header-icon" />
+            运行时协议栈 (Transmutation)
+          </div>
+          <div className="protocol-list">
+            {[
+              { flow: "OpenAI ↔ Anthropic", status: "ONLINE", type: "SSE_HIJACK" },
+              { flow: "OpenAI ↔ Gemini", status: "ONLINE", type: "NATIVE_MAP" },
+              { flow: "OpenAI ↔ DeepSeek", status: "ONLINE", type: "PASSTHROUGH" },
+              { flow: "Auth0IDE ↔ ClaudeCode", status: "STANDBY", type: "FORGE_ID" }
+            ].map((p, i) => (
+              <div key={i} className="protocol-item">
+                <div className="protocol-flow">{p.flow}</div>
+                <div className="protocol-meta">
+                  <span className="protocol-tag">{p.type}</span>
+                  <span className={`protocol-status ${p.status === 'ONLINE' ? 'online' : 'standby'}`}>{p.status}</span>
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
+      </div>
 
-        {/* Model Mapping Rule Grid */}
-        <div className="cyber-card" style={{ marginTop: "var(--space-4)" }}>
-          <h2 className="cyber-section-title">
-            <span className="pulse-dot"></span> MODEL_MAPPING // 模型降维转录映射
-          </h2>
-          <div className="text-muted" style={{fontSize: 12, marginBottom: 'var(--space-3)'}}>
-             在此配置底层拦截映射。当客户端强行请求某一模型时，触发透明重写机制。
-          </div>
-          <ModelMappingPanel />
+      <ProxyEngineSettingsPanel />
+
+      <div className="proxy-card" style={{ marginTop: 24 }}>
+        <div className="proxy-card-header">
+          <Settings size={18} className="proxy-card-header-icon" />
+          全量自动模型重写 (Model Mapping Rules)
         </div>
+        <p style={{ margin: "0 0 16px 0", fontSize: 13, color: "var(--color-text-secondary)" }}>
+          设定模型降维与路由映射规则：当客户端使用来源模型请求网关时，透明转写至目标大模型提供商。
+        </p>
+        <ModelMappingPanel />
+      </div>
 
-        {/* Playground */}
-        <div className="cyber-card" style={{ marginTop: "var(--space-4)" }}>
-          <h2 className="cyber-section-title">SIGNAL_TEST // API 连通性测试沙盒</h2>
-          <div style={{ height: 380 }}>
-            <PlaygroundPanel />
-          </div>
+      <div className="proxy-card" style={{ marginTop: 24 }}>
+        <div className="proxy-card-header">
+          <ShieldCheck size={18} className="proxy-card-header-icon" />
+          沙盒内侧连通性验证 (Sandbox)
+        </div>
+        <div style={{ height: 380 }}>
+          <PlaygroundPanel />
         </div>
       </div>
     </div>

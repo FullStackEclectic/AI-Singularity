@@ -231,10 +231,7 @@ export default function ConfigPreview({
 
   return (
     <div className="cfg-preview-container">
-      <div className="form-section-title" style={{ marginTop: 0 }}>
-        配置文件预览
-        <span className="cfg-preview-hint">以下内容将在激活时写入对应配置文件</span>
-      </div>
+
       <div className="cfg-preview-list">
         {previews.map(({ tool, content, lang }) => (
           <PreviewBlock key={tool} tool={tool} content={content} lang={lang} />

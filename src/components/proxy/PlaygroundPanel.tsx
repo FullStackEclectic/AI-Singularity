@@ -104,7 +104,7 @@ export default function PlaygroundPanel() {
     <div className="playground-panel">
       <div className="playground-toolbar">
         <select
-          className="pg-select"
+          className="form-select"
           value={model}
           onChange={(e) => setModel(e.target.value)}
           title="选择模型"
@@ -116,7 +116,9 @@ export default function PlaygroundPanel() {
         <div className="pg-port-row">
           <span className="pg-label">代理端口</span>
           <input
-            className="pg-port-input"
+            type="number"
+            className="form-input"
+            style={{ width: 80 }}
             value={proxyPort}
             onChange={(e) => setProxyPort(e.target.value)}
             placeholder="3000"
@@ -153,9 +155,10 @@ export default function PlaygroundPanel() {
         <div ref={bottomRef} />
       </div>
 
-      <div className="playground-input-row">
+      <div className="playground-input-row" style={{ background: "transparent" }}>
         <textarea
-          className="pg-textarea"
+          className="form-input"
+          style={{ resize: "none", minHeight: 48, borderRadius: 12 }}
           placeholder="输入测试消息... (Enter 发送)"
           value={input}
           onChange={(e) => setInput(e.target.value)}

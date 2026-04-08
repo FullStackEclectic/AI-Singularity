@@ -21,7 +21,7 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
       { id: "accounts", icon: "👤", label: "账号与资产库" },
       { id: "sharing", icon: "🔑", label: "分享发卡与额度" },
       { id: "proxy", icon: "↔", label: "本地路由与隧道" },
-      // 注：此处预留 P1 的『高级规则 / 模型映射』，待下个阶段加入
+      { id: "security", icon: "🛡️", label: "哨站风控台" },
     ],
   },
   {
@@ -89,7 +89,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
               >
                 <span className="sidebar-nav-icon">{item.icon}</span>
                 <span className="sidebar-nav-label">
-                  {t(`sidebar.${item.id}`)}
+                  {t(`sidebar.${item.id}`, item.label)}
                 </span>
                 {item.badge && (
                   <span className="sidebar-nav-badge">{item.badge}</span>

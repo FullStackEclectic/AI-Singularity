@@ -202,4 +202,23 @@ impl<'a> UserTokenService<'a> {
         )?;
         Ok(())
     }
+
+    pub fn get_summary(&self) -> Result<crate::models::UserTokenSummary> {
+        let total_tokens: i64 = self.db.query_scalar("SELECT COUNT(*) FROM user_tokens", &[])?;
+        let active_tokens: i64 = self.db.query_scalar("SELECT COUNT(*) FROM user_tokens WHERE enabled = 1", &[])?;
+        let total_users: i64 = self.db.query_scalar("SELECT COUNT(DISTINCT username) FROM user_tokens", &[])?;
+        
+        let today_start = Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
+        let today_requests: i64 = self.db.query_scalar(
+            "SELECT COALESCE(SUM(total_requests), 0) FROM user_tokens WHERE last_used_at >= ?", 
+            &[&today_start]
+        ).unwrap_or(0);
+
+        Ok(crate::models::UserTokenSummary {
+            total_tokens,
+            active_tokens,
+            total_users,
+            today_requests,
+        })
+    }
 }
