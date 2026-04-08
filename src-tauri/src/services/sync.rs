@@ -42,9 +42,9 @@ impl<'a> SyncService<'a> {
         let prompts   = crate::services::prompts::PromptService::new(self.db).list_prompts().unwrap_or_default();
 
         self.sync_claude_code(&providers, &mcps, &prompts);
-        self.sync_codex(&providers);
+        self.sync_codex(&providers, &mcps);
         self.sync_gemini_cli(&providers);
-        self.sync_opencode(&providers);
+        self.sync_opencode(&providers, &mcps);
         self.sync_openclaw(&providers);
         self.sync_aider(&providers, &prompts);
     }
@@ -67,9 +67,9 @@ impl<'a> SyncService<'a> {
 
         match tool {
             ToolTarget::ClaudeCode => self.sync_claude_code(&providers, &mcps, &prompts),
-            ToolTarget::Codex      => self.sync_codex(&providers),
+            ToolTarget::Codex      => self.sync_codex(&providers, &mcps),
             ToolTarget::GeminiCli  => self.sync_gemini_cli(&providers),
-            ToolTarget::OpenCode   => self.sync_opencode(&providers),
+            ToolTarget::OpenCode   => self.sync_opencode(&providers, &mcps),
             ToolTarget::OpenClaw   => self.sync_openclaw(&providers),
             ToolTarget::Aider      => self.sync_aider(&providers, &prompts),
         }
@@ -80,7 +80,9 @@ impl<'a> SyncService<'a> {
     // ─────────────────────────────────────────────────────────
 
     fn sync_claude_code(&self, providers: &[ProviderConfig], mcps: &[McpServer], prompts: &[crate::models::PromptConfig]) {
-        let path = Self::home_dir().join(".claude.json");
+        let claude_dir = Self::home_dir().join(".claude");
+        let _ = fs::create_dir_all(&claude_dir);
+        let path = claude_dir.join("settings.json");
 
         let mut config: Value = if path.exists() {
             let content = fs::read_to_string(&path).unwrap_or_else(|_| "{}".to_string());
@@ -139,14 +141,14 @@ impl<'a> SyncService<'a> {
             config.as_object_mut().map(|m| m.remove("customInstructions"));
         }
 
-        self.write_json(&path, &config, "~/.claude.json");
+        self.write_json(&path, &config, "~/.claude/settings.json");
     }
 
     // ─────────────────────────────────────────────────────────
     // Codex  →  ~/.codex/config.toml  +  ~/.codex/auth.json
     // ─────────────────────────────────────────────────────────
 
-    fn sync_codex(&self, providers: &[ProviderConfig]) {
+    fn sync_codex(&self, providers: &[ProviderConfig], mcps: &[McpServer]) {
         let Some(p) = providers.iter().find(|p| p.is_active && p.syncs_to(&ToolTarget::Codex)) else {
             return;
         };
@@ -185,7 +187,61 @@ requires_openai_auth = true
         );
 
         let config_path = codex_dir.join("config.toml");
-        match fs::write(&config_path, toml_content) {
+        
+        let mut toml_doc = toml_content.parse::<toml_edit::DocumentMut>().unwrap_or_default();
+        
+        // 渲染 MCP 配置
+        let mut mcp_servers_tbl = toml_edit::Table::new();
+        let mut added_mcps = false;
+        
+        for mcp in mcps {
+            if mcp.is_active && mcp.parsed_tool_targets().contains(&ToolTarget::Codex) {
+                let mut server_tbl = toml_edit::Table::new();
+                
+                // 类型如果是 stdio / sse 根据 command 等判断, 这里简单以 command 是否为空区分？
+                // 如果有 command 则是 stdio, 如果是 url 则是 http
+                let cmd = mcp.command.clone();
+                let typ = if cmd.starts_with("http") { "http" } else { "stdio" };
+                
+                server_tbl["type"] = toml_edit::value(typ);
+                
+                if typ == "stdio" {
+                    server_tbl["command"] = toml_edit::value(cmd);
+                    
+                    if let Some(args) = &mcp.args {
+                        if let Ok(args_arr) = serde_json::from_str::<Vec<String>>(args) {
+                            let mut arr = toml_edit::Array::default();
+                            for a in args_arr { arr.push(a); }
+                            if !arr.is_empty() {
+                                server_tbl["args"] = toml_edit::Item::Value(toml_edit::Value::Array(arr));
+                            }
+                        }
+                    }
+                    if let Some(env) = &mcp.env {
+                        if let Ok(env_map) = serde_json::from_str::<std::collections::HashMap<String, String>>(env) {
+                            let mut env_tbl = toml_edit::Table::new();
+                            for (k, v) in env_map {
+                                env_tbl[&k] = toml_edit::value(v);
+                            }
+                            if !env_tbl.is_empty() {
+                                server_tbl["env"] = toml_edit::Item::Table(env_tbl);
+                            }
+                        }
+                    }
+                } else if typ == "http" {
+                    server_tbl["url"] = toml_edit::value(cmd);
+                }
+                
+                mcp_servers_tbl[&mcp.name] = toml_edit::Item::Table(server_tbl);
+                added_mcps = true;
+            }
+        }
+        
+        if added_mcps {
+            toml_doc["mcp_servers"] = toml_edit::Item::Table(mcp_servers_tbl);
+        }
+
+        match fs::write(&config_path, toml_doc.to_string()) {
             Ok(_) => info!("已同步 ~/.codex/config.toml"),
             Err(e) => error!("写入 ~/.codex/config.toml 失败: {}", e),
         }
@@ -239,7 +295,7 @@ requires_openai_auth = true
     //              (Windows: %APPDATA%\opencode\opencode.json)
     // ─────────────────────────────────────────────────────────
 
-    fn sync_opencode(&self, providers: &[ProviderConfig]) {
+    fn sync_opencode(&self, providers: &[ProviderConfig], mcps: &[McpServer]) {
         let Some(p) = providers.iter().find(|p| p.is_active && p.syncs_to(&ToolTarget::OpenCode)) else {
             return;
         };
@@ -280,6 +336,22 @@ requires_openai_auth = true
         // 用 provider id 作为 key（确保唯一）
         let safe_id = p.id.replace('-', "_");
         config["providers"][&safe_id] = provider_entry;
+        
+        // 注入 MCP
+        let mut mcp_obj = json!({});
+        for mcp in mcps {
+            if mcp.is_active && mcp.parsed_tool_targets().contains(&ToolTarget::OpenCode) {
+                let args: Vec<String> = serde_json::from_str(mcp.args.as_deref().unwrap_or("[]")).unwrap_or_default();
+                let env: std::collections::HashMap<String, String> =
+                    serde_json::from_str(mcp.env.as_deref().unwrap_or("{}")).unwrap_or_default();
+                mcp_obj[&mcp.name] = json!({
+                    "command": mcp.command,
+                    "args": args,
+                    "env": env
+                });
+            }
+        }
+        config["mcpServers"] = mcp_obj;
 
         self.write_json(&config_path, &config, "opencode config");
     }

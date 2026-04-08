@@ -98,16 +98,20 @@ impl<'a> ProviderService<'a> {
 
     /// 切换激活 Provider（仅同步目标工具相关的 provider 互斥）
     pub fn switch_provider(&self, id: &str) -> AppResult<()> {
-        // 获取目标 provider 的 tool_targets
-        let _target = self.db.query_one(
-            "SELECT tool_targets FROM providers WHERE id = ?1",
-            &[&id],
-            |row| row.get::<_, Option<String>>(0),
-        )?;
-
-        // 把同样 tool_targets 中包含相同工具的其他 provider 全部取消激活
-        self.db.execute("UPDATE providers SET is_active = 0", &[])?;
-        self.db.execute("UPDATE providers SET is_active = 1 WHERE id = ?1", &[&id])?;
+        let all_providers = self.list_providers()?;
+        if let Some(activating_p) = all_providers.iter().find(|p| p.id == id) {
+            let my_targets = activating_p.parsed_tool_targets();
+            for p in &all_providers {
+                if p.id != id && p.is_active {
+                    let their_targets = p.parsed_tool_targets();
+                    let overlap = my_targets.iter().any(|t| their_targets.contains(t));
+                    if overlap {
+                        self.db.execute("UPDATE providers SET is_active = 0 WHERE id = ?1", params![p.id])?;
+                    }
+                }
+            }
+            self.db.execute("UPDATE providers SET is_active = 1 WHERE id = ?1", params![id])?;
+        }
 
         SyncService::new(self.db).sync_all();
         Ok(())

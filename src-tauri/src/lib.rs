@@ -57,6 +57,12 @@ pub fn run() {
                 std::sync::Arc::new(db.clone())
             ).start(30);
 
+            // --- WebDAV 配置状态漫游自动同步进程（每 15 分钟） ---
+            crate::services::webdav_daemon::WebDavDaemon::new(
+                std::sync::Arc::new(db.clone()),
+                app_data_dir.clone()
+            ).start(15);
+
             app.manage(db);
 
             // --- 判断静默启动（托盘后台模式） ---
@@ -149,6 +155,10 @@ pub fn run() {
             // 配置备份
             commands::backup::export_config,
             commands::backup::import_config,
+            commands::webdav::webdav_test_connection,
+            commands::webdav::webdav_save_config,
+            commands::webdav::webdav_push,
+            commands::webdav::webdav_pull,
             // Skills
             commands::skill::list_skills,
             commands::skill::install_skill,
@@ -158,6 +168,7 @@ pub fn run() {
             commands::session::list_sessions,
             commands::session::get_session_details,
             commands::session::scan_zombies,
+            commands::session::launch_session_terminal,
             // OAuth
             commands::oauth::start_oauth_flow,
             commands::oauth::poll_oauth_login,

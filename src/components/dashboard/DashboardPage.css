@@ -83,3 +83,29 @@
   font-family: var(--font-sans);
   font-size: 11px;
 }
+
+.glow-text {
+  color: var(--color-primary);
+  text-shadow: 0 0 10px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2);
+  animation: pulse-glow 3s infinite alternate;
+}
+
+@keyframes pulse-glow {
+  0% { text-shadow: 0 0 10px rgba(99, 102, 241, 0.4), 0 0 20px rgba(99, 102, 241, 0.2); }
+  100% { text-shadow: 0 0 15px rgba(99, 102, 241, 0.6), 0 0 30px rgba(99, 102, 241, 0.4); }
+}
+
+.advanced-charts-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.advanced-charts-grid .span-2 {
+  grid-column: span 2;
+}
+
+/* Update grid layout when smaller */
+@media (max-width: 1400px) {
+  .advanced-charts-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}

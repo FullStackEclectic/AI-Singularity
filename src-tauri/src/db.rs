@@ -294,6 +294,16 @@ impl Database {
             )?;
         }
 
+        // ── Migration 10: Adv. Pricing Engine ─────────────
+        if current_version < 10 {
+            let _ = conn.execute_batch(
+                "ALTER TABLE token_usage_records ADD COLUMN total_cost_usd REAL NOT NULL DEFAULT 0.0;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (10, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 

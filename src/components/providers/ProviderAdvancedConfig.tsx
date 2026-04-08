@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 
 export interface ProviderExtraConfig {
+  temperature?: number;
+  maxTokens?: number;
   proxyEnabled?: boolean;
   proxyUrl?: string;
   speedTestEnabled?: boolean;
@@ -9,6 +11,7 @@ export interface ProviderExtraConfig {
   costMultiplier?: number;
   apiFormat?: string;
   apiKeyField?: string;
+  tool_configs?: any;
 }
 
 interface ProviderAdvancedConfigProps {

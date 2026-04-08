@@ -319,10 +319,11 @@ async fn handle_chat_completions(
                     let completion_tokens = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
                     let total_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
                     
+                    let cost = crate::services::pricing::PricingEngine::calculate_cost(&current_model, prompt_tokens, completion_tokens);
                     let id = uuid::Uuid::new_v4().to_string();
                     let _ = state.db.execute(
-                        "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at)
-                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))",
+                        "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, total_cost_usd, created_at)
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
                         &[
                             &id,
                             &target.key_id,
@@ -332,6 +333,7 @@ async fn handle_chat_completions(
                             &prompt_tokens,
                             &completion_tokens,
                             &total_tokens,
+                            &cost,
                         ]
                     );
                 }
@@ -488,10 +490,11 @@ struct AuditContext {
 
 impl AuditContext {
     fn write_usage(&self, prompt_tokens: u64, completion_tokens: u64, total_tokens: u64) {
+        let cost = crate::services::pricing::PricingEngine::calculate_cost(&self.model, prompt_tokens, completion_tokens);
         let id = uuid::Uuid::new_v4().to_string();
         let _ = self.db.execute(
-            "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, datetime('now'))",
+            "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, total_cost_usd, created_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, datetime('now'))",
             &[
                 &id,
                 &self.key_id,
@@ -501,6 +504,7 @@ impl AuditContext {
                 &prompt_tokens,
                 &completion_tokens,
                 &total_tokens,
+                &cost,
             ]
         );
     }

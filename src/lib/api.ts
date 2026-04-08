@@ -108,4 +108,10 @@ export const api = {
   oauth: {
     startFlow: (provider: string): Promise<string> => invoke("start_oauth_flow", { provider }),
   },
+
+  webdav: {
+    testConnection: (config: any): Promise<void> => invoke("webdav_test_connection", { config }),
+    push: (config: any): Promise<void> => invoke("webdav_push", { config }),
+    pull: (config: any): Promise<void> => invoke("webdav_pull", { config }),
+  },
 };

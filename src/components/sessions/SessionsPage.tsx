@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { MessageSquare, RefreshCw, Cpu, Activity, Skull } from "lucide-react";
+import { MessageSquare, RefreshCw, Cpu, Activity, Skull, Terminal, Copy, Folder } from "lucide-react";
 import "./SessionsPage.css";
 
 interface ChatSession {
@@ -84,6 +84,47 @@ export default function SessionsPage() {
     return `${(mins / 60).toFixed(1)}h`;
   };
 
+  const getSessionCwd = (session: ChatSession) => {
+    if (session.id.startsWith("aider-") || session.title.includes("Aider")) {
+       const sep = session.filepath.includes('\\') ? '\\' : '/';
+       return session.filepath.substring(0, session.filepath.lastIndexOf(sep));
+    }
+    return "";
+  };
+
+  const getResumeCommand = (session: ChatSession) => {
+    if (session.id.startsWith("aider-") || session.title.includes("Aider")) return "aider";
+    if (session.title.startsWith("Project-")) return "claude";
+    return "aider"; // fallback
+  };
+
+  const handleCopyCmd = (session: ChatSession) => {
+    const cwd = getSessionCwd(session);
+    const cmd = getResumeCommand(session);
+    const fullCmd = cwd ? `cd /d "${cwd}" && ${cmd}` : cmd;
+    navigator.clipboard.writeText(fullCmd).then(() => alert("恢复指令已复制到剪贴板"));
+  };
+
+  const handleCopyDir = (session: ChatSession) => {
+    const cwd = getSessionCwd(session);
+    if (cwd) {
+       navigator.clipboard.writeText(cwd).then(() => alert("目录路径已复制"));
+    } else {
+       alert("由于全局隔离，Claude 原生工具暂无法精准推断项目目录，请通过复制唤起命令解决。");
+    }
+  };
+
+  const handleLaunchTerminal = async (session: ChatSession) => {
+    const cwd = getSessionCwd(session);
+    const cmd = getResumeCommand(session);
+    
+    try {
+      await invoke("launch_session_terminal", { cwd: cwd || ".", command: cmd });
+    } catch (e) {
+      alert("外置终端下发执行失败：" + String(e));
+    }
+  };
+
   return (
     <div className="sessions-page cyberpunk-theme">
       {/* 侧边栏结构 */}
@@ -154,10 +195,23 @@ export default function SessionsPage() {
       <div className="session-content cyber-main">
         {selectedSession ? (
           <>
-            <div className="session-content-header cyber-header-box">
-              <h3 className="glow-text">{selectedSession.title}</h3>
-              <div className="session-path-text">
-                {selectedSession.filepath}
+            <div className="session-content-header cyber-header-box" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <h3 className="glow-text">{selectedSession.title}</h3>
+                <div className="session-path-text">
+                  {selectedSession.filepath}
+                </div>
+              </div>
+              <div className="session-actions" style={{ display: 'flex', gap: '8px' }}>
+                <button className="btn btn-ghost btn-sm" onClick={() => handleCopyDir(selectedSession)} title="复制会话对应的工作目录">
+                  <Folder size={14} style={{ marginRight: 4 }} /> 目录
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => handleCopyCmd(selectedSession)} title="生成恢复脚本并复制剪贴板">
+                  <Copy size={14} style={{ marginRight: 4 }} /> 复制指令
+                </button>
+                <button className="btn btn-primary btn-sm" onClick={() => handleLaunchTerminal(selectedSession)} title="在新终端以当前目录直接拉起">
+                  <Terminal size={14} style={{ marginRight: 4 }} /> 外置终端拉起
+                </button>
               </div>
             </div>
             

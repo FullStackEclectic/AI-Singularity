@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
 
 import { check } from "@tauri-apps/plugin-updater";
+import { api } from "../../lib/api";
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -10,6 +11,62 @@ export default function SettingsPage() {
   const [message, setMessage] = useState("");
   const [updateMsg, setUpdateMsg] = useState("");
   const [isCheckingUpdate, setIsCheckingUpdate] = useState(false);
+
+  const [webdavUrl, setWebdavUrl] = useState(localStorage.getItem("webdav_url") || "");
+  const [webdavUser, setWebdavUser] = useState(localStorage.getItem("webdav_user") || "");
+  const [webdavPass, setWebdavPass] = useState(localStorage.getItem("webdav_pass") || "");
+  const [webdavMsg, setWebdavMsg] = useState("");
+  const [webdavLoading, setWebdavLoading] = useState(false);
+
+  const saveWebdavConfig = () => {
+    localStorage.setItem("webdav_url", webdavUrl);
+    localStorage.setItem("webdav_user", webdavUser);
+    localStorage.setItem("webdav_pass", webdavPass);
+    const config = { url: webdavUrl, username: webdavUser, password: webdavPass || null };
+    // Send to backend for daemon usage
+    invoke("webdav_save_config", { config }).catch(console.error);
+    return config;
+  };
+
+  const handleWebdavTest = async () => {
+    try {
+      setWebdavLoading(true);
+      setWebdavMsg("正在测试连接...");
+      await api.webdav.testConnection(saveWebdavConfig());
+      setWebdavMsg("✅ 测试成功！");
+    } catch (e) {
+      setWebdavMsg(`❌ 测试失败: ${e}`);
+    } finally {
+      setWebdavLoading(false);
+    }
+  };
+
+  const handleWebdavPush = async () => {
+    try {
+      setWebdavLoading(true);
+      setWebdavMsg("正在推送至云端...");
+      await api.webdav.push(saveWebdavConfig());
+      setWebdavMsg("✅ 推送同步成功！");
+    } catch (e) {
+      setWebdavMsg(`❌ 推送失败: ${e}`);
+    } finally {
+      setWebdavLoading(false);
+    }
+  };
+
+  const handleWebdavPull = async () => {
+    if (!window.confirm("警告：拉取将会用云端配置覆盖本地配置（增量覆盖），确定要继续吗？")) return;
+    try {
+      setWebdavLoading(true);
+      setWebdavMsg("正在从云端拉取配置...");
+      await api.webdav.pull(saveWebdavConfig());
+      setWebdavMsg("✅ 拉取成功！数据已应用。");
+    } catch (e) {
+      setWebdavMsg(`❌ 拉取失败: ${e}`);
+    } finally {
+      setWebdavLoading(false);
+    }
+  };
 
   const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const lang = e.target.value;
@@ -155,6 +212,60 @@ export default function SettingsPage() {
             {message}
           </div>
         )}
+
+        {/* WebDAV 同步区 */}
+        <h3 style={{ marginBottom: "var(--space-2)" }}>多端 WebDAV 备份同步</h3>
+        <p className="text-muted" style={{ fontSize: "12px", marginBottom: "var(--space-4)" }}>
+          保障您的配置、Prompt、工具与资产跨端实时同步，数据安全不丢失（原生只支持基于 HTTP 基本认证的 WebDAV）。
+        </p>
+        <div style={{ background: "var(--surface-sunken)", padding: "var(--space-4)", borderRadius: "var(--radius-md)", marginBottom: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <div>
+            <label style={{ display: "block", marginBottom: "4px", fontSize: "13px" }}>WebDAV 服务器地址 (URL)</label>
+            <input 
+              type="text" 
+              className="form-input" 
+              placeholder="https://dav.your-server.com/" 
+              value={webdavUrl}
+              onChange={(e) => setWebdavUrl(e.target.value)}
+            />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-3)" }}>
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "13px" }}>用户名</label>
+              <input 
+                type="text" 
+                className="form-input" 
+                value={webdavUser}
+                onChange={(e) => setWebdavUser(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ display: "block", marginBottom: "4px", fontSize: "13px" }}>密码 / API Token</label>
+              <input 
+                type="password" 
+                className="form-input" 
+                value={webdavPass}
+                onChange={(e) => setWebdavPass(e.target.value)}
+              />
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
+            <button className="btn btn-secondary" onClick={handleWebdavTest} disabled={webdavLoading || !webdavUrl}>
+              测试连接
+            </button>
+            <button className="btn btn-primary" onClick={handleWebdavPush} disabled={webdavLoading || !webdavUrl}>
+              立即上传推送 (Push)
+            </button>
+            <button className="btn btn-danger" onClick={handleWebdavPull} disabled={webdavLoading || !webdavUrl}>
+              立即下载覆盖 (Pull)
+            </button>
+          </div>
+          {webdavMsg && (
+            <div style={{ padding: "var(--space-2)", background: "rgba(0,0,0,0.2)", borderRadius: "var(--radius-sm)", fontSize: 13, marginTop: "var(--space-2)" }}>
+              {webdavMsg}
+            </div>
+          )}
+        </div>
 
         {/* 自动更新区 */}
         <h3 style={{ marginBottom: "var(--space-2)" }}>{t("settings.auto_update")}</h3>

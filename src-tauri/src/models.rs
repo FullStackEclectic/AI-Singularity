@@ -103,7 +103,7 @@ impl ToolTarget {
     /// 配置文件路径描述（用于 UI 提示）
     pub fn config_path_hint(&self) -> &str {
         match self {
-            ToolTarget::ClaudeCode => "~/.claude.json",
+            ToolTarget::ClaudeCode => "~/.claude/settings.json",
             ToolTarget::Codex      => "~/.codex/config.toml",
             ToolTarget::GeminiCli  => "~/.gemini/settings.json",
             ToolTarget::OpenCode   => "~/.config/opencode/opencode.json",

@@ -7,6 +7,7 @@ pub struct TokenTrend {
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
     pub total_tokens: u64,
+    pub total_cost_usd: f64,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -22,14 +23,31 @@ pub struct TopConsumer {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct ModelCostStats {
+    pub model_name: String,
+    pub total_cost_usd: f64,
+    pub total_requests: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct PlatformCostStats {
+    pub platform: String,
+    pub total_cost_usd: f64,
+    pub total_requests: u64,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct DashboardMetrics {
     pub active_ide_accounts: u64,
     pub total_user_tokens: u64,
     pub today_total_tokens: u64,
+    pub total_cost_today_usd: f64, // NEW
     pub forbidden_accounts_ratio: f64,
     pub token_trends: Vec<TokenTrend>,
     pub ide_status_distribution: Vec<IdeAccountStatusData>,
     pub top_consumers: Vec<TopConsumer>,
+    pub model_costs: Vec<ModelCostStats>, // NEW
+    pub platform_costs: Vec<PlatformCostStats>, // NEW
 }
 
 pub struct AnalyticsService;
@@ -67,14 +85,21 @@ impl AnalyticsService {
         ).unwrap_or(0);
 
         let today_total_tokens: u64 = db.query_row(
-            "SELECT ifnull(sum(total_tokens), 0) FROM token_usage_records WHERE date(created_at) = date('now')",
+            "SELECT ifnull(sum(total_tokens), 0) FROM token_usage_records WHERE date(created_at) = date('now', 'localtime')",
             &[],
             |row| row.get(0)
         ).unwrap_or(0);
 
+        // Calculate Cost Today
+        let total_cost_today_usd: f64 = db.query_row(
+            "SELECT ifnull(sum(total_cost_usd), 0.0) FROM token_usage_records WHERE date(created_at) = date('now', 'localtime')",
+            &[],
+            |row| row.get(0)
+        ).unwrap_or(0.0);
+
         let limit = days;
         let trend_query = format!(
-            "SELECT date(created_at) as dt, ifnull(sum(prompt_tokens), 0), ifnull(sum(completion_tokens), 0), ifnull(sum(total_tokens), 0)
+            "SELECT date(created_at) as dt, ifnull(sum(prompt_tokens), 0), ifnull(sum(completion_tokens), 0), ifnull(sum(total_tokens), 0), ifnull(sum(total_cost_usd), 0.0)
              FROM token_usage_records
              WHERE created_at >= date('now', '-{} days')
              GROUP BY dt
@@ -86,6 +111,7 @@ impl AnalyticsService {
                 prompt_tokens: row.get(1)?,
                 completion_tokens: row.get(2)?,
                 total_tokens: row.get(3)?,
+                total_cost_usd: row.get(4)?,
             })
         }).unwrap_or_default();
 
@@ -116,14 +142,49 @@ impl AnalyticsService {
             })
         }).unwrap_or_default();
 
+        // Model Costs (Top 10)
+        let model_costs_query = "
+            SELECT model_name, ifnull(sum(total_cost_usd), 0.0) as cost, count(id)
+            FROM token_usage_records
+            GROUP BY model_name
+            ORDER BY cost DESC
+            LIMIT 10
+        ";
+        let model_costs = db.query_rows(model_costs_query, &[], |row| {
+            Ok(ModelCostStats {
+                model_name: row.get(0)?,
+                total_cost_usd: row.get(1)?,
+                total_requests: row.get(2)?,
+            })
+        }).unwrap_or_default();
+
+        // Platform/Provider Costs
+        let platform_costs_query = "
+            SELECT platform, ifnull(sum(total_cost_usd), 0.0) as cost, count(id)
+            FROM token_usage_records
+            GROUP BY platform
+            ORDER BY cost DESC
+        ";
+        let platform_costs = db.query_rows(platform_costs_query, &[], |row| {
+            Ok(PlatformCostStats {
+                platform: row.get(0)?,
+                total_cost_usd: row.get(1)?,
+                total_requests: row.get(2)?,
+            })
+        }).unwrap_or_default();
+
         Ok(DashboardMetrics {
             active_ide_accounts,
             total_user_tokens,
             today_total_tokens,
+            total_cost_today_usd,
             forbidden_accounts_ratio,
             token_trends,
             ide_status_distribution,
             top_consumers,
+            model_costs,
+            platform_costs,
         })
     }
 }
+

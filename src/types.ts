@@ -81,7 +81,7 @@ export const TOOL_TARGET_LABELS: Record<ToolTarget, string> = {
 };
 
 export const TOOL_TARGET_CONFIG_PATH: Record<ToolTarget, string> = {
-  claude_code: "~/.claude.json",
+  claude_code: "~/.claude/settings.json",
   codex:       "~/.codex/config.toml",
   gemini_cli:  "~/.gemini/settings.json",
   open_code:   "~/.config/opencode/opencode.json",
@@ -321,6 +321,8 @@ export interface IdeAccount {
 export interface ClaudeToolConfig {
   /** 主模型 — 对应 ANTHROPIC_MODEL */
   model?: string;
+  /** 推理模型 — 对应 ANTHROPIC_REASONING_MODEL */
+  reasoningModel?: string;
   /** Haiku 小模型 — 对应 ANTHROPIC_DEFAULT_HAIKU_MODEL */
   haikuModel?: string;
   /** Sonnet 中模型 — 对应 ANTHROPIC_DEFAULT_SONNET_MODEL */
