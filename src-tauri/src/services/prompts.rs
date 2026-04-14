@@ -1,10 +1,10 @@
+use crate::db::Database;
 use crate::error::AppResult;
 use crate::models::PromptConfig;
-use crate::db::Database;
 use rusqlite::params;
 use std::fs;
 use std::path::PathBuf;
-use tracing::{info, error, warn};
+use tracing::{error, info, warn};
 
 pub struct PromptService<'a> {
     db: &'a Database,
@@ -17,43 +17,49 @@ impl<'a> PromptService<'a> {
 
     pub fn list_prompts(&self) -> AppResult<Vec<PromptConfig>> {
         let sql = "SELECT id, name, description, target_file, content, is_active, tool_targets, created_at, updated_at FROM prompts";
-        self.db.query_rows(sql, &[], |row| {
-            let desc: Option<String> = row.get(2)?;
-            let tool_targets: Option<String> = row.get(6)?;
-            let created_at_str: String = row.get(7)?;
-            let updated_at_str: String = row.get(8)?;
-            Ok(PromptConfig {
-                id: row.get(0)?,
-                name: row.get(1)?,
-                description: desc,
-                target_file: row.get(3)?,
-                content: row.get(4)?,
-                is_active: row.get::<_, i32>(5)? != 0,
-                tool_targets,
-                created_at: created_at_str.parse().unwrap_or_default(),
-                updated_at: updated_at_str.parse().unwrap_or_default(),
+        self.db
+            .query_rows(sql, &[], |row| {
+                let desc: Option<String> = row.get(2)?;
+                let tool_targets: Option<String> = row.get(6)?;
+                let created_at_str: String = row.get(7)?;
+                let updated_at_str: String = row.get(8)?;
+                Ok(PromptConfig {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    description: desc,
+                    target_file: row.get(3)?,
+                    content: row.get(4)?,
+                    is_active: row.get::<_, i32>(5)? != 0,
+                    tool_targets,
+                    created_at: created_at_str.parse().unwrap_or_default(),
+                    updated_at: updated_at_str.parse().unwrap_or_default(),
+                })
             })
-        }).map_err(Into::into)
+            .map_err(Into::into)
     }
 
     pub fn save_prompt(&self, prompt: PromptConfig) -> AppResult<()> {
         let sql = "INSERT OR REPLACE INTO prompts (id, name, description, target_file, content, is_active, tool_targets, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)";
-        self.db.execute(sql, rusqlite::params![
-            prompt.id,
-            prompt.name,
-            prompt.description,
-            prompt.target_file,
-            prompt.content,
-            if prompt.is_active { 1 } else { 0 },
-            prompt.tool_targets,
-            prompt.created_at.to_rfc3339(),
-            prompt.updated_at.to_rfc3339()
-        ])?;
+        self.db.execute(
+            sql,
+            rusqlite::params![
+                prompt.id,
+                prompt.name,
+                prompt.description,
+                prompt.target_file,
+                prompt.content,
+                if prompt.is_active { 1 } else { 0 },
+                prompt.tool_targets,
+                prompt.created_at.to_rfc3339(),
+                prompt.updated_at.to_rfc3339()
+            ],
+        )?;
         Ok(())
     }
 
     pub fn delete_prompt(&self, id: &str) -> AppResult<()> {
-        self.db.execute("DELETE FROM prompts WHERE id = ?1", params![id])?;
+        self.db
+            .execute("DELETE FROM prompts WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -73,7 +79,7 @@ impl<'a> PromptService<'a> {
                 }
             }
         } else {
-             return Err(anyhow::anyhow!("Prompt not found").into());
+            return Err(anyhow::anyhow!("Prompt not found").into());
         }
         Ok(())
     }
@@ -82,14 +88,24 @@ impl<'a> PromptService<'a> {
     /// - "claude" → ~/.claude.md
     /// - "aider"  → ~/.aider.conf.yml (system-prompt 字段)
     pub fn sync_to_tool_defaults(&self, id: &str) -> AppResult<Vec<String>> {
-        let prompt = self.list_prompts()?.into_iter().find(|p| p.id == id)
+        let prompt = self
+            .list_prompts()?
+            .into_iter()
+            .find(|p| p.id == id)
             .ok_or_else(|| anyhow::anyhow!("Prompt not found"))?;
 
         let targets_raw = prompt.tool_targets.as_deref().unwrap_or("");
-        let targets: Vec<&str> = targets_raw.split(',').map(|s| s.trim()).filter(|s| !s.is_empty()).collect();
+        let targets: Vec<&str> = targets_raw
+            .split(',')
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty())
+            .collect();
 
         if targets.is_empty() {
-            return Err(anyhow::anyhow!("该 Prompt 未设置 tool_targets，请先在编辑页面指定目标工具后再分发").into());
+            return Err(anyhow::anyhow!(
+                "该 Prompt 未设置 tool_targets，请先在编辑页面指定目标工具后再分发"
+            )
+            .into());
         }
 
         let home = dirs::home_dir().ok_or_else(|| anyhow::anyhow!("无法获取用户 Home 目录"))?;
@@ -101,7 +117,10 @@ impl<'a> PromptService<'a> {
                     let path = home.join(".claude.md");
                     match fs::write(&path, &prompt.content) {
                         Ok(_) => {
-                            info!("✅ Prompt '{}' 已分发至 Claude Code: {:?}", prompt.name, path);
+                            info!(
+                                "✅ Prompt '{}' 已分发至 Claude Code: {:?}",
+                                prompt.name, path
+                            );
                             synced.push(format!("Claude Code: {}", path.display()));
                         }
                         Err(e) => {
@@ -133,7 +152,9 @@ impl<'a> PromptService<'a> {
         }
 
         if synced.is_empty() {
-            return Err(anyhow::anyhow!("没有任何已知工具被成功分发，请检查 tool_targets 设置").into());
+            return Err(
+                anyhow::anyhow!("没有任何已知工具被成功分发，请检查 tool_targets 设置").into(),
+            );
         }
 
         Ok(synced)
@@ -162,7 +183,11 @@ impl<'a> PromptService<'a> {
                 .find(|(_, line)| !line.is_empty() && !line.starts_with(' '))
                 .map(|(i, _)| {
                     // 计算字节偏移
-                    after_marker.lines().take(i + 1).map(|l| l.len() + 1).sum::<usize>()
+                    after_marker
+                        .lines()
+                        .take(i + 1)
+                        .map(|l| l.len() + 1)
+                        .sum::<usize>()
                 })
                 .unwrap_or(after_marker.len());
 

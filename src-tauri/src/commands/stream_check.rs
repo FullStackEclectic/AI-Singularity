@@ -1,7 +1,7 @@
+use crate::db::Database;
 use crate::error::AppResult;
 use crate::models::StreamCheckResult;
 use crate::services::stream_check::StreamCheckService;
-use crate::db::Database;
 use tauri::State;
 
 #[tauri::command]

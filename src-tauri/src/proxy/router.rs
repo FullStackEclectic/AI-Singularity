@@ -1,8 +1,8 @@
 use crate::db::Database;
 use crate::models::{Platform, TokenScope};
 use crate::store::SecureStore;
-use std::sync::Arc;
 use chrono::Utc;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct RouteTarget {
@@ -23,10 +23,14 @@ impl Router {
 
     /// 根据 Scope 和可选强制平台，挑选全网甚至细分池里最优的一个节点。
     /// 这里统一检索 api_keys 表与 ide_accounts 混合池。
-    pub fn pick_best_key(&self, force_platform: Option<&str>, scope: &TokenScope) -> Option<RouteTarget> {
+    pub fn pick_best_key(
+        &self,
+        force_platform: Option<&str>,
+        scope: &TokenScope,
+    ) -> Option<RouteTarget> {
         let mut where_api_keys = vec!["status = 'valid'".to_string()];
         let mut where_ide_accs = vec!["status = 'active'".to_string()];
-        
+
         // 1. 如果代码层级强制指定了某平台（例如客户端非要用 openai 接口），兜底过滤
         if let Some(p) = force_platform {
             where_api_keys.push(format!("platform = '{}'", p));
@@ -65,7 +69,10 @@ impl Router {
                 if channel_ins_ide.is_empty() {
                     where_ide_accs.push("1=0".to_string());
                 } else {
-                    where_ide_accs.push(format!("origin_platform IN ({})", channel_ins_ide.join(",")));
+                    where_ide_accs.push(format!(
+                        "origin_platform IN ({})",
+                        channel_ins_ide.join(",")
+                    ));
                 }
             }
             "tag" => {
@@ -108,7 +115,7 @@ impl Router {
         };
 
         // 终极聚合 SQL，将两个异构数据源统一为 标准 RouteTarget 模型输出
-        // id | source_type | platform | base_url | access_token | priority 
+        // id | source_type | platform | base_url | access_token | priority
         let sql = format!(
             "SELECT id, 'api_key' AS source_type, platform, base_url, '' AS access_token, priority, last_checked_at 
              FROM api_keys WHERE {}
@@ -119,37 +126,49 @@ impl Router {
             api_where, ide_where, order_clause
         );
 
-        let result_row: Option<(String, String, String, Option<String>, String)> = self.db.query_one(
-            &sql,
-            &[],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?))
-        ).ok();
+        let result_row: Option<(String, String, String, Option<String>, String)> = self
+            .db
+            .query_one(&sql, &[], |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            })
+            .ok();
 
         if let Some((id, source_type, platform_str, base_url, access_token)) = result_row {
-             let platform = serde_json::from_str::<Platform>(&format!("\"{}\"", platform_str))
+            let platform = serde_json::from_str::<Platform>(&format!("\"{}\"", platform_str))
                 .unwrap_or(Platform::Custom);
-            
-             let secret = if source_type == "api_key" {
-                 SecureStore::get_key(&id).ok()?
-             } else {
-                 access_token
-             };
 
-             Some(RouteTarget { key_id: id, secret, platform, base_url })
+            let secret = if source_type == "api_key" {
+                SecureStore::get_key(&id).ok()?
+            } else {
+                access_token
+            };
+
+            Some(RouteTarget {
+                key_id: id,
+                secret,
+                platform,
+                base_url,
+            })
         } else {
-             None
+            None
         }
     }
 
     /// 标记节点死亡状态（由于现在是混合池，所以需要判断 ID 在哪张表里）
     pub fn mark_key_status(&self, key_id: &str, is_ide_account: bool, status: &str) {
         if is_ide_account {
-             let _ = self.db.execute(
+            let _ = self.db.execute(
                 "UPDATE ide_accounts SET status = ?1, updated_at = ?2 WHERE id = ?3",
                 &[&status, &Utc::now().to_rfc3339(), &key_id],
             );
         } else {
-             let _ = self.db.execute(
+            let _ = self.db.execute(
                 "UPDATE api_keys SET status = ?1, last_checked_at = ?2 WHERE id = ?3",
                 &[&status, &Utc::now().to_rfc3339(), &key_id],
             );

@@ -1,11 +1,11 @@
+use crate::models::EngineConfig;
 use crate::{db::Database, AppError};
+use lazy_static::lazy_static;
 use serde::Serialize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use tauri::{AppHandle, Manager, State};
 use std::sync::RwLock;
-use lazy_static::lazy_static;
-use crate::models::EngineConfig;
+use tauri::{AppHandle, Manager, State};
 
 lazy_static! {
     pub static ref ENGINE_CONFIG: RwLock<EngineConfig> = RwLock::new(EngineConfig::default());
@@ -25,7 +25,7 @@ pub struct ProxyStatus {
 #[tauri::command]
 pub async fn start_proxy(
     app: AppHandle,
-    db: State<'_, Database>,
+    _db: State<'_, Database>,
     port: Option<u16>,
 ) -> Result<ProxyStatus, AppError> {
     let port = port.unwrap_or(8765);

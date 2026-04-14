@@ -29,4 +29,32 @@ export default defineConfig(async () => ({
       ignored: ["**/src-tauri/**"],
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("react-syntax-highlighter")) return "vendor-highlighter";
+            if (id.includes("recharts")) return "vendor-charts";
+            if (id.includes("@dnd-kit")) return "vendor-dnd";
+            if (id.includes("@tanstack/react-query")) return "vendor-query";
+            if (id.includes("@tanstack/react-virtual")) return "vendor-virtual";
+            if (
+              id.includes("@tauri-apps") ||
+              id.includes("react") ||
+              id.includes("react-dom") ||
+              id.includes("react-router-dom") ||
+              id.includes("zustand") ||
+              id.includes("i18next") ||
+              id.includes("react-i18next") ||
+              id.includes("lucide-react")
+            ) {
+              return "vendor-core";
+            }
+          }
+          return undefined;
+        },
+      },
+    },
+  },
 }));

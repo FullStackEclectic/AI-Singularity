@@ -1,28 +1,28 @@
+use base64::Engine as _;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::Mutex,
     time::{Duration, Instant},
 };
-use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpListener,
     sync::watch,
 };
 use url::Url;
-use base64::Engine as _;
 
 // ── 常量配置 ─────────────────────────────────────────────────────────────────
 
 // Antigravity（Google OAuth）
 const ANTIGRAVITY_CLIENT_ID: &str =
     "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
-const ANTIGRAVITY_CLIENT_SECRET: &str = "TODO_REPLACE_WITH_OAUTH_SECRET";
+const ANTIGRAVITY_CLIENT_SECRET_ENV: &str = "AIS_ANTIGRAVITY_CLIENT_SECRET";
 
 // Gemini CLI（Google OAuth）
 const GEMINI_CLIENT_ID: &str =
     "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com";
-const GEMINI_CLIENT_SECRET: &str = "TODO_REPLACE_WITH_GEMINI_SECRET";
+const GEMINI_CLIENT_SECRET_ENV: &str = "AIS_GEMINI_CLIENT_SECRET";
 
 const GOOGLE_AUTH_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
 const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
@@ -44,7 +44,6 @@ const GITHUB_SCOPE: &str = "read:user user:email";
 const WINDSURF_CLIENT_ID: &str = "3GUryQ7ldAeKEuD2obYnppsnmj58eP5u";
 const WINDSURF_AUTH_BASE_URL: &str = "https://www.windsurf.com";
 const WINDSURF_REGISTER_API_URL: &str = "https://register.windsurf.com";
-const WINDSURF_DEFAULT_API_SERVER: &str = "https://server.codeium.com";
 const WINDSURF_CALLBACK_PATH: &str = "/windsurf-auth-callback";
 
 // Codex (OpenAI Codex) OAuth - PKCE
@@ -63,8 +62,8 @@ const KIRO_CALLBACK_PATH: &str = "/oauth/callback";
 // Trae OAuth
 const TRAE_AUTH_CLIENT_ID: &str = "ono9krqynydwx5";
 const TRAE_CALLBACK_PATH: &str = "/authorize";
-const TRAE_LOGIN_GUIDANCE_URL: &str = "https://api.marscode.com/cloudide/api/v3/trae/GetLoginGuidance";
-const TRAE_EXCHANGE_TOKEN_PATH: &str = "/cloudide/api/v3/trae/oauth/ExchangeToken";
+const TRAE_LOGIN_GUIDANCE_URL: &str =
+    "https://api.marscode.com/cloudide/api/v3/trae/GetLoginGuidance";
 
 // Qoder OAuth - 服务端轮询
 const QODER_LOGIN_URL: &str = "https://qoder.com/device/selectAccounts";
@@ -83,7 +82,6 @@ const ZED_CALLBACK_PATH: &str = "/zed-auth-callback";
 
 // APP 超时
 const OAUTH_TIMEOUT_SECS: u64 = 300;
-
 
 // ── 渠道分类 ──────────────────────────────────────────────────────────────────
 
@@ -124,24 +122,27 @@ fn is_import_only_provider(provider: &str) -> bool {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OAuthResult {
     /// refresh_token 优先，否则为 access_token
-    pub token:    String,
-    pub email:    Option<String>,
-    pub name:     Option<String>,
+    pub token: String,
+    pub access_token: Option<String>,
+    pub refresh_token: Option<String>,
+    pub meta_json: Option<String>,
+    pub email: Option<String>,
+    pub name: Option<String>,
     pub provider: String,
     /// 发生错误时非空
-    pub error:    Option<String>,
+    pub error: Option<String>,
 }
 
 /// 启动 OAuth 流程的返回结构（前端 `DeviceFlowStart` 接口）
 #[derive(Debug, Clone, Serialize)]
 pub struct DeviceFlowStartResponse {
-    pub login_id:         String,
+    pub login_id: String,
     /// Device Flow 的 6-8 位验证码（其它渠道为空字符串）
-    pub user_code:        String,
+    pub user_code: String,
     /// 授权链接（用户需要访问的 URL）
     pub verification_uri: String,
     /// 到期时间（秒）
-    pub expires_in:       u64,
+    pub expires_in: u64,
     /// 前端应该多久轮询一次
     pub interval_seconds: u64,
 }
@@ -150,15 +151,16 @@ pub struct DeviceFlowStartResponse {
 
 #[derive(Debug)]
 struct OAuthSession {
-    provider:       String,
-    callback_port:  Option<u16>,
+    provider: String,
+    #[allow(dead_code)]
+    callback_port: Option<u16>,
     /// 授权完成后写入（A类/Cursor/GitHub 共用 None 表示等待中）
     pending_result: Option<OAuthResult>,
-    state_token:    Option<String>,
-    code_verifier:  Option<String>,
-    device_code:    Option<String>,
-    cancel_tx:      watch::Sender<bool>,
-    expires_at:     Instant,
+    state_token: Option<String>,
+    code_verifier: Option<String>,
+    device_code: Option<String>,
+    cancel_tx: watch::Sender<bool>,
+    expires_at: Instant,
 }
 
 static SESSION_MAP: Mutex<Option<HashMap<String, OAuthSession>>> = Mutex::new(None);
@@ -193,16 +195,16 @@ fn build_google_auth_url(client_id: &str, redirect_uri: &str, state: &str) -> St
 
 #[derive(Deserialize)]
 struct GoogleTokenResponse {
-    access_token:      Option<String>,
-    refresh_token:     Option<String>,
-    error:             Option<String>,
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    error: Option<String>,
     error_description: Option<String>,
 }
 
 #[derive(Deserialize)]
 struct GoogleUserInfo {
     email: Option<String>,
-    name:  Option<String>,
+    name: Option<String>,
 }
 
 async fn exchange_google_code(
@@ -242,7 +244,9 @@ async fn exchange_google_code(
         ));
     }
 
-    let access_token = body.access_token.ok_or("Google token 响应缺少 access_token")?;
+    let access_token = body
+        .access_token
+        .ok_or("Google token 响应缺少 access_token")?;
     Ok((access_token, body.refresh_token))
 }
 
@@ -264,9 +268,7 @@ async fn fetch_google_userinfo(access_token: &str) -> Option<GoogleUserInfo> {
 
 fn generate_token(len: usize) -> String {
     use rand::Rng;
-    let bytes: Vec<u8> = (0..len)
-        .map(|_| rand::thread_rng().gen::<u8>())
-        .collect();
+    let bytes: Vec<u8> = (0..len).map(|_| rand::thread_rng().gen::<u8>()).collect();
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(&bytes)
 }
 
@@ -275,6 +277,21 @@ fn sha256_b64(input: &str) -> String {
     let mut h = Sha256::new();
     h.update(input.as_bytes());
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(h.finalize().as_slice())
+}
+
+fn get_google_client_secret(provider: &str) -> Result<String, String> {
+    let (env_name, label) = match provider {
+        "gemini" => (GEMINI_CLIENT_SECRET_ENV, "Gemini"),
+        "antigravity" => (ANTIGRAVITY_CLIENT_SECRET_ENV, "Antigravity"),
+        other => return Err(format!("{} 不是 Google OAuth provider", other)),
+    };
+
+    std::env::var(env_name).map_err(|_| {
+        format!(
+            "{} OAuth 尚未配置 client secret。请设置环境变量 {} 后重试。",
+            label, env_name
+        )
+    })
 }
 
 // ── Windsurf 工具函数 ─────────────────────────────────────────────────────────
@@ -385,7 +402,10 @@ async fn windsurf_register_user(
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Windsurf RegisterUser 失败: HTTP {} — {}", status, text));
+        return Err(format!(
+            "Windsurf RegisterUser 失败: HTTP {} — {}",
+            status, text
+        ));
     }
 
     let value: serde_json::Value = resp
@@ -393,13 +413,15 @@ async fn windsurf_register_user(
         .await
         .map_err(|e| format!("解析 Windsurf RegisterUser 响应失败: {}", e))?;
 
-    let api_key = value.get("apiKey")
+    let api_key = value
+        .get("apiKey")
         .or_else(|| value.get("api_key"))
         .and_then(|v| v.as_str())
         .map(String::from)
         .ok_or("Windsurf RegisterUser 响应缺少 apiKey")?;
 
-    let name = value.get("name")
+    let name = value
+        .get("name")
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(String::from);
@@ -462,9 +484,24 @@ fn decode_jwt_claim(token: &str, claim: &str) -> Option<String> {
     }
     let padding = (4 - parts[1].len() % 4) % 4;
     let padded = format!("{}{}", parts[1], "=".repeat(padding));
-    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(&padded).ok()?;
+    let bytes = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(&padded)
+        .ok()?;
     let payload: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
-    payload.get(claim)?.as_str().filter(|s| !s.is_empty()).map(String::from)
+    payload
+        .get(claim)?
+        .as_str()
+        .filter(|s| !s.is_empty())
+        .map(String::from)
+}
+
+fn decode_any_jwt_claim(token: &str, claims: &[&str]) -> Option<String> {
+    for claim in claims {
+        if let Some(value) = decode_jwt_claim(token, claim) {
+            return Some(value);
+        }
+    }
+    None
 }
 
 // ── Trae 工具函数 ─────────────────────────────────────────────────────────────
@@ -494,15 +531,25 @@ async fn trae_get_login_url(redirect_uri: &str, state: &str) -> Result<String, S
     if !resp.status().is_success() {
         let st = resp.status();
         let text = resp.text().await.unwrap_or_default();
-        return Err(format!("Trae GetLoginGuidance 失败: HTTP {} — {}", st, text));
+        return Err(format!(
+            "Trae GetLoginGuidance 失败: HTTP {} — {}",
+            st, text
+        ));
     }
 
-    let value: serde_json::Value = resp.json().await
+    let value: serde_json::Value = resp
+        .json()
+        .await
         .map_err(|e| format!("解析 Trae GetLoginGuidance 响应失败: {}", e))?;
 
     // 尝试多个字段路径
-    value.get("data")
-        .and_then(|d| d.get("authUrl").or_else(|| d.get("auth_url")).or_else(|| d.get("url")))
+    value
+        .get("data")
+        .and_then(|d| {
+            d.get("authUrl")
+                .or_else(|| d.get("auth_url"))
+                .or_else(|| d.get("url"))
+        })
         .and_then(|v| v.as_str())
         .filter(|s| !s.is_empty())
         .map(String::from)
@@ -519,7 +566,10 @@ async fn trae_get_login_url(redirect_uri: &str, state: &str) -> Result<String, S
 }
 
 /// 通过 Trae refresh_token 获取用户信息（email/name）
-async fn trae_get_user_info(token: &str, login_host: &str) -> Result<(Option<String>, Option<String>), String> {
+async fn trae_get_user_info(
+    token: &str,
+    login_host: &str,
+) -> Result<(Option<String>, Option<String>), String> {
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .build()
@@ -548,16 +598,24 @@ async fn trae_get_user_info(token: &str, login_host: &str) -> Result<(Option<Str
 
     let value: serde_json::Value = resp.json().await.unwrap_or(serde_json::Value::Null);
     let data = value.get("data").unwrap_or(&serde_json::Value::Null);
-    let email = data.get("email").and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(String::from);
-    let name = data.get("name").or_else(|| data.get("nickname"))
-        .and_then(|v| v.as_str()).filter(|s| !s.is_empty()).map(String::from);
+    let email = data
+        .get("email")
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
+    let name = data
+        .get("name")
+        .or_else(|| data.get("nickname"))
+        .and_then(|v| v.as_str())
+        .filter(|s| !s.is_empty())
+        .map(String::from);
     Ok((email, name))
 }
 
 // ── 本地 TCP 回调服务器（Google） ─────────────────────────────────────────────
 
-
-static CALLBACK_SUCCESS_HTML: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
+static CALLBACK_SUCCESS_HTML: &str =
+    "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
 <html><body style='font-family:sans-serif;background:#0f172a;color:#e2e8f0;\
 padding:32px;text-align:center;'>\
 <h2 style='color:#22c55e;'>✅ 授权成功</h2>\
@@ -565,7 +623,8 @@ padding:32px;text-align:center;'>\
 <script>setTimeout(function(){window.close();},1500);</script>\
 </body></html>";
 
-static CALLBACK_FAIL_HTML: &str = "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
+static CALLBACK_FAIL_HTML: &str =
+    "HTTP/1.1 400 Bad Request\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
 <html><body style='font-family:sans-serif;background:#0f172a;color:#e2e8f0;\
 padding:32px;text-align:center;'>\
 <h2 style='color:#ef4444;'>❌ 授权失败</h2>\
@@ -684,34 +743,38 @@ impl OauthManager {
         let probe = TcpListener::bind("127.0.0.1:0")
             .await
             .map_err(|e| format!("绑定本地端口失败: {}", e))?;
-        let port = probe.local_addr()
+        let port = probe
+            .local_addr()
             .map_err(|e| format!("获取本地端口失败: {}", e))?
             .port();
         drop(probe);
 
         let state_token = generate_token(24);
-        let login_id    = generate_token(16);
+        let login_id = generate_token(16);
 
         // 按渠道区分 OAuth URL 构建方式
         let (auth_url, redirect_uri, extra_state) = match provider {
             "antigravity" => {
                 let redir = format!("http://127.0.0.1:{}{}", port, GOOGLE_OAUTH_CALLBACK_PATH);
-                let url   = build_google_auth_url(ANTIGRAVITY_CLIENT_ID, &redir, &state_token);
+                let url = build_google_auth_url(ANTIGRAVITY_CLIENT_ID, &redir, &state_token);
                 (url, redir, None::<String>)
             }
             "gemini" => {
                 let redir = format!("http://127.0.0.1:{}{}", port, GOOGLE_OAUTH_CALLBACK_PATH);
-                let url   = build_google_auth_url(GEMINI_CLIENT_ID, &redir, &state_token);
+                let url = build_google_auth_url(GEMINI_CLIENT_ID, &redir, &state_token);
                 (url, redir, None)
             }
             "windsurf" => {
                 let redir = format!("http://127.0.0.1:{}{}", port, WINDSURF_CALLBACK_PATH);
-                let url   = build_windsurf_auth_url(&redir, &state_token);
+                let url = build_windsurf_auth_url(&redir, &state_token);
                 (url, redir, None)
             }
             "codex" => {
                 // Codex 固定使用 port 1455
-                let redir = format!("http://localhost:{}{}", CODEX_CALLBACK_PORT, CODEX_CALLBACK_PATH);
+                let redir = format!(
+                    "http://localhost:{}{}",
+                    CODEX_CALLBACK_PORT, CODEX_CALLBACK_PATH
+                );
                 let code_verifier = generate_token(32);
                 let code_challenge = sha256_b64(&code_verifier);
                 let url = format!(
@@ -761,11 +824,12 @@ impl OauthManager {
                 );
                 (url, redir, None)
             }
-            _ => return Err(format!(
-                "「{}」OAuth 暂未支持，敬请期待后续更新。目前可使用「导入」Tab 导入账号。",
-                provider
-            )),
-
+            _ => {
+                return Err(format!(
+                    "「{}」OAuth 暂未支持，敬请期待后续更新。目前可使用「导入」Tab 导入账号。",
+                    provider
+                ))
+            }
         };
 
         let (cancel_tx, cancel_rx) = watch::channel(false);
@@ -775,25 +839,27 @@ impl OauthManager {
 
         // 占位写入 SESSION_MAP
         with_sessions(|map| {
-            map.insert(login_id.clone(), OAuthSession {
-                provider:       provider_owned.clone(),
-                callback_port:  Some(port),
-                pending_result: None,
-                state_token:    Some(state_token.clone()),
-                code_verifier:  extra_state,
-                device_code:    None,
-                cancel_tx,
-                expires_at,
-            });
+            map.insert(
+                login_id.clone(),
+                OAuthSession {
+                    provider: provider_owned.clone(),
+                    callback_port: Some(port),
+                    pending_result: None,
+                    state_token: Some(state_token.clone()),
+                    code_verifier: extra_state,
+                    device_code: None,
+                    cancel_tx,
+                    expires_at,
+                },
+            );
         });
 
         // 后台等待回调（按渠道路由不同解析逻辑）
-        let login_id_bg   = login_id.clone();
-        let app_handle    = app.clone();
-        let state_bg      = state_token.clone();
+        let login_id_bg = login_id.clone();
+        let app_handle = app.clone();
+        let state_bg = state_token.clone();
         let redirect_uri_bg = redirect_uri.clone();
         tokio::spawn(async move {
-
             let oauth_result = match provider_owned.as_str() {
                 "windsurf" => {
                     // Windsurf Implicit Flow：access_token 直接在回调 query 中
@@ -802,11 +868,14 @@ impl OauthManager {
                             // 用 access_token 换 api_key（RegisterUser）
                             match windsurf_register_user(&access_token).await {
                                 Ok((api_key, name, email)) => Ok(OAuthResult {
-                                    token:    api_key,
+                                    token: api_key,
+                                    access_token: None,
+                                    refresh_token: None,
+                                    meta_json: None,
                                     email,
                                     name,
                                     provider: "windsurf".to_string(),
-                                    error:    None,
+                                    error: None,
                                 }),
                                 Err(e) => Err(e),
                             }
@@ -815,28 +884,45 @@ impl OauthManager {
                     }
                 }
                 // Google 系（antigravity / gemini）：Authorization Code Flow
-                _ => {
-                    let client_id_owned = match provider_owned.as_str() {
-                        "gemini" => GEMINI_CLIENT_ID.to_string(),
-                        _        => ANTIGRAVITY_CLIENT_ID.to_string(),
-                    };
-                    let client_secret_own = match provider_owned.as_str() {
-                        "gemini" => GEMINI_CLIENT_SECRET.to_string(),
-                        _        => ANTIGRAVITY_CLIENT_SECRET.to_string(),
-                    };
-                    match wait_for_callback(port, state_bg, cancel_rx).await {
-                        Ok((code, redir)) => {
-                            match exchange_google_code(&code, &redir, &client_id_owned, &client_secret_own).await {
-                                Ok((access_token, refresh_token)) => {
-                                    let user_info = fetch_google_userinfo(&access_token).await;
-                                    let token = refresh_token.unwrap_or(access_token);
-                                    Ok(OAuthResult {
-                                        token,
-                                        email:    user_info.as_ref().and_then(|u| u.email.clone()),
-                                        name:     user_info.as_ref().and_then(|u| u.name.clone()),
-                                        provider: provider_owned.clone(),
-                                        error:    None,
-                                    })
+                "antigravity" | "gemini" => {
+                    match get_google_client_secret(provider_owned.as_str()) {
+                        Ok(client_secret_own) => {
+                            let client_id_owned = match provider_owned.as_str() {
+                                "gemini" => GEMINI_CLIENT_ID.to_string(),
+                                _ => ANTIGRAVITY_CLIENT_ID.to_string(),
+                            };
+                            match wait_for_callback(port, state_bg, cancel_rx).await {
+                                Ok((code, redir)) => {
+                                    match exchange_google_code(
+                                        &code,
+                                        &redir,
+                                        &client_id_owned,
+                                        &client_secret_own,
+                                    )
+                                    .await
+                                    {
+                                        Ok((access_token, refresh_token)) => {
+                                            let user_info =
+                                                fetch_google_userinfo(&access_token).await;
+                                            let refresh_token_to_store = refresh_token.clone();
+                                            let token = refresh_token.unwrap_or(access_token.clone());
+                                            Ok(OAuthResult {
+                                                token,
+                                                access_token: Some(access_token),
+                                                refresh_token: refresh_token_to_store,
+                                                meta_json: None,
+                                                email: user_info
+                                                    .as_ref()
+                                                    .and_then(|u| u.email.clone()),
+                                                name: user_info
+                                                    .as_ref()
+                                                    .and_then(|u| u.name.clone()),
+                                                provider: provider_owned.clone(),
+                                                error: None,
+                                            })
+                                        }
+                                        Err(e) => Err(e),
+                                    }
                                 }
                                 Err(e) => Err(e),
                             }
@@ -851,14 +937,58 @@ impl OauthManager {
                     match wait_for_callback(cb_port, state_bg, cancel_rx).await {
                         Ok((code, _redir)) => {
                             let verifier = code_verifier_opt.clone().unwrap_or_default();
-                            let redir = format!("http://localhost:{}{}", CODEX_CALLBACK_PORT, CODEX_CALLBACK_PATH);
-                            match exchange_pkce_code(CODEX_TOKEN_URL, CODEX_CLIENT_ID, &code, &redir, &verifier).await {
+                            let redir = format!(
+                                "http://localhost:{}{}",
+                                CODEX_CALLBACK_PORT, CODEX_CALLBACK_PATH
+                            );
+                            match exchange_pkce_code(
+                                CODEX_TOKEN_URL,
+                                CODEX_CLIENT_ID,
+                                &code,
+                                &redir,
+                                &verifier,
+                            )
+                            .await
+                            {
                                 Ok(token_json) => {
-                                    let access_token = token_json["access_token"].as_str().unwrap_or("").to_string();
+                                    let access_token = token_json["access_token"]
+                                        .as_str()
+                                        .unwrap_or("")
+                                        .to_string();
+                                    let refresh_token = token_json["refresh_token"]
+                                        .as_str()
+                                        .filter(|s| !s.is_empty())
+                                        .map(String::from);
+                                    let id_token = token_json["id_token"]
+                                        .as_str()
+                                        .filter(|s| !s.is_empty())
+                                        .map(String::from);
                                     let email = decode_jwt_claim(&access_token, "email");
                                     let name = decode_jwt_claim(&access_token, "name");
+                                    let account_id = decode_any_jwt_claim(
+                                        &access_token,
+                                        &["chatgpt_account_id", "account_id", "workspace_id"],
+                                    )
+                                    .or_else(|| {
+                                        id_token.as_deref().and_then(|token| {
+                                            decode_any_jwt_claim(
+                                                token,
+                                                &["chatgpt_account_id", "account_id", "workspace_id"],
+                                            )
+                                        })
+                                    });
+                                    let meta_json = serde_json::json!({
+                                        "auth_mode": "oauth",
+                                        "id_token": id_token,
+                                        "account_id": account_id,
+                                        "last_refresh": chrono::Utc::now().to_rfc3339(),
+                                    })
+                                    .to_string();
                                     Ok(OAuthResult {
-                                        token: access_token,
+                                        token: access_token.clone(),
+                                        access_token: Some(access_token),
+                                        refresh_token,
+                                        meta_json: Some(meta_json),
                                         email,
                                         name,
                                         provider: "codex".to_string(),
@@ -872,34 +1002,41 @@ impl OauthManager {
                     }
                 }
                 // Kiro：PKCE + code exchange 到 kiro auth service
-                "kiro" => {
-                    match wait_for_callback(port, state_bg, cancel_rx).await {
-                        Ok((code, redir)) => {
-                            let verifier = code_verifier_opt.clone().unwrap_or_default();
-                            match exchange_pkce_code(KIRO_TOKEN_URL, "", &code, &redir, &verifier).await {
-                                Ok(token_json) => {
-                                    let access_token = token_json["accessToken"]
-                                        .as_str()
-                                        .or_else(|| token_json["access_token"].as_str())
-                                        .unwrap_or("").to_string();
-                                    let email = token_json["email"].as_str().map(String::from)
-                                        .or_else(|| decode_jwt_claim(&access_token, "email"));
-                                    let name = token_json["name"].as_str().map(String::from)
-                                        .or_else(|| decode_jwt_claim(&access_token, "name"));
-                                    Ok(OAuthResult {
-                                        token: access_token,
-                                        email,
-                                        name,
-                                        provider: "kiro".to_string(),
-                                        error: None,
-                                    })
-                                }
-                                Err(e) => Err(e),
+                "kiro" => match wait_for_callback(port, state_bg, cancel_rx).await {
+                    Ok((code, redir)) => {
+                        let verifier = code_verifier_opt.clone().unwrap_or_default();
+                        match exchange_pkce_code(KIRO_TOKEN_URL, "", &code, &redir, &verifier).await
+                        {
+                            Ok(token_json) => {
+                                let access_token = token_json["accessToken"]
+                                    .as_str()
+                                    .or_else(|| token_json["access_token"].as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let email = token_json["email"]
+                                    .as_str()
+                                    .map(String::from)
+                                    .or_else(|| decode_jwt_claim(&access_token, "email"));
+                                let name = token_json["name"]
+                                    .as_str()
+                                    .map(String::from)
+                                    .or_else(|| decode_jwt_claim(&access_token, "name"));
+                                Ok(OAuthResult {
+                                    token: access_token,
+                                    access_token: None,
+                                    refresh_token: None,
+                                    meta_json: None,
+                                    email,
+                                    name,
+                                    provider: "kiro".to_string(),
+                                    error: None,
+                                })
                             }
+                            Err(e) => Err(e),
                         }
-                        Err(e) => Err(e),
                     }
-                }
+                    Err(e) => Err(e),
+                },
                 // Trae：先请求 GetLoginGuidance 获取真实登录 URL，然后等候 refresh_token 回调
                 "trae" => {
                     match trae_get_login_url(&redirect_uri_bg, &state_bg).await {
@@ -910,10 +1047,15 @@ impl OauthManager {
                             match wait_for_callback(port, state_bg.clone(), cancel_rx).await {
                                 Ok((refresh_token, _redir)) => {
                                     // Trae 回调直接带 refresh_token
-                                    let (email, name) = trae_get_user_info(&refresh_token, &redirect_uri_bg).await
-                                        .unwrap_or((None, None));
+                                    let (email, name) =
+                                        trae_get_user_info(&refresh_token, &redirect_uri_bg)
+                                            .await
+                                            .unwrap_or((None, None));
                                     Ok(OAuthResult {
                                         token: refresh_token,
+                                        access_token: None,
+                                        refresh_token: None,
+                                        meta_json: None,
                                         email,
                                         name,
                                         provider: "trae".to_string(),
@@ -927,24 +1069,28 @@ impl OauthManager {
                     }
                 }
                 // Zed：回调带 access_token（类似 Implicit Flow）
-                "zed" => {
-                    match wait_for_callback(port, state_bg, cancel_rx).await {
-                        Ok((access_token, _)) => {
-                            let email = decode_jwt_claim(&access_token, "email");
-                            let name = decode_jwt_claim(&access_token, "name");
-                            Ok(OAuthResult {
-                                token: access_token,
-                                email,
-                                name,
-                                provider: "zed".to_string(),
-                                error: None,
-                            })
-                        }
-                        Err(e) => Err(e),
+                "zed" => match wait_for_callback(port, state_bg, cancel_rx).await {
+                    Ok((access_token, _)) => {
+                        let email = decode_jwt_claim(&access_token, "email");
+                        let name = decode_jwt_claim(&access_token, "name");
+                        Ok(OAuthResult {
+                            token: access_token,
+                            access_token: None,
+                            refresh_token: None,
+                            meta_json: None,
+                            email,
+                            name,
+                            provider: "zed".to_string(),
+                            error: None,
+                        })
                     }
-                }
+                    Err(e) => Err(e),
+                },
+                _ => Err(format!(
+                    "OAuth provider {} 尚未接入后台回调处理",
+                    provider_owned
+                )),
             };
-
 
             match oauth_result {
                 Ok(result) => {
@@ -966,8 +1112,14 @@ impl OauthManager {
                     with_sessions(|map| {
                         if let Some(s) = map.get_mut(&login_id_bg) {
                             s.pending_result = Some(OAuthResult {
-                                token: String::new(), email: None, name: None,
-                                provider: String::new(), error: Some(e),
+                                token: String::new(),
+                                access_token: None,
+                                refresh_token: None,
+                                meta_json: None,
+                                email: None,
+                                name: None,
+                                provider: String::new(),
+                                error: Some(e),
                             });
                         }
                     });
@@ -983,9 +1135,9 @@ impl OauthManager {
 
         Ok(DeviceFlowStartResponse {
             login_id,
-            user_code:        String::new(),
+            user_code: String::new(),
             verification_uri: auth_url,
-            expires_in:       OAUTH_TIMEOUT_SECS,
+            expires_in: OAUTH_TIMEOUT_SECS,
             interval_seconds: 2,
         })
     }
@@ -1017,7 +1169,8 @@ impl OauthManager {
                     "nonce": nonce,
                     "verifier": code_verifier,
                     "challenge_method": "S256"
-                }).to_string();
+                })
+                .to_string();
 
                 (auth_url, state_json, login_id)
             }
@@ -1027,17 +1180,33 @@ impl OauthManager {
                     .timeout(Duration::from_secs(15))
                     .build()
                     .map_err(|e| format!("HTTP 客户端创建失败: {}", e))?;
-                let url = format!("{}{}/auth/state?platform=ide", CODEBUDDY_API_URL, CODEBUDDY_API_PREFIX);
-                let resp = client.post(&url).json(&serde_json::json!({})).send().await
+                let url = format!(
+                    "{}{}/auth/state?platform=ide",
+                    CODEBUDDY_API_URL, CODEBUDDY_API_PREFIX
+                );
+                let resp = client
+                    .post(&url)
+                    .json(&serde_json::json!({}))
+                    .send()
+                    .await
                     .map_err(|e| format!("CodeBuddy auth/state 请求失败: {}", e))?;
 
-                let body: serde_json::Value = resp.json().await
+                let body: serde_json::Value = resp
+                    .json()
+                    .await
                     .map_err(|e| format!("解析 CodeBuddy auth/state 响应失败: {}", e))?;
 
                 let data = body.get("data").cloned().unwrap_or(serde_json::Value::Null);
-                let state = data.get("state").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                let auth_url = data.get("authUrl").or_else(|| data.get("url"))
-                    .and_then(|v| v.as_str()).filter(|s| !s.is_empty())
+                let state = data
+                    .get("state")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let auth_url = data
+                    .get("authUrl")
+                    .or_else(|| data.get("url"))
+                    .and_then(|v| v.as_str())
+                    .filter(|s| !s.is_empty())
                     .map(String::from)
                     .unwrap_or_else(|| format!("{}/login?state={}", CODEBUDDY_API_URL, state));
 
@@ -1055,64 +1224,109 @@ impl OauthManager {
         let poll_state_clone = poll_state.clone();
 
         with_sessions(|map| {
-            map.insert(login_id.clone(), OAuthSession {
-                provider:       provider_owned.clone(),
-                callback_port:  None,
-                pending_result: None,
-                state_token:    None,
-                code_verifier:  None,
-                device_code:    Some(poll_state.clone()),
-                cancel_tx,
-                expires_at,
-            });
+            map.insert(
+                login_id.clone(),
+                OAuthSession {
+                    provider: provider_owned.clone(),
+                    callback_port: None,
+                    pending_result: None,
+                    state_token: None,
+                    code_verifier: None,
+                    device_code: Some(poll_state.clone()),
+                    cancel_tx,
+                    expires_at,
+                },
+            );
         });
 
         // 后台轮询
-        let login_id_bg  = login_id.clone();
-        let app_bg       = app.clone();
+        let login_id_bg = login_id.clone();
+        let app_bg = app.clone();
         tokio::spawn(async move {
             let result = match provider_owned.as_str() {
                 "qoder" => {
-                    let state: serde_json::Value = serde_json::from_str(&poll_state_clone)
-                        .unwrap_or(serde_json::Value::Null);
-                    let nonce    = state["nonce"].as_str().unwrap_or("").to_string();
+                    let state: serde_json::Value =
+                        serde_json::from_str(&poll_state_clone).unwrap_or(serde_json::Value::Null);
+                    let nonce = state["nonce"].as_str().unwrap_or("").to_string();
                     let verifier = state["verifier"].as_str().unwrap_or("").to_string();
-                    let method   = state["challenge_method"].as_str().unwrap_or("S256").to_string();
+                    let method = state["challenge_method"]
+                        .as_str()
+                        .unwrap_or("S256")
+                        .to_string();
 
-                    let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().ok();
+                    let client = reqwest::Client::builder()
+                        .timeout(Duration::from_secs(15))
+                        .build()
+                        .ok();
                     let mut found: Option<OAuthResult> = None;
-                    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(OAUTH_TIMEOUT_SECS);
+                    let deadline = tokio::time::Instant::now()
+                        + tokio::time::Duration::from_secs(OAUTH_TIMEOUT_SECS);
 
                     loop {
-                        if tokio::time::Instant::now() > deadline { break; }
+                        if tokio::time::Instant::now() > deadline {
+                            break;
+                        }
                         // 检查取消
-                        if *cancel_rx.borrow() { break; }
+                        if *cancel_rx.borrow() {
+                            break;
+                        }
 
                         if let Some(ref c) = client {
-                            let url = format!("{}{}?nonce={}&verifier={}&challenge_method={}",
-                                QODER_OPENAPI_URL, QODER_POLL_PATH,
+                            let url = format!(
+                                "{}{}?nonce={}&verifier={}&challenge_method={}",
+                                QODER_OPENAPI_URL,
+                                QODER_POLL_PATH,
                                 urlencoding::encode(&nonce),
                                 urlencoding::encode(&verifier),
-                                urlencoding::encode(&method));
+                                urlencoding::encode(&method)
+                            );
                             if let Ok(resp) = c.get(&url).send().await {
                                 if resp.status().is_success() {
                                     if let Ok(body) = resp.json::<serde_json::Value>().await {
-                                        let token = body.get("token")
+                                        let token = body
+                                            .get("token")
                                             .and_then(|v| v.as_str())
                                             .filter(|s| !s.is_empty())
                                             .map(String::from);
                                         if let Some(tk) = token {
                                             // 获取用户信息
                                             let (email, name) = if let Ok(ui_resp) = c
-                                                .get(&format!("{}{}", QODER_OPENAPI_URL, QODER_USERINFO_PATH))
-                                                .bearer_auth(&tk).send().await {
-                                                if let Ok(ui) = ui_resp.json::<serde_json::Value>().await {
-                                                    let email = ui.get("email").and_then(|v| v.as_str()).map(String::from);
-                                                    let name = ui.get("name").and_then(|v| v.as_str()).map(String::from);
+                                                .get(&format!(
+                                                    "{}{}",
+                                                    QODER_OPENAPI_URL, QODER_USERINFO_PATH
+                                                ))
+                                                .bearer_auth(&tk)
+                                                .send()
+                                                .await
+                                            {
+                                                if let Ok(ui) =
+                                                    ui_resp.json::<serde_json::Value>().await
+                                                {
+                                                    let email = ui
+                                                        .get("email")
+                                                        .and_then(|v| v.as_str())
+                                                        .map(String::from);
+                                                    let name = ui
+                                                        .get("name")
+                                                        .and_then(|v| v.as_str())
+                                                        .map(String::from);
                                                     (email, name)
-                                                } else { (None, None) }
-                                            } else { (None, None) };
-                                            found = Some(OAuthResult { token: tk, email, name, provider: "qoder".to_string(), error: None });
+                                                } else {
+                                                    (None, None)
+                                                }
+                                            } else {
+                                                (None, None)
+                                            };
+                                            found = Some(OAuthResult {
+                                                token: tk,
+                                                access_token: None,
+                                                refresh_token: None,
+                                                meta_json: None,
+                                                email,
+                                                name,
+                                                provider: "qoder".to_string(),
+                                                error: None,
+                                            });
                                             break;
                                         }
                                     }
@@ -1124,35 +1338,63 @@ impl OauthManager {
                     found.ok_or("Qoder 授权超时或已取消".to_string())
                 }
                 "codebuddy" => {
-                    let state: serde_json::Value = serde_json::from_str(&poll_state_clone)
-                        .unwrap_or(serde_json::Value::Null);
+                    let state: serde_json::Value =
+                        serde_json::from_str(&poll_state_clone).unwrap_or(serde_json::Value::Null);
                     let cb_state = state["state"].as_str().unwrap_or("").to_string();
 
-                    let client = reqwest::Client::builder().timeout(Duration::from_secs(15)).build().ok();
+                    let client = reqwest::Client::builder()
+                        .timeout(Duration::from_secs(15))
+                        .build()
+                        .ok();
                     let mut found: Option<OAuthResult> = None;
-                    let deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(OAUTH_TIMEOUT_SECS);
+                    let deadline = tokio::time::Instant::now()
+                        + tokio::time::Duration::from_secs(OAUTH_TIMEOUT_SECS);
 
                     loop {
-                        if tokio::time::Instant::now() > deadline { break; }
-                        if *cancel_rx.borrow() { break; }
+                        if tokio::time::Instant::now() > deadline {
+                            break;
+                        }
+                        if *cancel_rx.borrow() {
+                            break;
+                        }
 
                         if let Some(ref c) = client {
-                            let url = format!("{}{}/auth/token?state={}", CODEBUDDY_API_URL, CODEBUDDY_API_PREFIX, cb_state);
+                            let url = format!(
+                                "{}{}/auth/token?state={}",
+                                CODEBUDDY_API_URL, CODEBUDDY_API_PREFIX, cb_state
+                            );
                             if let Ok(resp) = c.get(&url).send().await {
                                 if let Ok(body) = resp.json::<serde_json::Value>().await {
-                                    let code = body.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
+                                    let code =
+                                        body.get("code").and_then(|v| v.as_i64()).unwrap_or(-1);
                                     if code == 0 || code == 200 {
                                         if let Some(data) = body.get("data") {
-                                            let access_token = data.get("accessToken")
+                                            let access_token = data
+                                                .get("accessToken")
                                                 .or_else(|| data.get("access_token"))
                                                 .and_then(|v| v.as_str())
                                                 .filter(|s| !s.is_empty())
                                                 .map(String::from);
                                             if let Some(tk) = access_token {
-                                                let email = data.get("email").and_then(|v| v.as_str()).map(String::from);
-                                                let name = data.get("nickname").or_else(|| data.get("name"))
-                                                    .and_then(|v| v.as_str()).map(String::from);
-                                                found = Some(OAuthResult { token: tk, email, name, provider: "codebuddy".to_string(), error: None });
+                                                let email = data
+                                                    .get("email")
+                                                    .and_then(|v| v.as_str())
+                                                    .map(String::from);
+                                                let name = data
+                                                    .get("nickname")
+                                                    .or_else(|| data.get("name"))
+                                                    .and_then(|v| v.as_str())
+                                                    .map(String::from);
+                                                found = Some(OAuthResult {
+                                                    token: tk,
+                                                    access_token: None,
+                                                    refresh_token: None,
+                                                    meta_json: None,
+                                                    email,
+                                                    name,
+                                                    provider: "codebuddy".to_string(),
+                                                    error: None,
+                                                });
                                                 break;
                                             }
                                         }
@@ -1187,8 +1429,14 @@ impl OauthManager {
                     with_sessions(|map| {
                         if let Some(s) = map.get_mut(&login_id_bg) {
                             s.pending_result = Some(OAuthResult {
-                                token: String::new(), email: None, name: None,
-                                provider: String::new(), error: Some(e),
+                                token: String::new(),
+                                access_token: None,
+                                refresh_token: None,
+                                meta_json: None,
+                                email: None,
+                                name: None,
+                                provider: String::new(),
+                                error: Some(e),
                             });
                         }
                     });
@@ -1204,25 +1452,23 @@ impl OauthManager {
 
         Ok(DeviceFlowStartResponse {
             login_id,
-            user_code:        String::new(),
+            user_code: String::new(),
             verification_uri,
-            expires_in:       OAUTH_TIMEOUT_SECS,
+            expires_in: OAUTH_TIMEOUT_SECS,
             interval_seconds: 2,
         })
     }
 
     // ── B 类：GitHub Copilot Device Flow ─────────────────────────────────────
 
-
     async fn start_github_device_flow() -> Result<DeviceFlowStartResponse, String> {
-
         #[derive(Deserialize)]
         struct GhDeviceCodeResp {
-            device_code:      String,
-            user_code:        String,
+            device_code: String,
+            user_code: String,
             verification_uri: String,
-            expires_in:       u64,
-            interval:         Option<u64>,
+            expires_in: u64,
+            interval: Option<u64>,
         }
 
         let client = reqwest::Client::builder()
@@ -1234,10 +1480,7 @@ impl OauthManager {
             .post(GITHUB_DEVICE_CODE_URL)
             .header("Accept", "application/json")
             .header("User-Agent", "ai-singularity")
-            .form(&[
-                ("client_id", GITHUB_CLIENT_ID),
-                ("scope", GITHUB_SCOPE),
-            ])
+            .form(&[("client_id", GITHUB_CLIENT_ID), ("scope", GITHUB_SCOPE)])
             .send()
             .await
             .map_err(|e| format!("请求 GitHub 设备码失败（请检查网络）: {}", e))?;
@@ -1259,23 +1502,26 @@ impl OauthManager {
         let expires_at = Instant::now() + Duration::from_secs(payload.expires_in);
 
         with_sessions(|map| {
-            map.insert(login_id.clone(), OAuthSession {
-                provider:       "github_copilot".to_string(),
-                callback_port:  None,
-                pending_result: None,
-                state_token:    None,
-                code_verifier:  None,
-                device_code:    Some(payload.device_code.clone()),
-                cancel_tx,
-                expires_at,
-            });
+            map.insert(
+                login_id.clone(),
+                OAuthSession {
+                    provider: "github_copilot".to_string(),
+                    callback_port: None,
+                    pending_result: None,
+                    state_token: None,
+                    code_verifier: None,
+                    device_code: Some(payload.device_code.clone()),
+                    cancel_tx,
+                    expires_at,
+                },
+            );
         });
 
         Ok(DeviceFlowStartResponse {
             login_id,
-            user_code:        payload.user_code,
+            user_code: payload.user_code,
             verification_uri: payload.verification_uri,
-            expires_in:       payload.expires_in,
+            expires_in: payload.expires_in,
             interval_seconds: interval,
         })
     }
@@ -1283,9 +1529,9 @@ impl OauthManager {
     // ── Cursor DeepControl ────────────────────────────────────────────────────
 
     fn start_cursor_flow() -> Result<DeviceFlowStartResponse, String> {
-        let code_verifier  = generate_token(32);
+        let code_verifier = generate_token(32);
         let code_challenge = sha256_b64(&code_verifier);
-        let uuid     = uuid::Uuid::new_v4().to_string();
+        let uuid = uuid::Uuid::new_v4().to_string();
         let login_id = generate_token(16);
 
         let verification_uri = format!(
@@ -1297,23 +1543,26 @@ impl OauthManager {
         let expires_at = Instant::now() + Duration::from_secs(300);
 
         with_sessions(|map| {
-            map.insert(login_id.clone(), OAuthSession {
-                provider:       "cursor".to_string(),
-                callback_port:  None,
-                pending_result: None,
-                state_token:    Some(uuid.clone()), // 复用 state_token 存 uuid
-                code_verifier:  Some(code_verifier.clone()),
-                device_code:    None,
-                cancel_tx,
-                expires_at,
-            });
+            map.insert(
+                login_id.clone(),
+                OAuthSession {
+                    provider: "cursor".to_string(),
+                    callback_port: None,
+                    pending_result: None,
+                    state_token: Some(uuid.clone()), // 复用 state_token 存 uuid
+                    code_verifier: Some(code_verifier.clone()),
+                    device_code: None,
+                    cancel_tx,
+                    expires_at,
+                },
+            );
         });
 
         Ok(DeviceFlowStartResponse {
             login_id,
-            user_code:        String::new(),
+            user_code: String::new(),
             verification_uri,
-            expires_in:       300,
+            expires_in: 300,
             interval_seconds: 2,
         })
     }
@@ -1325,31 +1574,34 @@ impl OauthManager {
     /// - Ok(None)         → 继续等待
     /// - Err(msg)         → 失败/超时/取消
     pub async fn poll_oauth_login(login_id: String) -> Result<Option<OAuthResult>, String> {
-        let (provider, device_code, code_verifier, uuid, expired, pending) =
-            with_sessions(|map| {
-                if let Some(s) = map.get(&login_id) {
-                    (
-                        s.provider.clone(),
-                        s.device_code.clone(),
-                        s.code_verifier.clone(),
-                        s.state_token.clone(),
-                        s.expires_at < Instant::now(),
-                        s.pending_result.clone(),
-                    )
-                } else {
-                    ("".to_string(), None, None, None, true, None)
-                }
-            });
+        let (provider, device_code, code_verifier, uuid, expired, pending) = with_sessions(|map| {
+            if let Some(s) = map.get(&login_id) {
+                (
+                    s.provider.clone(),
+                    s.device_code.clone(),
+                    s.code_verifier.clone(),
+                    s.state_token.clone(),
+                    s.expires_at < Instant::now(),
+                    s.pending_result.clone(),
+                )
+            } else {
+                ("".to_string(), None, None, None, true, None)
+            }
+        });
 
         if expired {
-            with_sessions(|map| { map.remove(&login_id); });
+            with_sessions(|map| {
+                map.remove(&login_id);
+            });
             return Err("授权码已过期，请重新发起".to_string());
         }
 
         // A 类：检查回调是否已写入
         if is_localhost_redirect_provider(&provider) {
             if let Some(result) = pending {
-                with_sessions(|map| { map.remove(&login_id); });
+                with_sessions(|map| {
+                    map.remove(&login_id);
+                });
                 if let Some(e) = result.error {
                     return Err(e);
                 }
@@ -1364,15 +1616,13 @@ impl OauthManager {
                 &login_id,
                 &uuid.unwrap_or_default(),
                 &code_verifier.unwrap_or_default(),
-            ).await;
+            )
+            .await;
         }
 
         // B 类：GitHub Device Flow 轮询
         if is_device_flow_provider(&provider) {
-            return Self::poll_github(
-                &login_id,
-                &device_code.unwrap_or_default(),
-            ).await;
+            return Self::poll_github(&login_id, &device_code.unwrap_or_default()).await;
         }
 
         Err(format!("未知 provider: {}", provider))
@@ -1387,9 +1637,9 @@ impl OauthManager {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
         struct CursorPollResp {
-            access_token:  Option<String>,
+            access_token: Option<String>,
             refresh_token: Option<String>,
-            auth_id:       Option<String>,
+            auth_id: Option<String>,
         }
 
         let client = reqwest::Client::builder()
@@ -1397,7 +1647,10 @@ impl OauthManager {
             .build()
             .map_err(|e| format!("HTTP 客户端创建失败: {}", e))?;
 
-        let url = format!("{}?uuid={}&verifier={}", CURSOR_POLL_URL, uuid, code_verifier);
+        let url = format!(
+            "{}?uuid={}&verifier={}",
+            CURSOR_POLL_URL, uuid, code_verifier
+        );
         let resp = client
             .get(&url)
             .header("Accept", "application/json")
@@ -1421,13 +1674,20 @@ impl OauthManager {
         if let Some(token) = body.access_token.or(body.refresh_token) {
             if !token.is_empty() {
                 // 从 auth_id 中提取 email（格式可能是 "user:email@example.com"）
-                let email = body.auth_id.as_deref()
+                let email = body
+                    .auth_id
+                    .as_deref()
                     .filter(|id| id.contains('@'))
                     .map(|id| id.to_string());
 
-                with_sessions(|map| { map.remove(login_id); });
+                with_sessions(|map| {
+                    map.remove(login_id);
+                });
                 return Ok(Some(OAuthResult {
                     token,
+                    access_token: None,
+                    refresh_token: None,
+                    meta_json: None,
                     email,
                     name: None,
                     provider: "cursor".to_string(),
@@ -1439,14 +1699,11 @@ impl OauthManager {
     }
 
     // 轮询 GitHub
-    async fn poll_github(
-        login_id: &str,
-        device_code: &str,
-    ) -> Result<Option<OAuthResult>, String> {
+    async fn poll_github(login_id: &str, device_code: &str) -> Result<Option<OAuthResult>, String> {
         #[derive(Deserialize)]
         struct GhTokenResp {
             access_token: Option<String>,
-            error:        Option<String>,
+            error: Option<String>,
         }
 
         let client = reqwest::Client::builder()
@@ -1476,9 +1733,14 @@ impl OauthManager {
             if !token.is_empty() {
                 // 尝试获取 GitHub 用户信息
                 let email = Self::fetch_github_user_email(&token).await;
-                with_sessions(|map| { map.remove(login_id); });
+                with_sessions(|map| {
+                    map.remove(login_id);
+                });
                 return Ok(Some(OAuthResult {
                     token,
+                    access_token: None,
+                    refresh_token: None,
+                    meta_json: None,
                     email,
                     name: None,
                     provider: "github_copilot".to_string(),
@@ -1490,15 +1752,21 @@ impl OauthManager {
         match body.error.as_deref() {
             Some("authorization_pending") | Some("slow_down") | None => Ok(None),
             Some("expired_token") => {
-                with_sessions(|map| { map.remove(login_id); });
+                with_sessions(|map| {
+                    map.remove(login_id);
+                });
                 Err("GitHub 授权码已过期，请重新发起".to_string())
             }
             Some("access_denied") => {
-                with_sessions(|map| { map.remove(login_id); });
+                with_sessions(|map| {
+                    map.remove(login_id);
+                });
                 Err("用户拒绝了授权".to_string())
             }
             Some(other) => {
-                with_sessions(|map| { map.remove(login_id); });
+                with_sessions(|map| {
+                    map.remove(login_id);
+                });
                 Err(format!("GitHub 授权失败: {}", other))
             }
         }
@@ -1507,7 +1775,10 @@ impl OauthManager {
     /// 尝试获取 GitHub 用户的主 email
     async fn fetch_github_user_email(access_token: &str) -> Option<String> {
         #[derive(Deserialize)]
-        struct GhUser { login: Option<String>, email: Option<String> }
+        struct GhUser {
+            login: Option<String>,
+            email: Option<String>,
+        }
 
         let client = reqwest::Client::builder()
             .timeout(Duration::from_secs(10))
@@ -1530,17 +1801,15 @@ impl OauthManager {
     // ── 取消授权 ──────────────────────────────────────────────────────────────
 
     pub fn cancel_oauth_flow(login_id: Option<String>) -> Result<(), String> {
-        with_sessions(|map| {
-            match &login_id {
-                Some(id) => {
-                    if let Some(s) = map.remove(id) {
-                        let _ = s.cancel_tx.send(true);
-                    }
+        with_sessions(|map| match &login_id {
+            Some(id) => {
+                if let Some(s) = map.remove(id) {
+                    let _ = s.cancel_tx.send(true);
                 }
-                None => {
-                    for (_, s) in map.drain() {
-                        let _ = s.cancel_tx.send(true);
-                    }
+            }
+            None => {
+                for (_, s) in map.drain() {
+                    let _ = s.cancel_tx.send(true);
                 }
             }
         });
@@ -1548,7 +1817,9 @@ impl OauthManager {
     }
 
     /// 兼容接口：等同于 start_oauth_flow("antigravity")
-    pub async fn prepare_oauth_url(app: tauri::AppHandle) -> Result<DeviceFlowStartResponse, String> {
+    pub async fn prepare_oauth_url(
+        app: tauri::AppHandle,
+    ) -> Result<DeviceFlowStartResponse, String> {
         Self::start_oauth_flow(app, "antigravity".to_string()).await
     }
 }

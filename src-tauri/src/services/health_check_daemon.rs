@@ -45,14 +45,11 @@ impl HealthCheckDaemon {
     async fn run_checks(&self) {
         let keys_to_test: Vec<(String, String, Option<String>, String)> = self
             .db
-            .query_rows("SELECT id, platform, base_url, status FROM api_keys", &[], |row| {
-                Ok((
-                    row.get(0)?,
-                    row.get(1)?,
-                    row.get(2)?,
-                    row.get(3)?,
-                ))
-            })
+            .query_rows(
+                "SELECT id, platform, base_url, status FROM api_keys",
+                &[],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
             .unwrap_or_default();
 
         for (id, platform_str, base_url, status) in keys_to_test {
@@ -65,7 +62,9 @@ impl HealthCheckDaemon {
             };
 
             // 构建极其廉价的请求，只为探活 401
-            let is_alive = self.ping_api(&platform_str, base_url.as_deref(), &secret).await;
+            let is_alive = self
+                .ping_api(&platform_str, base_url.as_deref(), &secret)
+                .await;
 
             let new_status = if is_alive { "valid" } else { "invalid" };
 
@@ -93,7 +92,10 @@ impl HealthCheckDaemon {
             match platform_str {
                 "openai" => "https://api.openai.com/v1/models".to_string(),
                 "anthropic" => "https://api.anthropic.com/v1/models".to_string(),
-                "gemini" => format!("https://generativelanguage.googleapis.com/v1beta/models?key={}", secret),
+                "gemini" => format!(
+                    "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+                    secret
+                ),
                 "deep_seek" => "https://api.deepseek.com/v1/models".to_string(),
                 "aliyun" => "https://dashscope.aliyuncs.com/compatible-mode/v1/models".to_string(),
                 _ => return true, // 未知平台默认乐观认为存活

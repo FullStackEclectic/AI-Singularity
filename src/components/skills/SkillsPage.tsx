@@ -8,6 +8,8 @@ export default function SkillsPage() {
   const [installUrl, setInstallUrl] = useState("");
   const [isInstalling, setIsInstalling] = useState(false);
   const [installError, setInstallError] = useState("");
+  const [message, setMessage] = useState("");
+  const [confirmUninstallId, setConfirmUninstallId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch();
@@ -33,18 +35,19 @@ export default function SkillsPage() {
   const handleUpdate = async (id: string) => {
     try {
       await update(id);
-      alert("更新成功");
+      setMessage("更新成功");
     } catch (err: any) {
-      alert("更新失败: " + String(err));
+      setMessage("更新失败: " + String(err));
     }
   };
 
   const handleUninstall = async (id: string) => {
-    if (!confirm(`确定卸载技能库 ${id} 吗？将彻底删除本地文件。`)) return;
     try {
       await uninstall(id);
+      setMessage(`已卸载技能库 ${id}`);
+      setConfirmUninstallId(null);
     } catch (err: any) {
-      alert("卸载失败: " + String(err));
+      setMessage("卸载失败: " + String(err));
     }
   };
 
@@ -54,7 +57,7 @@ export default function SkillsPage() {
         <div>
           <h1 className="page-title">Skills 技能插件</h1>
           <p className="page-subtitle">
-            专门管理 Claude Code 的扩展命令行逻辑，支持通过 Git 仓库地址一键下发和本地拉取隔离能力。
+            统一管理本地技能仓，支持通过 Git 仓库地址安装、更新与清理，为多工具工作流沉淀通用能力。
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
@@ -68,6 +71,7 @@ export default function SkillsPage() {
       </div>
 
       {error && <div className="form-error" style={{ marginBottom: 16 }}>⚠ 获取技能列表失败：{error}</div>}
+      {message && <div className="alert alert-info" style={{ marginBottom: 16 }}>{message}</div>}
 
       <div className="skills-body">
         {isLoading && skills.length === 0 ? (
@@ -79,7 +83,7 @@ export default function SkillsPage() {
            <div className="empty-state">
              <div className="empty-state-icon">🧩</div>
              <h3 style={{ color: "var(--color-text-secondary)" }}>您还没有安装任何 Skill</h3>
-             <p>通过提供 Github 仓库 URL 自动在 Claude Code 目录下生成挂载镜像。</p>
+             <p>通过 GitHub 仓库 URL 把技能收纳进 AI Singularity 的本地技能仓，后续再按工具进行接入。</p>
              <button className="btn btn-primary" onClick={() => setShowAdd(true)}>
                ＋ 输入 Github Repository URL
              </button>
@@ -91,7 +95,7 @@ export default function SkillsPage() {
                  key={s.id} 
                  skill={s} 
                  onUpdate={() => handleUpdate(s.id)}
-                 onUninstall={() => handleUninstall(s.id)}
+                 onUninstall={() => setConfirmUninstallId(s.id)}
                />
              ))}
            </div>
@@ -108,7 +112,7 @@ export default function SkillsPage() {
             </div>
             <form className="modal-body" onSubmit={handleInstall}>
               <p className="text-muted" style={{ fontSize: 13, marginBottom: 16 }}>
-                程序将在后台将代码库安全克隆至 <code>~/.claude/commands/</code> 以供跨端工具执行。
+                程序会将代码仓库克隆到 <code>~/.ai-singularity/skills/</code>。如果你此前安装在旧的 <code>~/.claude/commands/</code>，这里也会继续识别。
               </p>
               
               <div className="form-row">
@@ -141,6 +145,24 @@ export default function SkillsPage() {
           </div>
         </div>
       )}
+
+      {confirmUninstallId && (
+        <div className="modal-overlay" onClick={() => setConfirmUninstallId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>卸载技能库</h2>
+              <button className="btn btn-icon" onClick={() => setConfirmUninstallId(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>确定卸载技能库 {confirmUninstallId} 吗？将彻底删除本地文件。</p>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setConfirmUninstallId(null)}>取消</button>
+                <button type="button" className="btn btn-danger" onClick={() => handleUninstall(confirmUninstallId)}>卸载</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -152,7 +174,9 @@ function SkillCard({ skill, onUpdate, onUninstall }: { skill: SkillInfo; onUpdat
       <div className="skill-info">
         <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
           <h3 style={{ margin: 0, fontSize: 16 }}>{skill.name}</h3>
-          <span className="badge badge-success">Local</span>
+          <span className={`badge ${skill.status === "legacy" ? "badge-warning" : "badge-success"}`}>
+            {skill.status === "legacy" ? "Legacy" : "Local"}
+          </span>
         </div>
         {skill.source_url && (
           <div className="text-muted font-mono" style={{ fontSize: 12, marginTop: 4 }}>
@@ -162,6 +186,11 @@ function SkillCard({ skill, onUpdate, onUninstall }: { skill: SkillInfo; onUpdat
         <div className="text-muted font-mono" style={{ fontSize: 11, marginTop: 2 }}>
           路径: {skill.local_path}
         </div>
+        {skill.status === "legacy" && (
+          <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
+            这是旧目录中的技能；后续新安装会默认进入 AI Singularity 自己的技能仓。
+          </div>
+        )}
       </div>
       <div className="skill-actions">
          <button className="btn btn-ghost btn-xs" onClick={onUpdate} title="执行 git pull">🔄 更新 pull</button>

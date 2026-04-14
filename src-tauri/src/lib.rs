@@ -5,10 +5,10 @@ mod commands;
 mod db;
 mod error;
 mod models;
+mod panic_hook;
 mod proxy;
 mod services;
 mod store;
-mod panic_hook;
 pub mod tray;
 
 pub use error::{AppError, AppResult};
@@ -45,6 +45,9 @@ pub fn run() {
                 .app_data_dir()
                 .expect("Failed to get app data directory");
             std::fs::create_dir_all(&app_data_dir).expect("Failed to create app data directory");
+            let logs_dir = app_data_dir.join("logs");
+            std::fs::create_dir_all(&logs_dir).expect("Failed to create logs directory");
+            let _ = crate::services::logs::LogsService::init_runtime_logging(&logs_dir);
 
             // --- 全局灾难捕获系统 ---
             crate::panic_hook::set_panic_hook(app_data_dir.clone());
@@ -53,15 +56,26 @@ pub fn run() {
             let db = db::Database::new(&db_path).expect("Failed to initialize database");
 
             // --- 主动健康探活守护进程（每 30 分钟探活所有 Key） ---
-            crate::services::health_check_daemon::HealthCheckDaemon::new(
-                std::sync::Arc::new(db.clone())
-            ).start(30);
+            crate::services::health_check_daemon::HealthCheckDaemon::new(std::sync::Arc::new(
+                db.clone(),
+            ))
+            .start(30);
 
             // --- WebDAV 配置状态漫游自动同步进程（每 15 分钟） ---
             crate::services::webdav_daemon::WebDavDaemon::new(
                 std::sync::Arc::new(db.clone()),
-                app_data_dir.clone()
-            ).start(15);
+                app_data_dir.clone(),
+            )
+            .start(15);
+
+            // --- Wakeup 调度器 ---
+            crate::services::wakeup::WakeupService::ensure_scheduler_started(
+                app.handle().clone(),
+                app_data_dir.clone(),
+            );
+
+            // --- 本地 WebSocket 广播服务 ---
+            tauri::async_runtime::spawn(crate::services::websocket::start_server());
 
             app.manage(db);
 
@@ -92,14 +106,15 @@ pub fn run() {
                 loop {
                     // 每 2 小时轮询一次平台余额快照 (先 Sleep 等待系统稳定运行)
                     std::thread::sleep(std::time::Duration::from_secs(7200));
-                    
+
                     let app_h = app_handle.clone();
                     tauri::async_runtime::block_on(async move {
                         use tauri::Manager;
                         let db_state = app_h.state::<crate::db::Database>();
-                        let tracker = crate::services::balance_tracker::BalanceTracker::new(&*db_state);
+                        let tracker =
+                            crate::services::balance_tracker::BalanceTracker::new(&*db_state);
                         let _ = tracker.refresh_all().await;
-                        
+
                         let alert_service = crate::services::alert::AlertService::new(&*db_state);
                         let alerts = alert_service.get_alerts();
                         alert_service.notify_os_throttle(&app_h, alerts);
@@ -115,6 +130,13 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             // Key 管理
             commands::keys::list_keys,
+            commands::announcement::announcement_get_state,
+            commands::announcement::announcement_mark_as_read,
+            commands::announcement::announcement_mark_all_as_read,
+            commands::announcement::announcement_force_refresh,
+            commands::logs::list_desktop_logs,
+            commands::logs::read_desktop_log,
+            commands::logs::export_desktop_log,
             commands::keys::add_key,
             commands::keys::delete_key,
             commands::keys::update_key,
@@ -128,6 +150,9 @@ pub fn run() {
             // 统计
             commands::stats::get_dashboard_stats,
             commands::stats::get_token_usage_stats,
+            // 模型目录
+            commands::models::list_models,
+            commands::models::get_platform_models,
             // 代理
             commands::proxy::start_proxy,
             commands::proxy::get_proxy_status,
@@ -146,6 +171,8 @@ pub fn run() {
             commands::provider::switch_provider,
             commands::provider::delete_provider,
             commands::provider::update_providers_order,
+            commands::provider::fetch_provider_models,
+            commands::provider_current::get_provider_current_account_id,
             commands::mcp::get_mcps,
             commands::mcp::add_mcp,
             commands::mcp::toggle_mcp,
@@ -169,6 +196,7 @@ pub fn run() {
             commands::webdav::webdav_pull,
             // Skills
             commands::skill::list_skills,
+            commands::skill::get_skill_storage_info,
             commands::skill::install_skill,
             commands::skill::update_skill,
             commands::skill::uninstall_skill,
@@ -177,12 +205,32 @@ pub fn run() {
             commands::session::get_session_details,
             commands::session::scan_zombies,
             commands::session::launch_session_terminal,
+            commands::session::move_sessions_to_trash,
+            commands::session::repair_codex_session_index,
+            commands::session::sync_codex_threads_across_instances,
+            commands::session::list_codex_instances,
+            commands::session::get_default_codex_instance,
+            commands::session::add_codex_instance,
+            commands::session::delete_codex_instance,
+            commands::session::update_codex_instance_settings,
+            commands::session::start_codex_instance,
+            commands::session::stop_codex_instance,
+            commands::session::open_codex_instance_window,
+            commands::session::close_all_codex_instances,
             // OAuth
             commands::oauth::start_oauth_flow,
             commands::oauth::poll_oauth_login,
             commands::oauth::cancel_oauth_flow,
             commands::oauth::prepare_oauth_url,
-
+            commands::oauth::get_oauth_env_status,
+            // Gemini instances
+            commands::gemini_instance::list_gemini_instances,
+            commands::gemini_instance::get_default_gemini_instance,
+            commands::gemini_instance::add_gemini_instance,
+            commands::gemini_instance::delete_gemini_instance,
+            commands::gemini_instance::update_gemini_instance_settings,
+            commands::gemini_instance::get_gemini_instance_launch_command,
+            commands::gemini_instance::launch_gemini_instance,
             // 系统检测
             commands::env::check_system_env_conflicts,
             // 降维指纹核心库 (Ide Account Pool)
@@ -190,16 +238,50 @@ pub fn run() {
             commands::ide_account::import_ide_accounts,
             commands::ide_account::delete_ide_account,
             commands::ide_account::update_ide_account_tags,
+            commands::ide_account::update_ide_account_label,
             commands::ide_account::update_api_key_tags,
+            commands::ide_account::refresh_ide_account,
+            commands::ide_account::refresh_all_ide_accounts_by_platform,
+            commands::ide_account::list_gemini_cloud_projects_for_ide_account,
+            commands::ide_account::set_gemini_project_for_ide_account,
+            commands::ide_account::update_codex_api_key_credentials_for_ide_account,
+            commands::ide_account::export_ide_accounts,
             // 本地 IDE 账号扫描器
             commands::ide_scanner::scan_ide_accounts_from_local,
             commands::ide_scanner::import_from_custom_db,
             commands::ide_scanner::import_v1_accounts,
+            commands::ide_scanner::import_from_files,
+            commands::ide_scanner::import_gemini_from_local,
+            commands::ide_scanner::import_codex_from_local,
+            commands::ide_scanner::import_kiro_from_local,
+            commands::ide_scanner::import_cursor_from_local,
+            commands::ide_scanner::import_windsurf_from_local,
+            commands::ide_scanner::import_codebuddy_from_local,
+            commands::ide_scanner::import_codebuddy_cn_from_local,
+            commands::ide_scanner::import_workbuddy_from_local,
+            commands::ide_scanner::import_zed_from_local,
+            commands::ide_scanner::import_qoder_from_local,
+            commands::ide_scanner::import_trae_from_local,
             // 重装沙盒启动器
             commands::sandbox::launch_tool_sandboxed,
             // 局域网兵工厂分发
             commands::tools::check_tool_status,
             commands::tools::deploy_tool,
+            commands::update::get_update_settings,
+            commands::update::save_update_settings,
+            commands::update::update_last_check_time,
+            commands::update::get_update_runtime_info,
+            commands::update::get_linux_update_release_info,
+            commands::update::open_update_asset_url,
+            commands::update::install_linux_update_asset,
+            commands::wakeup::wakeup_get_state,
+            commands::wakeup::wakeup_save_state,
+            commands::wakeup::wakeup_load_history,
+            commands::wakeup::wakeup_add_history,
+            commands::wakeup::wakeup_clear_history,
+            commands::wakeup::wakeup_run_verification_batch,
+            commands::wakeup::wakeup_run_task_now,
+            commands::websocket::get_websocket_status,
             // 洗脑芯片 (强连)
             commands::injector::force_inject_ide,
             // SaaS 分发管理 (User Tokens)

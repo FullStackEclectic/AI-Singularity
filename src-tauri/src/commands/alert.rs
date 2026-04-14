@@ -1,7 +1,7 @@
+use crate::db::Database;
 use crate::error::AppResult;
 use crate::models::AlertItem;
 use crate::services::alert::AlertService;
-use crate::db::Database;
 use tauri::State;
 
 #[tauri::command]

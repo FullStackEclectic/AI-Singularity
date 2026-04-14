@@ -24,7 +24,7 @@ impl WebDavDaemon {
                 "守护进程已启动：WebDAV 配置状态漫游 (每 {} 分钟尝试推送备存)",
                 interval_minutes
             );
-            
+
             // 使用 interval 进行周期调度
             let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
             // 首次 Tick 会立刻执行，我们通常选择在服务刚启动时拉平一次
@@ -57,14 +57,18 @@ impl WebDavDaemon {
                 // 2. 导出最新 DB 快照（这里不能阻塞 tokio executor 核心线程，使用 spawn_blocking）
                 let db_clone = self.db.clone();
                 let adf_clone = self.app_data_dir.clone();
-                
-                let json_data_res = tokio::task::spawn_blocking(move || -> Result<String, crate::error::AppError> {
-                    let backup_service = BackupService::new(&db_clone, adf_clone);
-                    let backup_data = backup_service.export_config()?;
-                    let str_data = serde_json::to_string_pretty(&backup_data)
-                        .map_err(|e| crate::error::AppError::Other(anyhow::anyhow!("JSON error: {}", e)))?;
-                    Ok(str_data)
-                }).await;
+
+                let json_data_res = tokio::task::spawn_blocking(
+                    move || -> Result<String, crate::error::AppError> {
+                        let backup_service = BackupService::new(&db_clone, adf_clone);
+                        let backup_data = backup_service.export_config()?;
+                        let str_data = serde_json::to_string_pretty(&backup_data).map_err(|e| {
+                            crate::error::AppError::Other(anyhow::anyhow!("JSON error: {}", e))
+                        })?;
+                        Ok(str_data)
+                    },
+                )
+                .await;
 
                 let json_data = match json_data_res {
                     Ok(Ok(data)) => data,

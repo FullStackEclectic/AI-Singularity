@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::path::{Path, PathBuf};
 
 pub fn vscode_data_root_candidates() -> Result<Vec<PathBuf>, String> {

@@ -11,6 +11,9 @@ export default function SharingPage() {
   const [tokens, setTokens] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [actionMessage, setActionMessage] = useState("");
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
+  const [revoking, setRevoking] = useState(false);
   
   // ---------- Form State ----------
   const [username, setUsername] = useState("");
@@ -117,12 +120,17 @@ export default function SharingPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm("确定要收回这个 Token 吗？使用该 Token 的设备将立刻失去连接。")) return;
     try {
+      setRevoking(true);
       await api.userTokens.delete(id);
+      setActionMessage("Token 已收回");
+      setConfirmRevokeId(null);
       fetchTokens();
     } catch (e) {
       console.error("Delete failed", e);
+      setActionMessage("收回失败: " + String(e));
+    } finally {
+      setRevoking(false);
     }
   };
 
@@ -167,6 +175,12 @@ export default function SharingPage() {
           <Plus size={16} /> 创建中转分发 Token
         </button>
       </header>
+
+      {actionMessage && (
+        <div className="sharing-message-bar">
+          {actionMessage}
+        </div>
+      )}
 
       {showForm && (
         <div className="creation-panel">
@@ -305,7 +319,7 @@ export default function SharingPage() {
                   <button onClick={() => handleToggleEnabled(token)} className={`status-toggle ${token.enabled ? 'on' : 'off'}`} title={token.enabled ? "拔掉网线" : "恢复供应"}>
                     <Power size={18} />
                   </button>
-                  <button onClick={() => handleDelete(token.id)} className="delete-btn" title="核平销毁">
+                  <button onClick={() => setConfirmRevokeId(token.id)} className="delete-btn" title="核平销毁">
                     <Trash2 size={18} />
                   </button>
                 </div>
@@ -373,6 +387,23 @@ export default function SharingPage() {
               <span>目前没有任何对外建立的安全隧道。创建你的第一把私有化钥匙。</span>
             </div>
           )}
+        </div>
+      )}
+
+      {confirmRevokeId && (
+        <div className="sharing-modal-overlay" onClick={() => !revoking && setConfirmRevokeId(null)}>
+          <div className="sharing-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>收回 Token</h3>
+            <p>确定要收回这个 Token 吗？使用该 Token 的设备将立刻失去连接。</p>
+            <div className="sharing-modal-actions">
+              <button className="secondary-button" onClick={() => setConfirmRevokeId(null)} disabled={revoking}>
+                取消
+              </button>
+              <button className="danger-button" onClick={() => handleDelete(confirmRevokeId)} disabled={revoking}>
+                {revoking ? "收回中..." : "确认收回"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

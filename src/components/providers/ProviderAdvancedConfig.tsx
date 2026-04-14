@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 export interface ProviderExtraConfig {
   temperature?: number;

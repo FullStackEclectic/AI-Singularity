@@ -3,7 +3,6 @@ import { useProviderStore } from "../../stores/providerStore";
 import type { ProviderConfig, ToolTarget, Platform } from "../../types";
 import {
   TOOL_TARGET_LABELS,
-  TOOL_TARGET_CONFIG_PATH,
   PLATFORM_LABELS,
   parseToolTargets,
 } from "../../types";
@@ -50,6 +49,8 @@ export default function ProvidersPage() {
   const [editingProvider, setEditingProvider] = useState<ProviderConfig | null>(null);
   const [snippetProvider, setSnippetProvider] = useState<ProviderConfig | null>(null);
   const [selectedPreviewId, setSelectedPreviewId] = useState<string | null>(null);
+  const [confirmDeleteProvider, setConfirmDeleteProvider] = useState<ProviderConfig | null>(null);
+  const [message, setMessage] = useState("");
 
   useEffect(() => { fetch(); }, [fetch]);
 
@@ -59,9 +60,10 @@ export default function ProvidersPage() {
 
   const handleDelete = async (id: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!confirm("确定删除此 Provider？删除后相关工具配置将使用下一个可用的 Provider。")) return;
     await deleteProvider(id);
     if (selectedPreviewId === id) setSelectedPreviewId(null);
+    setConfirmDeleteProvider(null);
+    setMessage("Provider 已删除");
   };
 
   const selectedProvider = providers.find(p => p.id === selectedPreviewId);
@@ -86,6 +88,7 @@ export default function ProvidersPage() {
       </div>
 
       {error && <div className="form-error" style={{ marginBottom: 16 }}>⚠ {error}</div>}
+      {message && <div className="alert alert-info" style={{ marginBottom: 16 }}>{message}</div>}
 
       <div className="providers-split-layout">
         {/* 左侧列表 */}
@@ -111,7 +114,7 @@ export default function ProvidersPage() {
                   onSelect={() => setSelectedPreviewId(p.id)}
                   onActivate={(e) => { e.stopPropagation(); handleSwitch(p.id); }}
                   onEdit={(e) => { e.stopPropagation(); setEditingProvider(p); }}
-                  onDelete={(e) => handleDelete(p.id, e)}
+                  onDelete={(e) => { e.stopPropagation(); setConfirmDeleteProvider(p); }}
                 />
               ))}
             </div>
@@ -153,6 +156,23 @@ export default function ProvidersPage() {
           provider={snippetProvider}
           onClose={() => setSnippetProvider(null)}
         />
+      )}
+      {confirmDeleteProvider && (
+        <div className="modal-overlay" onClick={() => setConfirmDeleteProvider(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>删除 Provider</h2>
+              <button className="btn btn-icon" onClick={() => setConfirmDeleteProvider(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>确定删除此 Provider 吗？删除后相关工具配置将使用下一个可用的 Provider。</p>
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setConfirmDeleteProvider(null)}>取消</button>
+                <button className="btn btn-danger" onClick={() => handleDelete(confirmDeleteProvider.id)}>删除</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -356,6 +376,9 @@ export function ProviderModal({
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [modelFetchError, setModelFetchError] = useState("");
 
   // ── 预设过滤 ──────────────────────────────────────────────────────────────
 
@@ -453,6 +476,27 @@ export function ProviderModal({
         ? f.tool_targets.filter(t => t !== tool)
         : [...f.tool_targets, tool],
     }));
+  };
+
+  const handleFetchModels = async () => {
+    setIsFetchingModels(true);
+    setModelFetchError("");
+    try {
+      const models = await api.providers.fetchModels({
+        platform: form.platform,
+        base_url: form.base_url.trim() || undefined,
+        api_key_value: form.api_key_value.trim() || undefined,
+        api_key_id: initialProvider?.api_key_id,
+      });
+      setModelOptions(models);
+      if (!form.model_name.trim() && models.length > 0) {
+        setForm((prev) => ({ ...prev, model_name: models[0] }));
+      }
+    } catch (err) {
+      setModelFetchError(String(err));
+    } finally {
+      setIsFetchingModels(false);
+    }
   };
 
   // ── Render ─────────────────────────────────────────────────────────────────
@@ -592,13 +636,41 @@ export function ProviderModal({
 
                 {/* 3. 默认模型 */}
                 <div className="form-row">
-                  <label className="form-label">默认模型</label>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    <label className="form-label" style={{ marginBottom: 0 }}>默认模型</label>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs"
+                      onClick={handleFetchModels}
+                      disabled={isFetchingModels}
+                      title="从当前 Provider 拉取模型列表"
+                    >
+                      {isFetchingModels ? "获取中..." : "获取模型"}
+                    </button>
+                  </div>
                   <input
                     className="form-input font-mono"
                     placeholder="claude-opus-4-5"
                     value={form.model_name}
                     onChange={e => setForm({ ...form, model_name: e.target.value })}
                   />
+                  {modelOptions.length > 0 && (
+                    <select
+                      className="form-input"
+                      value={form.model_name}
+                      onChange={e => setForm({ ...form, model_name: e.target.value })}
+                      style={{ marginTop: 8 }}
+                    >
+                      {modelOptions.map((model) => (
+                        <option key={model} value={model}>{model}</option>
+                      ))}
+                    </select>
+                  )}
+                  {modelFetchError && (
+                    <div className="form-hint" style={{ color: "var(--color-danger)", marginTop: 6 }}>
+                      {modelFetchError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="form-row" style={{ marginTop: 12 }}>

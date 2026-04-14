@@ -7,22 +7,21 @@ export default function PromptsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingPrompt, setEditingPrompt] = useState<PromptConfig | null>(null);
   const [syncingId, setSyncingId] = useState<string | null>(null);
+  const [message, setMessage] = useState("");
+  const [syncDialog, setSyncDialog] = useState<{ prompt: PromptConfig; dir: string } | null>(null);
+  const [confirmDeletePrompt, setConfirmDeletePrompt] = useState<PromptConfig | null>(null);
 
   useEffect(() => {
     fetch();
   }, [fetch]);
 
-  const handleSync = async (prompt: PromptConfig) => {
-    // Ideally open a directory picker, but for MVP we will sync to a specific fixed path or let user type it via window.prompt
-    const dir = window.prompt("请输入要同步到的目标工程目录的绝对路径：\n例如：C:\\Code\\my-project");
-    if (!dir) return;
-
+  const executeSync = async (prompt: PromptConfig, dir: string) => {
     setSyncingId(prompt.id);
     try {
       await syncPrompt(prompt.id, dir);
-      alert(`成功同步到 ${dir}\\${prompt.target_file}`);
+      setMessage(`成功同步到 ${dir}\\${prompt.target_file}`);
     } catch (e) {
-      alert(`同步失败: ${e}`);
+      setMessage(`同步失败: ${e}`);
     } finally {
       setSyncingId(null);
     }
@@ -51,6 +50,11 @@ export default function PromptsPage() {
       </div>
 
       <div className="prompts-body">
+        {message && (
+          <div className="alert alert-info" style={{ marginBottom: "var(--space-4)" }}>
+            {message}
+          </div>
+        )}
         {isLoading && prompts.length === 0 ? (
           <div className="empty-state">
              <div className="animate-spin" style={{ fontSize: 24 }}>⟳</div>
@@ -84,18 +88,14 @@ export default function PromptsPage() {
                       >编辑</button>
                       <button 
                          className="btn btn-primary btn-sm"
-                         onClick={() => handleSync(p)}
+                         onClick={() => setSyncDialog({ prompt: p, dir: "" })}
                          disabled={syncingId === p.id}
                       >
                         {syncingId === p.id ? "同步中..." : "推送至项目"}
                       </button>
                       <button 
                          className="btn btn-danger btn-sm btn-icon"
-                         onClick={() => {
-                           if(window.confirm("确认删除该 Prompt?")) {
-                             deletePrompt(p.id);
-                           }
-                         }}
+                         onClick={() => setConfirmDeletePrompt(p)}
                       >✕</button>
                    </div>
                 </div>
@@ -120,6 +120,71 @@ export default function PromptsPage() {
             setEditingPrompt(null);
           }}
         />
+      )}
+
+      {syncDialog && (
+        <div className="modal-overlay" onClick={() => setSyncDialog(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>推送至项目</h2>
+              <button className="btn btn-icon" onClick={() => setSyncDialog(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <div className="form-row">
+                <label className="form-label">目标工程目录</label>
+                <input
+                  className="form-input font-mono"
+                  placeholder="例如：C:\\Code\\my-project"
+                  value={syncDialog.dir}
+                  onChange={(e) => setSyncDialog({ ...syncDialog, dir: e.target.value })}
+                />
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setSyncDialog(null)}>取消</button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled={!syncDialog.dir.trim() || syncingId === syncDialog.prompt.id}
+                  onClick={async () => {
+                    const current = syncDialog;
+                    setSyncDialog(null);
+                    await executeSync(current.prompt, current.dir.trim());
+                  }}
+                >
+                  {syncingId === syncDialog.prompt.id ? "同步中..." : "开始推送"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeletePrompt && (
+        <div className="modal-overlay" onClick={() => setConfirmDeletePrompt(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>删除 Prompt</h2>
+              <button className="btn btn-icon" onClick={() => setConfirmDeletePrompt(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>确认删除 Prompt “{confirmDeletePrompt.name}” 吗？</p>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-ghost" onClick={() => setConfirmDeletePrompt(null)}>取消</button>
+                <button
+                  type="button"
+                  className="btn btn-danger"
+                  onClick={async () => {
+                    await deletePrompt(confirmDeletePrompt.id);
+                    setMessage(`已删除 Prompt：${confirmDeletePrompt.name}`);
+                    setConfirmDeletePrompt(null);
+                  }}
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

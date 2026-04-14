@@ -1,5 +1,12 @@
+use crate::services::oauth::{DeviceFlowStartResponse, OauthManager};
 use tauri::AppHandle;
-use crate::services::oauth::{OauthManager, DeviceFlowStartResponse};
+
+#[derive(serde::Serialize)]
+pub struct OAuthEnvStatusItem {
+    pub provider: String,
+    pub env_name: String,
+    pub configured: bool,
+}
 
 // ── OAuth 命令层 ─────────────────────────────────────────────────────────────
 //
@@ -22,7 +29,7 @@ pub async fn start_oauth_flow(
 /// 轮询授权状态（前端每 interval_seconds 秒调用一次）
 ///
 /// 返回 JSON：
-/// - `{ "done": true, "token": "...", "email": "...", "name": "..." }` → 授权成功
+/// - `{ "done": true, "token": "...", "access_token": "...", "refresh_token": "...", "meta_json": "{...}", "email": "...", "name": "..." }` → 授权成功
 /// - `{ "done": false }`                                               → 继续等待
 /// - Err(msg)                                                           → 失败/超时/取消
 #[tauri::command]
@@ -31,8 +38,12 @@ pub async fn poll_oauth_login(login_id: String) -> Result<serde_json::Value, Str
         Some(result) => Ok(serde_json::json!({
             "done":  true,
             "token": result.token,
+            "access_token": result.access_token,
+            "refresh_token": result.refresh_token,
+            "meta_json": result.meta_json,
             "email": result.email,
             "name":  result.name,
+            "provider": result.provider,
         })),
         None => Ok(serde_json::json!({ "done": false })),
     }
@@ -50,4 +61,20 @@ pub fn cancel_oauth_flow(login_id: Option<String>) -> Result<(), String> {
 #[tauri::command]
 pub async fn prepare_oauth_url(app: AppHandle) -> Result<DeviceFlowStartResponse, String> {
     OauthManager::prepare_oauth_url(app).await
+}
+
+#[tauri::command]
+pub async fn get_oauth_env_status() -> Result<Vec<OAuthEnvStatusItem>, String> {
+    Ok(vec![
+        OAuthEnvStatusItem {
+            provider: "Antigravity".to_string(),
+            env_name: "AIS_ANTIGRAVITY_CLIENT_SECRET".to_string(),
+            configured: std::env::var_os("AIS_ANTIGRAVITY_CLIENT_SECRET").is_some(),
+        },
+        OAuthEnvStatusItem {
+            provider: "Gemini".to_string(),
+            env_name: "AIS_GEMINI_CLIENT_SECRET".to_string(),
+            configured: std::env::var_os("AIS_GEMINI_CLIENT_SECRET").is_some(),
+        },
+    ])
 }

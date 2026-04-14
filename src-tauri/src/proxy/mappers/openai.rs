@@ -1,9 +1,9 @@
-use async_trait::async_trait;
+use crate::proxy::converter::OpenAIRequest;
+use crate::proxy::mappers::{MapperChunk, ProtocolMapper};
 use anyhow::Result;
+use async_trait::async_trait;
 use serde_json::json;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::proxy::mappers::{ProtocolMapper, MapperChunk};
-use crate::proxy::converter::OpenAIRequest;
 
 pub struct OpenAiMapper;
 
@@ -28,9 +28,12 @@ impl ProtocolMapper for OpenAiMapper {
         tool_call_index: &mut u32,
     ) -> Result<Vec<MapperChunk>> {
         let mut results = vec![];
-        
+
         if is_final {
-            results.push(MapperChunk { event: None, data: generate_chunk(model, "", true)? });
+            results.push(MapperChunk {
+                event: None,
+                data: generate_chunk(model, "", true)?,
+            });
             return Ok(results);
         }
 
@@ -45,11 +48,17 @@ impl ProtocolMapper for OpenAiMapper {
                     *in_tool_call = true;
                     let prefix = &pending_text[..start_pos];
                     if !prefix.is_empty() {
-                        results.push(MapperChunk { event: None, data: generate_chunk(model, prefix, false)? });
+                        results.push(MapperChunk {
+                            event: None,
+                            data: generate_chunk(model, prefix, false)?,
+                        });
                     }
                     pending_text = pending_text[start_pos + "<tool_call>".len()..].to_string();
                 } else {
-                    results.push(MapperChunk { event: None, data: generate_chunk(model, &pending_text, false)? });
+                    results.push(MapperChunk {
+                        event: None,
+                        data: generate_chunk(model, &pending_text, false)?,
+                    });
                     pending_text = String::new();
                 }
             } else {
@@ -59,13 +68,37 @@ impl ProtocolMapper for OpenAiMapper {
                     let trim_buf = tool_call_buffer.trim();
                     if !trim_buf.is_empty() {
                         if let Ok(v) = serde_json::from_str::<serde_json::Value>(trim_buf) {
-                            let name = v.get("name").and_then(|n| n.as_str()).unwrap_or("unknown_tool").to_string();
-                            let args = v.get("arguments").map(|a| if let Some(s) = a.as_str() { s.to_string() } else { a.to_string() }).unwrap_or_else(|| "{}".to_string());
-                            results.push(MapperChunk { event: None, data: generate_tool_call_chunk(model, &name, &args, *tool_call_index)? });
+                            let name = v
+                                .get("name")
+                                .and_then(|n| n.as_str())
+                                .unwrap_or("unknown_tool")
+                                .to_string();
+                            let args = v
+                                .get("arguments")
+                                .map(|a| {
+                                    if let Some(s) = a.as_str() {
+                                        s.to_string()
+                                    } else {
+                                        a.to_string()
+                                    }
+                                })
+                                .unwrap_or_else(|| "{}".to_string());
+                            results.push(MapperChunk {
+                                event: None,
+                                data: generate_tool_call_chunk(
+                                    model,
+                                    &name,
+                                    &args,
+                                    *tool_call_index,
+                                )?,
+                            });
                             *tool_call_index += 1;
                         } else {
                             let fallback = format!("<tool_call>{}</tool_call>", trim_buf);
-                            results.push(MapperChunk { event: None, data: generate_chunk(model, &fallback, false)? });
+                            results.push(MapperChunk {
+                                event: None,
+                                data: generate_chunk(model, &fallback, false)?,
+                            });
                         }
                     }
                     tool_call_buffer.clear();
@@ -98,7 +131,12 @@ fn generate_chunk(model: &str, content: &str, is_final: bool) -> Result<String> 
     Ok(chunk.to_string())
 }
 
-fn generate_tool_call_chunk(model: &str, name: &str, args: &str, tool_call_index: u32) -> Result<String> {
+fn generate_tool_call_chunk(
+    model: &str,
+    name: &str,
+    args: &str,
+    tool_call_index: u32,
+) -> Result<String> {
     let now = SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs();
     let chunk = json!({
         "id": format!("chatcmpl-proxy-{}", uuid::Uuid::new_v4()),

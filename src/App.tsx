@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "./components/layout/Sidebar";
 import DashboardPage from "./components/dashboard/DashboardPage";
 import ModelsPage from "./components/models/ModelsPage";
@@ -10,22 +11,28 @@ import SkillsPage from "./components/skills/SkillsPage";
 import PromptsPage from "./components/prompts/PromptsPage";
 import SpeedTestPage from "./components/speedtest/SpeedTestPage";
 import AnalyticsPage from "./components/analytics/AnalyticsPage";
+import LogsPage from "./components/logs/LogsPage";
 import SessionsPage from "./components/sessions/SessionsPage";
 import UnifiedAccountsList from "./components/accounts/UnifiedAccountsList";
 import SharingPage from "./components/accounts/SharingPage";
 import ToolDepotPage from "./components/tools/ToolDepotPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import SecurityPage from "./components/security/SecurityPage";
+import MfaVaultPage from "./components/mfa/MfaVaultPage";
+import WebReportPage from "./components/report/WebReportPage";
+import WakeupPage from "./components/wakeup/WakeupPage";
+import { message } from "@tauri-apps/plugin-dialog";
+import { api } from "./lib/api";
 import "./App.css";
 
-export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "speedtest" | "analytics" | "sessions" | "settings" | "security";
+export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "mfa" | "wakeup" | "speedtest" | "analytics" | "report" | "logs" | "sessions" | "settings" | "security";
 
-import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { useProviderStore } from "./stores/providerStore";
 
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     const unlistenProvider = listen("provider_switched", () => {
@@ -40,9 +47,6 @@ export default function App() {
     // --- 高危环境冲突体检 ---
     const checkEnv = async () => {
       try {
-        const { api } = await import("./lib/api");
-        const { message } = await import("@tauri-apps/plugin-dialog");
-        
         const conflicts = await Promise.all([
           api.env.checkConflicts("claude"),
           api.env.checkConflicts("openai"),
@@ -67,17 +71,24 @@ export default function App() {
       console.warn("🛡️ 捕获到底层配置文件遭到外部篡改: ", event.payload);
       // 静默热更新 Zustand 缓存池中的数据，确切保证外挂改动实时映射到界面
       await useProviderStore.getState().fetch();
-      
-      const { message } = await import("@tauri-apps/plugin-dialog");
+
       message(`检测到外部程序修改了配置文件:\n${event.payload}\n\n已自动拉取同步！`, { kind: "info", title: "配置文件热更新" });
+    });
+
+    const unlistenDataChanged = listen<{ domain?: string; action?: string; source?: string }>("data:changed", async (event) => {
+      const payload = event.payload || {};
+      await queryClient.invalidateQueries();
+      await useProviderStore.getState().fetch();
+      window.dispatchEvent(new CustomEvent("ais-data-changed", { detail: payload }));
     });
 
     return () => {
       unlistenProvider.then((unlisten: () => void) => unlisten());
       unlistenRefresh.then((unlisten: () => void) => unlisten());
       unlistenWatcher.then((unlisten: () => void) => unlisten());
+      unlistenDataChanged.then((unlisten: () => void) => unlisten());
     };
-  }, []);
+  }, [queryClient]);
 
   const renderPage = () => {
     switch (activePage) {
@@ -90,9 +101,13 @@ export default function App() {
       case "mcp":        return <McpPage />;
       case "skills":     return <SkillsPage />;
       case "tools":      return <ToolDepotPage />;
+      case "mfa":        return <MfaVaultPage />;
+      case "wakeup":     return <WakeupPage />;
       case "prompts":    return <PromptsPage />;
       case "speedtest":  return <SpeedTestPage />;
       case "analytics":  return <AnalyticsPage />;
+      case "report":     return <WebReportPage />;
+      case "logs":       return <LogsPage />;
       case "sessions":   return <SessionsPage />;
       case "settings":   return <SettingsPage />;
       case "security":   return <SecurityPage />;

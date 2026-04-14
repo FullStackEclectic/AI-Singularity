@@ -166,14 +166,14 @@ function AddMcpModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       }
 
       await add({
-        id: "",
+        id: crypto.randomUUID(),
         name: form.name.trim(),
         command: form.command.trim(),
         args: argsJson,
         env: envJson,
         is_active: false,
-        created_at: "",
-        updated_at: ""
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
       onSuccess();
     } catch (err) {

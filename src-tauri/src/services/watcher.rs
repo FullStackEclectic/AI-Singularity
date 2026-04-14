@@ -1,10 +1,10 @@
+use dirs::home_dir;
 use notify::event::ModifyKind;
 use notify::{Event as NotifyEvent, EventKind, RecursiveMode, Watcher};
 use std::path::PathBuf;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 use tokio::sync::mpsc;
-use dirs::home_dir;
 
 pub struct WatcherService;
 
@@ -15,17 +15,18 @@ impl WatcherService {
 
         // Notify Watcher 属于阻塞模型，抛入独立的 OS 线程死循环保活
         std::thread::spawn(move || {
-            let mut watcher = notify::recommended_watcher(move |res: notify::Result<NotifyEvent>| {
-                if let Ok(event) = res {
-                    // 我们只捕获实质性的「数据修改」动作，忽略 Access 等杂音
-                    if matches!(event.kind, EventKind::Modify(ModifyKind::Data(_))) {
-                        for path in event.paths {
-                            let _ = tx.blocking_send(path);
+            let mut watcher =
+                notify::recommended_watcher(move |res: notify::Result<NotifyEvent>| {
+                    if let Ok(event) = res {
+                        // 我们只捕获实质性的「数据修改」动作，忽略 Access 等杂音
+                        if matches!(event.kind, EventKind::Modify(ModifyKind::Data(_))) {
+                            for path in event.paths {
+                                let _ = tx.blocking_send(path);
+                            }
                         }
                     }
-                }
-            })
-            .expect("初始化文件系统雷达引擎失败");
+                })
+                .expect("初始化文件系统雷达引擎失败");
 
             let mut paths_to_watch = vec![];
             if let Some(home) = home_dir() {
@@ -43,7 +44,7 @@ impl WatcherService {
                     }
                     let _ = std::fs::File::create(p);
                 }
-                
+
                 if let Err(e) = watcher.watch(p, RecursiveMode::NonRecursive) {
                     tracing::warn!("无法锁定监听目标 {:?} - {}", p, e);
                 } else {

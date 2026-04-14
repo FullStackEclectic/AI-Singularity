@@ -110,7 +110,7 @@ impl EnvChecker {
     fn check_shell_configs(keywords: &[&str]) -> Result<Vec<EnvConflict>, String> {
         let mut conflicts = Vec::new();
         let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-        
+
         // 激进狂扫所有常规配置
         let config_files = vec![
             format!("{}/.bashrc", home),
@@ -124,9 +124,11 @@ impl EnvChecker {
             if let Ok(content) = fs::read_to_string(&file_path) {
                 for (line_num, line) in content.lines().enumerate() {
                     let trimmed = line.trim();
-                    if trimmed.starts_with("export ") || (!trimmed.starts_with('#') && trimmed.contains('=')) {
+                    if trimmed.starts_with("export ")
+                        || (!trimmed.starts_with('#') && trimmed.contains('='))
+                    {
                         let export_line = trimmed.strip_prefix("export ").unwrap_or(trimmed);
-                        
+
                         if let Some(eq_pos) = export_line.find('=') {
                             let var_name = export_line[..eq_pos].trim();
                             let var_value = export_line[eq_pos + 1..].trim();
@@ -134,7 +136,10 @@ impl EnvChecker {
                             if keywords.iter().any(|&k| var_name.to_uppercase() == k) {
                                 conflicts.push(EnvConflict {
                                     var_name: var_name.to_string(),
-                                    var_value: var_value.trim_matches('"').trim_matches('\'').to_string(),
+                                    var_value: var_value
+                                        .trim_matches('"')
+                                        .trim_matches('\'')
+                                        .to_string(),
                                     source_type: "file(shell)".to_string(),
                                     source_path: format!("{}:{}", file_path, line_num + 1),
                                 });

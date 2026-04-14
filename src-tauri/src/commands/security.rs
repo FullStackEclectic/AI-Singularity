@@ -1,12 +1,15 @@
-use tauri::State;
-use crate::error::AppResult;
 use crate::db::Database;
+use crate::error::AppResult;
 use crate::models::{IpAccessLog, IpRule};
 use crate::services::security_db::SecurityDbService;
 use std::sync::Arc;
+use tauri::State;
 
 #[tauri::command]
-pub async fn get_ip_access_logs(db: State<'_, Database>, limit: Option<i64>) -> AppResult<Vec<IpAccessLog>> {
+pub async fn get_ip_access_logs(
+    db: State<'_, Database>,
+    limit: Option<i64>,
+) -> AppResult<Vec<IpAccessLog>> {
     let service = SecurityDbService::new(&Arc::new((*db).clone()));
     service.get_access_logs(limit.unwrap_or(200))
 }

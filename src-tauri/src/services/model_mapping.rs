@@ -1,7 +1,4 @@
-use crate::{
-    db::Database,
-    error::AppError,
-};
+use crate::{db::Database, error::AppError};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -38,8 +35,10 @@ impl ModelMappingService {
                     source_model: row.get(1)?,
                     target_model: row.get(2)?,
                     is_active: row.get::<_, i32>(3)? != 0,
-                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(4)?).unwrap_or_else(|_| Utc::now()),
-                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(5)?).unwrap_or_else(|_| Utc::now()),
+                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(4)?)
+                        .unwrap_or_else(|_| Utc::now()),
+                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(5)?)
+                        .unwrap_or_else(|_| Utc::now()),
                 })
             },
         )?;
@@ -69,7 +68,8 @@ impl ModelMappingService {
     }
 
     pub fn delete(&self, id: &str) -> Result<(), AppError> {
-        self.db.execute("DELETE FROM model_mappings WHERE id = ?1", &[&id])?;
+        self.db
+            .execute("DELETE FROM model_mappings WHERE id = ?1", &[&id])?;
         Ok(())
     }
 }
@@ -98,7 +98,7 @@ pub async fn upsert_model_mapping(
     let service = ModelMappingService::new(&db);
     let now = Utc::now();
     let id = req.id.unwrap_or_else(|| Uuid::new_v4().to_string());
-    
+
     let mapping = ModelMapping {
         id: id.clone(),
         source_model: req.source_model,
@@ -107,16 +107,13 @@ pub async fn upsert_model_mapping(
         created_at: now,
         updated_at: now,
     };
-    
+
     service.upsert(&mapping)?;
     Ok(mapping)
 }
 
 #[tauri::command]
-pub async fn delete_model_mapping(
-    db: State<'_, Database>,
-    id: String,
-) -> Result<(), AppError> {
+pub async fn delete_model_mapping(db: State<'_, Database>, id: String) -> Result<(), AppError> {
     let service = ModelMappingService::new(&db);
     service.delete(&id)
 }

@@ -28,6 +28,8 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
     title: "系统统计 (Analytics)",
     items: [
       { id: "analytics", icon: "📊", label: "用量看板" },
+      { id: "report", icon: "📰", label: "Web 报告" },
+      { id: "logs", icon: "📜", label: "桌面日志" },
       { id: "sessions", icon: "💬", label: "流转日志" },
       { id: "speedtest", icon: "⚡", label: "节点测速" },
     ],
@@ -39,6 +41,8 @@ const NAV_GROUPS: { title?: string; items: NavItem[] }[] = [
       { id: "mcp", icon: "🔌", label: "MCP 扩展" },
       { id: "skills", icon: "🛠️", label: "技能包" },
       { id: "tools", icon: "⏬", label: "本地兵工厂" },
+      { id: "mfa", icon: "🔐", label: "2FA / MFA 管理" },
+      { id: "wakeup", icon: "⏰", label: "Wakeup / Verification" },
       { id: "prompts", icon: "📝", label: "全局注入与 Prompt" },
     ],
   },

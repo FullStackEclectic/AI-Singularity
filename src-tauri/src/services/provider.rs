@@ -1,9 +1,9 @@
-use crate::error::AppResult;
-use crate::models::{ProviderConfig, Platform, ProviderCategory};
 use crate::db::Database;
+use crate::error::AppResult;
+use crate::models::{Platform, ProviderConfig};
 use crate::services::sync::SyncService;
-use rusqlite::params;
 use chrono::Utc;
+use rusqlite::params;
 
 pub struct ProviderService<'a> {
     db: &'a Database,
@@ -20,38 +20,40 @@ impl<'a> ProviderService<'a> {
                           notes, extra_config, created_at, updated_at, sort_order
                    FROM providers
                    ORDER BY sort_order ASC, created_at ASC";
-        self.db.query_rows(sql, &[], |row| {
-            let platform_str: String = row.get(2)?;
-            let platform = serde_json::from_str(&format!("\"{}\"", platform_str))
-                .unwrap_or(Platform::Custom);
-            let category_str: Option<String> = row.get(3)?;
-            let category = category_str.as_deref().and_then(|s| {
-                serde_json::from_str(&format!("\"{}\"", s)).ok()
-            });
-            let created_at_str: String = row.get(15)?;
-            let updated_at_str: String = row.get(16)?;
+        self.db
+            .query_rows(sql, &[], |row| {
+                let platform_str: String = row.get(2)?;
+                let platform = serde_json::from_str(&format!("\"{}\"", platform_str))
+                    .unwrap_or(Platform::Custom);
+                let category_str: Option<String> = row.get(3)?;
+                let category = category_str
+                    .as_deref()
+                    .and_then(|s| serde_json::from_str(&format!("\"{}\"", s)).ok());
+                let created_at_str: String = row.get(15)?;
+                let updated_at_str: String = row.get(16)?;
 
-            Ok(ProviderConfig {
-                id:           row.get(0)?,
-                name:         row.get(1)?,
-                platform,
-                category,
-                base_url:     row.get(4)?,
-                api_key_id:   row.get(5)?,
-                model_name:   row.get(6).unwrap_or_default(),
-                is_active:    row.get::<_, i32>(7)? != 0,
-                tool_targets: row.get(8)?,
-                icon:         row.get(9)?,
-                icon_color:   row.get(10)?,
-                website_url:  row.get(11)?,
-                api_key_url:  row.get(12)?,
-                notes:        row.get(13)?,
-                extra_config: row.get(14)?,
-                sort_order:   row.get(17).unwrap_or(0),
-                created_at:   created_at_str.parse().unwrap_or_else(|_| Utc::now()),
-                updated_at:   updated_at_str.parse().unwrap_or_else(|_| Utc::now()),
+                Ok(ProviderConfig {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    platform,
+                    category,
+                    base_url: row.get(4)?,
+                    api_key_id: row.get(5)?,
+                    model_name: row.get(6).unwrap_or_default(),
+                    is_active: row.get::<_, i32>(7)? != 0,
+                    tool_targets: row.get(8)?,
+                    icon: row.get(9)?,
+                    icon_color: row.get(10)?,
+                    website_url: row.get(11)?,
+                    api_key_url: row.get(12)?,
+                    notes: row.get(13)?,
+                    extra_config: row.get(14)?,
+                    sort_order: row.get(17).unwrap_or(0),
+                    created_at: created_at_str.parse().unwrap_or_else(|_| Utc::now()),
+                    updated_at: updated_at_str.parse().unwrap_or_else(|_| Utc::now()),
+                })
             })
-        }).map_err(Into::into)
+            .map_err(Into::into)
     }
 
     pub fn add_provider(&self, mut provider: ProviderConfig) -> AppResult<()> {
@@ -60,9 +62,12 @@ impl<'a> ProviderService<'a> {
         provider.updated_at = now;
 
         let platform_str = serde_json::to_string(&provider.platform)
-            .unwrap().trim_matches('"').to_string();
+            .unwrap()
+            .trim_matches('"')
+            .to_string();
         let category_str = provider.category.as_ref().and_then(|c| {
-            serde_json::to_string(c).ok()
+            serde_json::to_string(c)
+                .ok()
                 .map(|s| s.trim_matches('"').to_string())
         });
 
@@ -106,11 +111,17 @@ impl<'a> ProviderService<'a> {
                     let their_targets = p.parsed_tool_targets();
                     let overlap = my_targets.iter().any(|t| their_targets.contains(t));
                     if overlap {
-                        self.db.execute("UPDATE providers SET is_active = 0 WHERE id = ?1", params![p.id])?;
+                        self.db.execute(
+                            "UPDATE providers SET is_active = 0 WHERE id = ?1",
+                            params![p.id],
+                        )?;
                     }
                 }
             }
-            self.db.execute("UPDATE providers SET is_active = 1 WHERE id = ?1", params![id])?;
+            self.db.execute(
+                "UPDATE providers SET is_active = 1 WHERE id = ?1",
+                params![id],
+            )?;
         }
 
         SyncService::new(self.db).sync_all();
@@ -118,7 +129,8 @@ impl<'a> ProviderService<'a> {
     }
 
     pub fn delete_provider(&self, id: &str) -> AppResult<()> {
-        self.db.execute("DELETE FROM providers WHERE id = ?1", &[&id])?;
+        self.db
+            .execute("DELETE FROM providers WHERE id = ?1", &[&id])?;
         SyncService::new(self.db).sync_all();
         Ok(())
     }
@@ -126,9 +138,12 @@ impl<'a> ProviderService<'a> {
     /// 更新 Provider 信息
     pub fn update_provider(&self, provider: ProviderConfig) -> AppResult<()> {
         let platform_str = serde_json::to_string(&provider.platform)
-            .unwrap().trim_matches('"').to_string();
+            .unwrap()
+            .trim_matches('"')
+            .to_string();
         let category_str = provider.category.as_ref().and_then(|c| {
-            serde_json::to_string(c).ok()
+            serde_json::to_string(c)
+                .ok()
                 .map(|s| s.trim_matches('"').to_string())
         });
 

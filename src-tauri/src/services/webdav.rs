@@ -1,8 +1,9 @@
-use reqwest::{Client, Method, header};
+use crate::error::{AppError, AppResult};
+use reqwest::{header, Client, Method};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use crate::error::{AppError, AppResult};
 
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct WebDavAuth {
     pub username: String,
@@ -32,17 +33,27 @@ impl WebDavService {
 
     /// 发送一个轻量 PROPFIND 请求验证连接
     pub async fn test_connection(&self, config: &WebDavConfig) -> AppResult<()> {
-        let req = self.client.request(Method::from_bytes(b"PROPFIND").unwrap(), &config.url)
+        let req = self
+            .client
+            .request(Method::from_bytes(b"PROPFIND").unwrap(), &config.url)
             .header("Depth", "0")
             .basic_auth(&config.username, config.password.as_deref());
-        
-        let response = req.send().await.map_err(|e| AppError::Other(anyhow::anyhow!("WebDAV 连接失败: {}", e)))?;
-        
+
+        let response = req
+            .send()
+            .await
+            .map_err(|e| AppError::Other(anyhow::anyhow!("WebDAV 连接失败: {}", e)))?;
+
         if response.status().is_client_error() || response.status().is_server_error() {
             if response.status() == 401 || response.status() == 403 {
-                return Err(AppError::Other(anyhow::anyhow!("WebDAV 认证失败，请检查用户名和密码")));
+                return Err(AppError::Other(anyhow::anyhow!(
+                    "WebDAV 认证失败，请检查用户名和密码"
+                )));
             }
-            return Err(AppError::Other(anyhow::anyhow!("WebDAV 错误状态码: {}", response.status())));
+            return Err(AppError::Other(anyhow::anyhow!(
+                "WebDAV 错误状态码: {}",
+                response.status()
+            )));
         }
 
         Ok(())
@@ -63,15 +74,23 @@ impl WebDavService {
             url
         };
 
-        let req = self.client.put(&target_url)
+        let req = self
+            .client
+            .put(&target_url)
             .basic_auth(&config.username, config.password.as_deref())
             .header(header::CONTENT_TYPE, "application/json")
             .body(json_data.to_string());
-        
-        let response = req.send().await.map_err(|e| AppError::Other(anyhow::anyhow!("WebDAV 上传失败: {}", e)))?;
-        
+
+        let response = req
+            .send()
+            .await
+            .map_err(|e| AppError::Other(anyhow::anyhow!("WebDAV 上传失败: {}", e)))?;
+
         if !response.status().is_success() {
-            return Err(AppError::Other(anyhow::anyhow!("WebDAV 上传错误状态码: {}", response.status())));
+            return Err(AppError::Other(anyhow::anyhow!(
+                "WebDAV 上传错误状态码: {}",
+                response.status()
+            )));
         }
 
         Ok(())
@@ -90,19 +109,30 @@ impl WebDavService {
             url
         };
 
-        let req = self.client.get(&target_url)
+        let req = self
+            .client
+            .get(&target_url)
             .basic_auth(&config.username, config.password.as_deref());
-        
-        let response = req.send().await.map_err(|e| AppError::Other(anyhow::anyhow!("WebDAV 下载失败: {}", e)))?;
-        
+
+        let response = req
+            .send()
+            .await
+            .map_err(|e| AppError::Other(anyhow::anyhow!("WebDAV 下载失败: {}", e)))?;
+
         if !response.status().is_success() {
             if response.status() == 404 {
                 return Err(AppError::Other(anyhow::anyhow!("远端未找到备份文件")));
             }
-            return Err(AppError::Other(anyhow::anyhow!("WebDAV 下载错误状态码: {}", response.status())));
+            return Err(AppError::Other(anyhow::anyhow!(
+                "WebDAV 下载错误状态码: {}",
+                response.status()
+            )));
         }
 
-        let body = response.text().await.map_err(|e| AppError::Other(anyhow::anyhow!("读取 WebDAV 响应流失败: {}", e)))?;
+        let body = response
+            .text()
+            .await
+            .map_err(|e| AppError::Other(anyhow::anyhow!("读取 WebDAV 响应流失败: {}", e)))?;
         Ok(body)
     }
 }

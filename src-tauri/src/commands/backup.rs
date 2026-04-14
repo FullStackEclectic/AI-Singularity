@@ -1,7 +1,7 @@
+use crate::db::Database;
 use crate::error::AppResult;
 use crate::services::backup::{BackupData, BackupService};
 use tauri::{AppHandle, Manager, State};
-use crate::db::Database;
 
 #[tauri::command]
 pub fn export_config(app: AppHandle, db: State<'_, Database>) -> AppResult<BackupData> {

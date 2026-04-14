@@ -32,6 +32,7 @@ function ProviderRow({
   isActive, 
   localConfig,
   onChangeModel,
+  onSaveModel,
   onEdit,
   onDelete,
   onActivate
@@ -95,13 +96,14 @@ function ProviderRow({
 }
 
 export default function ToolSyncPage() {
-  const { providers, isLoading, fetch, deleteProvider } = useProviderStore();
+  const { providers, fetch, deleteProvider } = useProviderStore();
   const [activeTab, setActiveTab] = useState<ToolTarget>("claude_code");
   const [showProviderModal, setShowProviderModal] = useState(false);
   const [editingProvider, setEditingProvider] = useState<ProviderConfig | undefined>(undefined);
+  const [message, setMessage] = useState("");
+  const [confirmDeleteProviderId, setConfirmDeleteProviderId] = useState<string | null>(null);
   
   const [localProviders, setLocalProviders] = useState<ProviderConfig[]>([]);
-  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     fetch();
@@ -141,8 +143,9 @@ export default function ToolSyncPage() {
   };
 
   const handleDelete = async (providerId: string) => {
-    if (!confirm("确定要删除此配置源吗？")) return;
     await deleteProvider(providerId);
+    setMessage("配置源已删除");
+    setConfirmDeleteProviderId(null);
     await fetch();
   };
 
@@ -172,6 +175,11 @@ export default function ToolSyncPage() {
   return (
     <div className="tool-sync-page animate-fade-in" style={{ padding: 32, height: "100%", display: "flex", flexDirection: "column", overflowY: "auto", background: "var(--color-bg-primary)" }}>
       <div style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+        {message && (
+          <div className="alert alert-info" style={{ marginBottom: 16 }}>
+            {message}
+          </div>
+        )}
         
         {/* 精美的顶部 Tabs 区域 */}
         <div style={{ marginBottom: 32, flexShrink: 0 }}>
@@ -243,7 +251,7 @@ export default function ToolSyncPage() {
                       onChangeModel={(val) => handleChangeOverrideModel(p.id, val)}
                       onSaveModel={() => handleSaveModel(p.id)}
                       onEdit={() => { setEditingProvider(p); setShowProviderModal(true); }}
-                      onDelete={() => handleDelete(p.id)}
+                      onDelete={() => setConfirmDeleteProviderId(p.id)}
                       onActivate={() => handleActivate(p.id)}
                     />
                   );
@@ -301,6 +309,24 @@ export default function ToolSyncPage() {
             fetch();
           }}
         />
+      )}
+
+      {confirmDeleteProviderId && (
+        <div className="modal-overlay" onClick={() => setConfirmDeleteProviderId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>删除配置源</h2>
+              <button className="btn btn-icon" onClick={() => setConfirmDeleteProviderId(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>确定要删除此配置源吗？</p>
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setConfirmDeleteProviderId(null)}>取消</button>
+                <button className="btn btn-danger" onClick={() => handleDelete(confirmDeleteProviderId)}>删除</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

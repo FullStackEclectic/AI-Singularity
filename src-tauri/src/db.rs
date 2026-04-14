@@ -1,4 +1,3 @@
-use anyhow::Result;
 use rusqlite::{Connection, Result as SqlResult};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -146,9 +145,7 @@ impl Database {
                 "ALTER TABLE mcp_servers ADD COLUMN description TEXT;
                  ALTER TABLE mcp_servers ADD COLUMN tool_targets TEXT;",
             );
-            let _ = conn.execute_batch(
-                "ALTER TABLE prompts ADD COLUMN description TEXT;",
-            );
+            let _ = conn.execute_batch("ALTER TABLE prompts ADD COLUMN description TEXT;");
             let _ = conn.execute_batch(
                 "CREATE TABLE IF NOT EXISTS balance_snapshots (
                     id              TEXT PRIMARY KEY,
@@ -166,7 +163,7 @@ impl Database {
                 "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (2, datetime('now'));",
             )?;
         }
-        
+
         // ── Migration 3: Token 用量审计表 ─────────────────────────────────
         if current_version < 3 {
             let _ = conn.execute_batch(
@@ -186,7 +183,7 @@ impl Database {
                 "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (3, datetime('now'));",
             )?;
         }
-        
+
         // ── Migration 4: 降维打击武器库体系表 (IDE 指纹账号轮询池) ─────────────────────────────────
         if current_version < 4 {
             let _ = conn.execute_batch(
@@ -248,9 +245,7 @@ impl Database {
             let _ = conn.execute_batch(
                 "ALTER TABLE api_keys ADD COLUMN priority INTEGER NOT NULL DEFAULT 100;",
             );
-            let _ = conn.execute_batch(
-                "ALTER TABLE prompts ADD COLUMN tool_targets TEXT;",
-            );
+            let _ = conn.execute_batch("ALTER TABLE prompts ADD COLUMN tool_targets TEXT;");
             conn.execute_batch(
                 "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (6, datetime('now'));",
             )?;
@@ -331,6 +326,30 @@ impl Database {
             )?;
         }
 
+        // ── Migration 12: IDE 账号项目上下文字段 ─────────────
+        if current_version < 12 {
+            let _ = conn.execute_batch("ALTER TABLE ide_accounts ADD COLUMN project_id TEXT;");
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (12, datetime('now'));",
+            )?;
+        }
+
+        // ── Migration 13: IDE 账号平台扩展元数据 ─────────────
+        if current_version < 13 {
+            let _ = conn.execute_batch("ALTER TABLE ide_accounts ADD COLUMN meta_json TEXT;");
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (13, datetime('now'));",
+            )?;
+        }
+
+        // ── Migration 14: IDE 账号备注名 ─────────────
+        if current_version < 14 {
+            let _ = conn.execute_batch("ALTER TABLE ide_accounts ADD COLUMN label TEXT;");
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (14, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 
@@ -350,16 +369,18 @@ impl Database {
     }
 
     /// 执行查询并返回多行数据（通过回调提取每行）
-    pub fn query_rows<T, F>(&self, sql: &str, params: &[&dyn rusqlite::ToSql], f: F) -> SqlResult<Vec<T>>
+    pub fn query_rows<T, F>(
+        &self,
+        sql: &str,
+        params: &[&dyn rusqlite::ToSql],
+        f: F,
+    ) -> SqlResult<Vec<T>>
     where
         F: Fn(&rusqlite::Row<'_>) -> SqlResult<T>,
     {
         let conn = self.conn.lock().unwrap();
         let mut stmt = conn.prepare(sql)?;
-        let rows = stmt
-            .query_map(params, f)?
-            .filter_map(|r| r.ok())
-            .collect();
+        let rows = stmt.query_map(params, f)?.filter_map(|r| r.ok()).collect();
         Ok(rows)
     }
 
@@ -373,7 +394,11 @@ impl Database {
     }
 
     /// 执行查询返回单列单行（常用于 COUNT）
-    pub fn query_scalar<T: rusqlite::types::FromSql>(&self, sql: &str, params: &[&dyn rusqlite::ToSql]) -> SqlResult<T> {
+    pub fn query_scalar<T: rusqlite::types::FromSql>(
+        &self,
+        sql: &str,
+        params: &[&dyn rusqlite::ToSql],
+    ) -> SqlResult<T> {
         let conn = self.conn.lock().unwrap();
         conn.query_row(sql, params, |r| r.get(0))
     }
@@ -383,12 +408,16 @@ impl Database {
     // ============================================================
 
     /// 根据归属平台查询当前全体存活账号
-    pub fn get_active_ide_accounts(&self, origin_platform: &str) -> SqlResult<Vec<crate::models::IdeAccount>> {
+    #[allow(dead_code)]
+    pub fn get_active_ide_accounts(
+        &self,
+        origin_platform: &str,
+    ) -> SqlResult<Vec<crate::models::IdeAccount>> {
         self.query_rows(
             "SELECT 
                 id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
                 status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
-                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used, tags
+                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, tags, label
              FROM ide_accounts 
              WHERE origin_platform = ? AND status = 'active' AND is_proxy_disabled = 0",
             &[&origin_platform],
@@ -415,7 +444,7 @@ impl Database {
                     _ => crate::models::AccountStatus::Active,
                 };
 
-                let tags_json: Option<String> = row.get(18).ok();
+                let tags_json: Option<String> = row.get(20).ok();
                 let tags: Vec<String> = tags_json
                     .and_then(|j| serde_json::from_str(&j).ok())
                     .unwrap_or_default();
@@ -429,16 +458,19 @@ impl Database {
                         refresh_token: row.get(4)?,
                         expires_in: row.get(5)?,
                         token_type: row.get(6)?,
-                        updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
+                        updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(18)?).unwrap_or_else(|_| Utc::now()),
                     },
                     status,
                     disabled_reason: row.get(8)?,
                     is_proxy_disabled: row.get(9)?,
-                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(15)?).unwrap_or_else(|_| Utc::now()),
-                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
-                    last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
+                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
+                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(18)?).unwrap_or_else(|_| Utc::now()),
+                    last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(19)?).unwrap_or_else(|_| Utc::now()),
                     device_profile: profile,
                     quota_json: row.get(14)?,
+                    project_id: row.get(15)?,
+                    meta_json: row.get(16)?,
+                    label: row.get(21).ok(),
                     tags,
                 })
             },
@@ -446,7 +478,13 @@ impl Database {
     }
 
     /// 更新某账号在高并发环境下的实时健康红绿灯状态
-    pub fn update_ide_account_status(&self, id: &str, status: crate::models::AccountStatus, reason: Option<&str>) -> SqlResult<usize> {
+    #[allow(dead_code)]
+    pub fn update_ide_account_status(
+        &self,
+        id: &str,
+        status: crate::models::AccountStatus,
+        reason: Option<&str>,
+    ) -> SqlResult<usize> {
         let status_str = match status {
             crate::models::AccountStatus::Active => "active",
             crate::models::AccountStatus::Expired => "expired",
@@ -466,7 +504,7 @@ impl Database {
             "SELECT 
                 id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
                 status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
-                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used, tags
+                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, tags, label
              FROM ide_accounts ORDER BY created_at DESC",
             &[],
             |row| {
@@ -492,7 +530,7 @@ impl Database {
                     _ => crate::models::AccountStatus::Active,
                 };
 
-                let tags_json: Option<String> = row.get(18).ok();
+                let tags_json: Option<String> = row.get(20).ok();
                 let tags: Vec<String> = tags_json
                     .and_then(|j| serde_json::from_str(&j).ok())
                     .unwrap_or_default();
@@ -506,16 +544,19 @@ impl Database {
                         refresh_token: row.get(4)?,
                         expires_in: row.get(5)?,
                         token_type: row.get(6)?,
-                        updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
+                        updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(18)?).unwrap_or_else(|_| Utc::now()),
                     },
                     status,
                     disabled_reason: row.get(8)?,
                     is_proxy_disabled: row.get(9)?,
-                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(15)?).unwrap_or_else(|_| Utc::now()),
-                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(16)?).unwrap_or_else(|_| Utc::now()),
-                    last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
+                    created_at: DateTime::<Utc>::from_str(&row.get::<_, String>(17)?).unwrap_or_else(|_| Utc::now()),
+                    updated_at: DateTime::<Utc>::from_str(&row.get::<_, String>(18)?).unwrap_or_else(|_| Utc::now()),
+                    last_used: DateTime::<Utc>::from_str(&row.get::<_, String>(19)?).unwrap_or_else(|_| Utc::now()),
                     device_profile: profile,
                     quota_json: row.get(14)?,
+                    project_id: row.get(15)?,
+                    meta_json: row.get(16)?,
+                    label: row.get(21).ok(),
                     tags,
                 })
             },
@@ -532,10 +573,15 @@ impl Database {
             crate::models::AccountStatus::Unknown => "unknown",
         };
         let (mid, mac, did, sqm) = match &acc.device_profile {
-            Some(p) => (Some(&p.machine_id), Some(&p.mac_machine_id), Some(&p.dev_device_id), Some(&p.sqm_id)),
+            Some(p) => (
+                Some(&p.machine_id),
+                Some(&p.mac_machine_id),
+                Some(&p.dev_device_id),
+                Some(&p.sqm_id),
+            ),
             None => (None, None, None, None),
         };
-        
+
         let c_at = acc.created_at.to_rfc3339();
         let u_at = acc.updated_at.to_rfc3339();
         let lu = acc.last_used.to_rfc3339();
@@ -544,8 +590,8 @@ impl Database {
             "INSERT INTO ide_accounts (
                 id, email, origin_platform, access_token, refresh_token, expires_in, token_type,
                 status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id,
-                dev_device_id, sqm_id, quota_json, created_at, updated_at, last_used
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, label
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
             ON CONFLICT(id) DO UPDATE SET 
                 email = excluded.email,
                 origin_platform = excluded.origin_platform,
@@ -561,12 +607,15 @@ impl Database {
                 dev_device_id = excluded.dev_device_id,
                 sqm_id = excluded.sqm_id,
                 quota_json = excluded.quota_json,
+                project_id = excluded.project_id,
+                meta_json = excluded.meta_json,
+                label = excluded.label,
                 updated_at = excluded.updated_at,
                 last_used = excluded.last_used",
             rusqlite::params![
                 acc.id, acc.email, acc.origin_platform, acc.token.access_token, acc.token.refresh_token,
                 acc.token.expires_in, acc.token.token_type, status_str, acc.disabled_reason,
-                acc.is_proxy_disabled, mid, mac, did, sqm, acc.quota_json, c_at, u_at, lu
+                acc.is_proxy_disabled, mid, mac, did, sqm, acc.quota_json, acc.project_id, acc.meta_json, c_at, u_at, lu, acc.label
             ],
         )
     }
@@ -584,10 +633,13 @@ impl Database {
                            SET status = 'valid'
                            WHERE status = 'rate_limit'
                            AND last_checked_at < datetime('now', '-5 minutes');";
-        
+
         let api_rows = conn.execute(api_key_sql, []).unwrap_or(0);
         if api_rows > 0 {
-            tracing::info!("♻️ [流量重塑] 成功复活了 {} 个进入冷却期的 API Key 节点", api_rows);
+            tracing::info!(
+                "♻️ [流量重塑] 成功复活了 {} 个进入冷却期的 API Key 节点",
+                api_rows
+            );
         }
 
         // 复活超过 5 分钟的高优 IDE 僵尸账号
@@ -595,10 +647,13 @@ impl Database {
                                SET status = 'active'
                                WHERE status = 'rate_limited'
                                AND updated_at < datetime('now', '-5 minutes');";
-        
+
         let ide_rows = conn.execute(ide_account_sql, []).unwrap_or(0);
         if ide_rows > 0 {
-            tracing::info!("♻️ [降维预警解除] 成功复活了 {} 个高优 IDE 伪装节点的 Rate Limit", ide_rows);
+            tracing::info!(
+                "♻️ [降维预警解除] 成功复活了 {} 个高优 IDE 伪装节点的 Rate Limit",
+                ide_rows
+            );
         }
     }
 
@@ -607,6 +662,24 @@ impl Database {
         self.execute(
             "UPDATE ide_accounts SET tags = ?, updated_at = datetime('now') WHERE id = ?",
             &[&tags_json, &id],
+        )
+    }
+
+    pub fn update_ide_account_project_id(
+        &self,
+        id: &str,
+        project_id: Option<&str>,
+    ) -> SqlResult<usize> {
+        self.execute(
+            "UPDATE ide_accounts SET project_id = ?, updated_at = datetime('now') WHERE id = ?",
+            &[&project_id, &id],
+        )
+    }
+
+    pub fn update_ide_account_label(&self, id: &str, label: Option<&str>) -> SqlResult<usize> {
+        self.execute(
+            "UPDATE ide_accounts SET label = ?, updated_at = datetime('now') WHERE id = ?",
+            &[&label, &id],
         )
     }
 

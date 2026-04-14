@@ -2,14 +2,14 @@ use chrono::Local;
 use std::backtrace::Backtrace;
 use std::fs;
 use std::io::Write;
-use std::panic::PanicInfo;
+use std::panic::PanicHookInfo;
 use std::path::PathBuf;
 
 pub fn set_panic_hook(app_data_dir: PathBuf) {
     // 获取原生框架注册的默认崩溃钩子（比如控制台打印）
     let default_hook = std::panic::take_hook();
 
-    std::panic::set_hook(Box::new(move |panic_info: &PanicInfo<'_>| {
+    std::panic::set_hook(Box::new(move |panic_info: &PanicHookInfo<'_>| {
         // 先调用默认控制台打印
         default_hook(panic_info);
 
@@ -18,8 +18,10 @@ pub fn set_panic_hook(app_data_dir: PathBuf) {
             let _ = fs::create_dir_all(&logs_dir);
         }
 
-        let crash_file_path =
-            logs_dir.join(format!("crash_{}.log", Local::now().format("%Y%m%d_%H%M%S")));
+        let crash_file_path = logs_dir.join(format!(
+            "crash_{}.log",
+            Local::now().format("%Y%m%d_%H%M%S")
+        ));
 
         let mut crash_log = String::new();
         crash_log.push_str("================ AI Singularity Crash Report ================\n");

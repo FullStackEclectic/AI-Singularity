@@ -13,10 +13,10 @@ pub enum Platform {
     Anthropic,
     Gemini,
     DeepSeek,
-    Aliyun,      // 阿里云百炼
-    Bytedance,   // 字节豆包
-    Moonshot,    // Kimi
-    Zhipu,       // 智谱 GLM
+    Aliyun,    // 阿里云百炼
+    Bytedance, // 字节豆包
+    Moonshot,  // Kimi
+    Zhipu,     // 智谱 GLM
     MiniMax,
     StepFun,
     AwsBedrock,
@@ -33,41 +33,42 @@ pub enum Platform {
     Ollama,
     HuggingFace,
     Replicate,
-    Copilot,     // GitHub Copilot OAuth
-    Auth0IDE,    // 高阶白嫖设备指纹伪装池
-    Custom,      // 自定义 OpenAI 兼容
+    Copilot,  // GitHub Copilot OAuth
+    Auth0IDE, // 高阶白嫖设备指纹伪装池
+    Custom,   // 自定义 OpenAI 兼容
 }
 
 impl Platform {
+    #[allow(dead_code)]
     pub fn display_name(&self) -> &str {
         match self {
-            Platform::OpenAI     => "OpenAI",
-            Platform::Anthropic  => "Anthropic",
-            Platform::Gemini     => "Google Gemini",
-            Platform::DeepSeek   => "DeepSeek",
-            Platform::Aliyun     => "阿里云百炼",
-            Platform::Bytedance  => "字节豆包 (DouBao)",
-            Platform::Moonshot   => "Moonshot (Kimi)",
-            Platform::Zhipu      => "智谱 GLM / Z.ai",
-            Platform::MiniMax    => "MiniMax",
-            Platform::StepFun    => "StepFun",
+            Platform::OpenAI => "OpenAI",
+            Platform::Anthropic => "Anthropic",
+            Platform::Gemini => "Google Gemini",
+            Platform::DeepSeek => "DeepSeek",
+            Platform::Aliyun => "阿里云百炼",
+            Platform::Bytedance => "字节豆包 (DouBao)",
+            Platform::Moonshot => "Moonshot (Kimi)",
+            Platform::Zhipu => "智谱 GLM / Z.ai",
+            Platform::MiniMax => "MiniMax",
+            Platform::StepFun => "StepFun",
             Platform::AwsBedrock => "AWS Bedrock",
-            Platform::NvidiaNim  => "NVIDIA NIM",
+            Platform::NvidiaNim => "NVIDIA NIM",
             Platform::AzureOpenAI => "Azure OpenAI",
             Platform::SiliconFlow => "SiliconFlow",
-            Platform::OpenRouter  => "OpenRouter",
-            Platform::Groq        => "Groq",
-            Platform::Mistral     => "Mistral AI",
-            Platform::XAi         => "xAI (Grok)",
-            Platform::Cohere      => "Cohere",
-            Platform::Perplexity  => "Perplexity",
-            Platform::TogetherAi  => "Together AI",
-            Platform::Ollama      => "Ollama",
+            Platform::OpenRouter => "OpenRouter",
+            Platform::Groq => "Groq",
+            Platform::Mistral => "Mistral AI",
+            Platform::XAi => "xAI (Grok)",
+            Platform::Cohere => "Cohere",
+            Platform::Perplexity => "Perplexity",
+            Platform::TogetherAi => "Together AI",
+            Platform::Ollama => "Ollama",
             Platform::HuggingFace => "Hugging Face",
-            Platform::Replicate   => "Replicate",
-            Platform::Copilot    => "GitHub Copilot",
-            Platform::Auth0IDE   => "超级白嫖指纹池",
-            Platform::Custom     => "自定义接口",
+            Platform::Replicate => "Replicate",
+            Platform::Copilot => "GitHub Copilot",
+            Platform::Auth0IDE => "超级白嫖指纹池",
+            Platform::Custom => "自定义接口",
         }
     }
 }
@@ -89,29 +90,32 @@ pub enum ToolTarget {
 }
 
 impl ToolTarget {
+    #[allow(dead_code)]
     pub fn display_name(&self) -> &str {
         match self {
             ToolTarget::ClaudeCode => "Claude Code",
-            ToolTarget::Codex      => "OpenAI Codex",
-            ToolTarget::GeminiCli  => "Gemini CLI",
-            ToolTarget::OpenCode   => "OpenCode",
-            ToolTarget::OpenClaw   => "OpenClaw",
-            ToolTarget::Aider      => "Aider",
+            ToolTarget::Codex => "OpenAI Codex",
+            ToolTarget::GeminiCli => "Gemini CLI",
+            ToolTarget::OpenCode => "OpenCode",
+            ToolTarget::OpenClaw => "OpenClaw",
+            ToolTarget::Aider => "Aider",
         }
     }
 
     /// 配置文件路径描述（用于 UI 提示）
+    #[allow(dead_code)]
     pub fn config_path_hint(&self) -> &str {
         match self {
             ToolTarget::ClaudeCode => "~/.claude/settings.json",
-            ToolTarget::Codex      => "~/.codex/config.toml",
-            ToolTarget::GeminiCli  => "~/.gemini/settings.json",
-            ToolTarget::OpenCode   => "~/.config/opencode/opencode.json",
-            ToolTarget::OpenClaw   => "~/.openclaw/config.json",
-            ToolTarget::Aider      => "~/.aider.conf.yml",
+            ToolTarget::Codex => "~/.codex/config.toml",
+            ToolTarget::GeminiCli => "~/.gemini/settings.json",
+            ToolTarget::OpenCode => "~/.config/opencode/opencode.json",
+            ToolTarget::OpenClaw => "~/.openclaw/config.json",
+            ToolTarget::Aider => "~/.aider.conf.yml",
         }
     }
 
+    #[allow(dead_code)]
     pub fn all() -> Vec<ToolTarget> {
         vec![
             ToolTarget::ClaudeCode,
@@ -132,25 +136,43 @@ impl ToolTarget {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum ProviderCategory {
-    Official,       // 官方（Anthropic、OpenAI、Google）
-    CnOfficial,     // 国内大模型官方
-    CloudProvider,  // 云厂商（AWS、Azure、NVIDIA）
-    Aggregator,     // 聚合平台（OpenRouter、SiliconFlow）
-    ThirdParty,     // 第三方中继
-    Custom,         // 用户自定义
+    Official,      // 官方（Anthropic、OpenAI、Google）
+    CnOfficial,    // 国内大模型官方
+    CloudProvider, // 云厂商（AWS、Azure、NVIDIA）
+    Aggregator,    // 聚合平台（OpenRouter、SiliconFlow）
+    ThirdParty,    // 第三方中继
+    Custom,        // 用户自定义
 }
 
 impl ProviderCategory {
+    #[allow(dead_code)]
     pub fn display_name(&self) -> &str {
         match self {
-            ProviderCategory::Official      => "官方",
-            ProviderCategory::CnOfficial    => "国内大模型",
+            ProviderCategory::Official => "官方",
+            ProviderCategory::CnOfficial => "国内大模型",
             ProviderCategory::CloudProvider => "云厂商",
-            ProviderCategory::Aggregator    => "聚合平台",
-            ProviderCategory::ThirdParty    => "第三方中继",
-            ProviderCategory::Custom        => "自定义",
+            ProviderCategory::Aggregator => "聚合平台",
+            ProviderCategory::ThirdParty => "第三方中继",
+            ProviderCategory::Custom => "自定义",
         }
     }
+}
+
+// ============================================================
+// Model Catalog
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Model {
+    pub id: String,
+    pub name: String,
+    pub platform: Platform,
+    pub context_length: Option<u32>,
+    pub supports_vision: bool,
+    pub supports_tools: bool,
+    pub input_price_per_1m: Option<f64>,
+    pub output_price_per_1m: Option<f64>,
+    pub is_available: bool,
 }
 
 /// Provider 配置（支持多工具同步）
@@ -232,7 +254,9 @@ pub struct ApiKey {
     pub tags: Option<Vec<String>>,
 }
 
-fn default_priority() -> i64 { 100 }
+fn default_priority() -> i64 {
+    100
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -302,8 +326,8 @@ pub struct McpServer {
     pub id: String,
     pub name: String,
     pub command: String,
-    pub args: Option<String>,  // JSON array
-    pub env: Option<String>,   // JSON map
+    pub args: Option<String>, // JSON array
+    pub env: Option<String>,  // JSON map
     pub description: Option<String>,
     pub is_active: bool,
     /// 同步到哪些工具（JSON 数组）
@@ -399,6 +423,7 @@ pub struct StreamCheckResult {
 // Token 审计 (Usage Stats)
 // ============================================================
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TokenUsageRecord {
     pub id: String,
@@ -471,12 +496,21 @@ pub struct IdeAccount {
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub last_used: DateTime<Utc>,
-    
+
     /// 核武器：本机硬件码伪装。此项为 Some 时，底层转发网关将剥离原生请求的 Header 和数据包特征，并强行植入其对应的机器码，实现“白嫖免死金牌”。
     pub device_profile: Option<DeviceProfile>,
-    
+
     /// 当该账号支持高阶的限流逻辑（如 Claude 的按次限购）时，脱水保存其配额额度。
     pub quota_json: Option<String>,
+
+    /// Gemini 等平台使用的项目上下文
+    pub project_id: Option<String>,
+
+    /// 平台特有的扩展元数据（如 Codex auth.json 中的 id_token/account_id）
+    pub meta_json: Option<String>,
+
+    /// 用户自定义备注名（优先用于 UI 展示）
+    pub label: Option<String>,
 
     /// 用户自定义标签（JSON 字符串存储，如 ["vip","生产"]）
     #[serde(default)]
@@ -518,7 +552,9 @@ pub struct TokenScope {
     pub single_account: Option<String>,
 }
 
-fn default_scope() -> String { "global".to_string() }
+fn default_scope() -> String {
+    "global".to_string()
+}
 
 impl UserToken {
     pub fn parse_scope(&self) -> TokenScope {

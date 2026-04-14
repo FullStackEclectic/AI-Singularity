@@ -615,6 +615,69 @@
 .wiz-import-divider::before { left: 0; }
 .wiz-import-divider::after  { right: 0; }
 
+.wiz-import-summary {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.75);
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.wiz-import-summary-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.wiz-import-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.wiz-import-summary-item {
+  border-radius: 10px;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid rgba(239, 68, 68, 0.12);
+  background: rgba(239, 68, 68, 0.04);
+}
+
+.wiz-import-summary-title {
+  font-size: 0.83rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.wiz-import-summary-meta {
+  margin-top: 3px;
+  font-size: 0.73rem;
+  color: var(--color-text-muted, #94a3b8);
+  word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+}
+
+.wiz-import-summary-reason {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: var(--color-danger, #dc2626);
+}
+
+.wiz-import-summary-success {
+  font-size: 0.82rem;
+  color: var(--color-success, #059669);
+  font-weight: 600;
+}
+
+.wiz-import-summary-more {
+  font-size: 0.75rem;
+  color: var(--color-text-muted, #94a3b8);
+}
+
 /* ── Buttons (Primary & Ghost) ──────────────────────────── */
 .wiz-btn-primary {
   display: flex;

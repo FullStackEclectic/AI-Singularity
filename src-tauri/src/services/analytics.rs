@@ -46,7 +46,7 @@ pub struct DashboardMetrics {
     pub token_trends: Vec<TokenTrend>,
     pub ide_status_distribution: Vec<IdeAccountStatusData>,
     pub top_consumers: Vec<TopConsumer>,
-    pub model_costs: Vec<ModelCostStats>, // NEW
+    pub model_costs: Vec<ModelCostStats>,       // NEW
     pub platform_costs: Vec<PlatformCostStats>, // NEW
 }
 
@@ -54,17 +54,17 @@ pub struct AnalyticsService;
 
 impl AnalyticsService {
     pub fn get_metrics(db: &Database, days: u32) -> crate::error::AppResult<DashboardMetrics> {
-        let active_ide_accounts: u64 = db.query_row(
-            "SELECT count(*) FROM ide_accounts WHERE status = 'active'",
-            &[],
-            |row| row.get(0)
-        ).unwrap_or(0);
+        let active_ide_accounts: u64 = db
+            .query_row(
+                "SELECT count(*) FROM ide_accounts WHERE status = 'active'",
+                &[],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
 
-        let total_ide_accounts: u64 = db.query_row(
-            "SELECT count(*) FROM ide_accounts",
-            &[],
-            |row| row.get(0)
-        ).unwrap_or(0);
+        let total_ide_accounts: u64 = db
+            .query_row("SELECT count(*) FROM ide_accounts", &[], |row| row.get(0))
+            .unwrap_or(0);
 
         let forbidden_ide_accounts: u64 = db.query_row(
             "SELECT count(*) FROM ide_accounts WHERE status = 'forbidden' OR status = 'rate_limited'",
@@ -78,11 +78,9 @@ impl AnalyticsService {
             0.0
         };
 
-        let total_user_tokens: u64 = db.query_row(
-            "SELECT count(*) FROM user_tokens",
-            &[],
-            |row| row.get(0)
-        ).unwrap_or(0);
+        let total_user_tokens: u64 = db
+            .query_row("SELECT count(*) FROM user_tokens", &[], |row| row.get(0))
+            .unwrap_or(0);
 
         let today_total_tokens: u64 = db.query_row(
             "SELECT ifnull(sum(total_tokens), 0) FROM token_usage_records WHERE date(created_at) = date('now', 'localtime')",
@@ -105,27 +103,40 @@ impl AnalyticsService {
              GROUP BY dt
              ORDER BY dt ASC", limit
         );
-        let token_trends = db.query_rows(&trend_query, &[], |row| {
-            Ok(TokenTrend {
-                date: row.get(0)?,
-                prompt_tokens: row.get(1)?,
-                completion_tokens: row.get(2)?,
-                total_tokens: row.get(3)?,
-                total_cost_usd: row.get(4)?,
+        let token_trends = db
+            .query_rows(&trend_query, &[], |row| {
+                Ok(TokenTrend {
+                    date: row.get(0)?,
+                    prompt_tokens: row.get(1)?,
+                    completion_tokens: row.get(2)?,
+                    total_tokens: row.get(3)?,
+                    total_cost_usd: row.get(4)?,
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
         let mut ide_status_distribution = vec![
-            IdeAccountStatusData { name: "Active".to_string(), value: active_ide_accounts },
-            IdeAccountStatusData { name: "Forbidden".to_string(), value: forbidden_ide_accounts },
+            IdeAccountStatusData {
+                name: "Active".to_string(),
+                value: active_ide_accounts,
+            },
+            IdeAccountStatusData {
+                name: "Forbidden".to_string(),
+                value: forbidden_ide_accounts,
+            },
         ];
-        
-        let expired: u64 = db.query_row(
-            "SELECT count(*) FROM ide_accounts WHERE status = 'expired'",
-            &[],
-            |row| row.get(0)
-        ).unwrap_or(0);
-        ide_status_distribution.push(IdeAccountStatusData { name: "Expired".to_string(), value: expired });
+
+        let expired: u64 = db
+            .query_row(
+                "SELECT count(*) FROM ide_accounts WHERE status = 'expired'",
+                &[],
+                |row| row.get(0),
+            )
+            .unwrap_or(0);
+        ide_status_distribution.push(IdeAccountStatusData {
+            name: "Expired".to_string(),
+            value: expired,
+        });
 
         let limit_consumers = 10;
         let top_consumers_query = format!(
@@ -133,14 +144,17 @@ impl AnalyticsService {
              FROM token_usage_records
              GROUP BY client_app
              ORDER BY tokens DESC
-             LIMIT {}", limit_consumers
+             LIMIT {}",
+            limit_consumers
         );
-        let top_consumers = db.query_rows(&top_consumers_query, &[], |row| {
-            Ok(TopConsumer {
-                client_app: row.get(0)?,
-                total_tokens: row.get(1)?,
+        let top_consumers = db
+            .query_rows(&top_consumers_query, &[], |row| {
+                Ok(TopConsumer {
+                    client_app: row.get(0)?,
+                    total_tokens: row.get(1)?,
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
         // Model Costs (Top 10)
         let model_costs_query = "
@@ -150,13 +164,15 @@ impl AnalyticsService {
             ORDER BY cost DESC
             LIMIT 10
         ";
-        let model_costs = db.query_rows(model_costs_query, &[], |row| {
-            Ok(ModelCostStats {
-                model_name: row.get(0)?,
-                total_cost_usd: row.get(1)?,
-                total_requests: row.get(2)?,
+        let model_costs = db
+            .query_rows(model_costs_query, &[], |row| {
+                Ok(ModelCostStats {
+                    model_name: row.get(0)?,
+                    total_cost_usd: row.get(1)?,
+                    total_requests: row.get(2)?,
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
         // Platform/Provider Costs
         let platform_costs_query = "
@@ -165,13 +181,15 @@ impl AnalyticsService {
             GROUP BY platform
             ORDER BY cost DESC
         ";
-        let platform_costs = db.query_rows(platform_costs_query, &[], |row| {
-            Ok(PlatformCostStats {
-                platform: row.get(0)?,
-                total_cost_usd: row.get(1)?,
-                total_requests: row.get(2)?,
+        let platform_costs = db
+            .query_rows(platform_costs_query, &[], |row| {
+                Ok(PlatformCostStats {
+                    platform: row.get(0)?,
+                    total_cost_usd: row.get(1)?,
+                    total_requests: row.get(2)?,
+                })
             })
-        }).unwrap_or_default();
+            .unwrap_or_default();
 
         Ok(DashboardMetrics {
             active_ide_accounts,
@@ -187,6 +205,7 @@ impl AnalyticsService {
         })
     }
 
+    #[allow(dead_code)]
     pub fn log_token_usage(
         db: &Database,
         key_id: &str,
@@ -199,9 +218,9 @@ impl AnalyticsService {
     ) -> crate::error::AppResult<()> {
         let id = uuid::Uuid::new_v4().to_string();
         let created_at = chrono::Utc::now().to_rfc3339();
-        
+
         let total_cost_usd = 0.0; // Needs pricing formula, using 0 for now
-        
+
         db.execute(
             "INSERT INTO token_usage_records (
                 id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, created_at, total_cost_usd
@@ -211,4 +230,3 @@ impl AnalyticsService {
         Ok(())
     }
 }
-

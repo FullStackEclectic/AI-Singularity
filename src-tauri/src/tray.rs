@@ -1,6 +1,6 @@
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem, IsMenuItem};
-use tauri::tray::{TrayIconBuilder, TrayIconEvent, MouseButton, MouseButtonState};
-use tauri::{AppHandle, Manager, Emitter, Wry};
+use tauri::menu::{CheckMenuItem, IsMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::{AppHandle, Emitter, Manager, Wry};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::db::Database;
@@ -27,14 +27,21 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                     .on_menu_event(|app: &AppHandle, event: tauri::menu::MenuEvent| {
                         handle_menu_event(app, event.id().as_ref());
                     })
-                    .on_tray_icon_event(|tray: &tauri::tray::TrayIcon, event: tauri::tray::TrayIconEvent| {
-                        if let TrayIconEvent::Click { button: MouseButton::Left, button_state: MouseButtonState::Up, .. } = event {
-                            if let Some(window) = tray.app_handle().get_webview_window("main") {
-                                let _ = window.show();
-                                let _ = window.set_focus();
+                    .on_tray_icon_event(
+                        |tray: &tauri::tray::TrayIcon, event: tauri::tray::TrayIconEvent| {
+                            if let TrayIconEvent::Click {
+                                button: MouseButton::Left,
+                                button_state: MouseButtonState::Up,
+                                ..
+                            } = event
+                            {
+                                if let Some(window) = tray.app_handle().get_webview_window("main") {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
                             }
-                        }
-                    })
+                        },
+                    )
                     .build(app)?;
             }
         }
@@ -63,10 +70,18 @@ fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
 
     // -- 动态 Provider 列表 --
     let db = app.state::<Database>();
-    let providers = ProviderService::new(&*db).list_providers().unwrap_or_default();
+    let providers = ProviderService::new(&*db)
+        .list_providers()
+        .unwrap_or_default();
 
     if providers.is_empty() {
-        let empty_item = MenuItem::with_id(app, "no_provider", "(暂无 Provider 配置)", false, None::<&str>)?;
+        let empty_item = MenuItem::with_id(
+            app,
+            "no_provider",
+            "(暂无 Provider 配置)",
+            false,
+            None::<&str>,
+        )?;
         menu_items.push(Box::new(empty_item));
     } else {
         for p in providers {
@@ -80,7 +95,7 @@ fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
                 _ => "⚙️",
             };
             let label = format!("{} {}", prefix, p.name);
-            
+
             let item = CheckMenuItem::with_id(app, &id, &label, true, p.is_active, None::<&str>)?;
             menu_items.push(Box::new(item));
         }
@@ -90,7 +105,8 @@ fn build_menu(app: &AppHandle) -> Result<Menu<Wry>, tauri::Error> {
     let sep2 = PredefinedMenuItem::separator(app)?;
     menu_items.push(Box::new(sep2));
 
-    let refresh_item = MenuItem::with_id(app, "refresh_balances", "刷新全部余额", true, None::<&str>)?;
+    let refresh_item =
+        MenuItem::with_id(app, "refresh_balances", "刷新全部余额", true, None::<&str>)?;
     menu_items.push(Box::new(refresh_item));
 
     let quit_item = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
@@ -129,7 +145,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
             let provider_id = id.trim_start_matches("switch_provider_");
             let db = app.state::<Database>();
             let service = ProviderService::new(&*db);
-            
+
             match service.switch_provider(provider_id) {
                 Ok(_) => {
                     // 发桌面系统通知
@@ -143,7 +159,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
                                 .unwrap_or_default();
                         }
                     }
-                    
+
                     // 通过重新 build 菜单打勾
                     update_tray_menu(app);
 

@@ -1,7 +1,11 @@
-use crate::{db::Database, error::AppResult, models::{IpAccessLog, IpRule}};
+use crate::{
+    db::Database,
+    error::AppResult,
+    models::{IpAccessLog, IpRule},
+};
+use chrono::Utc;
 use std::sync::Arc;
 use uuid::Uuid;
-use chrono::Utc;
 
 pub struct SecurityDbService {
     db: Arc<Database>,
@@ -41,8 +45,11 @@ impl SecurityDbService {
         // 防爆库：随机概率（或每次）删掉最旧的记录保底，比如只保留 10000 条
         // 为了避免每次插入都查数量导致慢，可以使用时间来切断
         let two_days_ago = now - 2 * 24 * 3600;
-        let _ = self.db.execute("DELETE FROM ip_access_logs WHERE created_at < ?1", &[&two_days_ago]);
-        
+        let _ = self.db.execute(
+            "DELETE FROM ip_access_logs WHERE created_at < ?1",
+            &[&two_days_ago],
+        );
+
         Ok(())
     }
 
@@ -58,12 +65,20 @@ impl SecurityDbService {
                     endpoint: row.get(2)?,
                     token_id: {
                         let t: String = row.get(3)?;
-                        if t.is_empty() { None } else { Some(t) }
+                        if t.is_empty() {
+                            None
+                        } else {
+                            Some(t)
+                        }
                     },
                     action_taken: row.get(4)?,
                     reason: {
                         let r: String = row.get(5)?;
-                        if r.is_empty() { None } else { Some(r) }
+                        if r.is_empty() {
+                            None
+                        } else {
+                            Some(r)
+                        }
                     },
                     created_at: row.get(6)?,
                 })
@@ -108,13 +123,7 @@ impl SecurityDbService {
         self.db.execute(
             "INSERT INTO ip_rules (id, ip_cidr, rule_type, notes, is_active, created_at)
              VALUES (?1, ?2, ?3, ?4, 1, ?5)",
-            &[
-                &id,
-                &ip_cidr,
-                &rule_type,
-                &notes.unwrap_or(""),
-                &now,
-            ],
+            &[&id, &ip_cidr, &rule_type, &notes.unwrap_or(""), &now],
         )?;
         // Update security cache right away in proxy
         crate::proxy::security::SecurityShield::sync_rules(&self.db)?;
@@ -122,14 +131,18 @@ impl SecurityDbService {
     }
 
     pub fn delete_rule(&self, id: &str) -> AppResult<()> {
-        self.db.execute("DELETE FROM ip_rules WHERE id = ?1", &[&id])?;
+        self.db
+            .execute("DELETE FROM ip_rules WHERE id = ?1", &[&id])?;
         crate::proxy::security::SecurityShield::sync_rules(&self.db)?;
         Ok(())
     }
 
     pub fn toggle_rule(&self, id: &str, active: bool) -> AppResult<()> {
         let act = if active { 1 } else { 0 };
-        self.db.execute("UPDATE ip_rules SET is_active = ?1 WHERE id = ?2", &[&act, &id])?;
+        self.db.execute(
+            "UPDATE ip_rules SET is_active = ?1 WHERE id = ?2",
+            &[&act, &id],
+        )?;
         crate::proxy::security::SecurityShield::sync_rules(&self.db)?;
         Ok(())
     }

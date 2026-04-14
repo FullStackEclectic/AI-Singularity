@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
   BarChart, Bar
 } from "recharts";
+import { useTranslation } from "react-i18next";
 import "./DashboardPage.css";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -17,10 +18,17 @@ const STATUS_COLORS: Record<string, string> = {
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
 export default function DashboardPage() {
+  const { i18n } = useTranslation();
+  const queryClient = useQueryClient();
   const { data: metrics, isLoading } = useQuery({
     queryKey: ["dashboard-metrics"],
     queryFn: () => api.analytics.getDashboardMetrics(7),
     refetchInterval: 15_000,
+  });
+  const { data: announcementState, isLoading: announcementsLoading } = useQuery({
+    queryKey: ["announcement-state", i18n.language],
+    queryFn: () => api.announcements.getState(i18n.language),
+    staleTime: 60_000,
   });
 
   const STATS_ITEMS = [
@@ -40,6 +48,91 @@ export default function DashboardPage() {
       </div>
 
       <div className="dashboard-body">
+        {announcementState && announcementState.announcements.length > 0 && (
+          <div className="card announcement-panel">
+            <div className="announcement-panel-header">
+              <div>
+                <h3 className="chart-title">系统公告</h3>
+                <div className="announcement-panel-meta">
+                  共 {announcementState.announcements.length} 条
+                  {announcementState.unread_ids.length > 0 ? `，未读 ${announcementState.unread_ids.length} 条` : "，全部已读"}
+                </div>
+              </div>
+              <div className="announcement-panel-actions">
+                <button
+                  className="btn btn-secondary btn-sm"
+                  onClick={async () => {
+                    await api.announcements.refresh(i18n.language);
+                    queryClient.invalidateQueries({ queryKey: ["announcement-state", i18n.language] });
+                  }}
+                >
+                  刷新公告
+                </button>
+                <button
+                  className="btn btn-ghost btn-sm"
+                  disabled={announcementState.unread_ids.length === 0}
+                  onClick={async () => {
+                    await api.announcements.markAllRead(i18n.language);
+                    queryClient.invalidateQueries({ queryKey: ["announcement-state", i18n.language] });
+                  }}
+                >
+                  全部标为已读
+                </button>
+              </div>
+            </div>
+            <div className="announcement-list">
+              {announcementState.announcements.slice(0, 3).map((item) => {
+                const unread = announcementState.unread_ids.includes(item.id);
+                return (
+                  <div key={item.id} className={`announcement-item ${unread ? "unread" : ""}`}>
+                    <div className="announcement-item-top">
+                      <div className="announcement-item-title-row">
+                        <span className={`announcement-type ${item.type || "info"}`}>{item.type || "info"}</span>
+                        <span className="announcement-item-title">{item.title}</span>
+                      </div>
+                      <span className="announcement-item-time">
+                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : "未知时间"}
+                      </span>
+                    </div>
+                    {item.summary && <div className="announcement-item-summary">{item.summary}</div>}
+                    {item.content && <div className="announcement-item-content">{item.content}</div>}
+                    <div className="announcement-item-actions">
+                      {item.action?.target && (
+                        item.action.type === "url" ? (
+                          <a className="btn btn-secondary btn-sm" href={item.action.target} target="_blank" rel="noreferrer">
+                            {item.action.label || "打开链接"}
+                          </a>
+                        ) : (
+                          <button className="btn btn-secondary btn-sm" disabled title={`暂未接入动作类型：${item.action.type}`}>
+                            {item.action.label || "执行动作"}
+                          </button>
+                        )
+                      )}
+                      {unread && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          onClick={async () => {
+                            await api.announcements.markRead(item.id);
+                            queryClient.invalidateQueries({ queryKey: ["announcement-state", i18n.language] });
+                          }}
+                        >
+                          标为已读
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {announcementsLoading && (
+          <div className="card announcement-panel loading">
+            <div className="announcement-panel-meta">正在加载公告...</div>
+          </div>
+        )}
+
         {/* 指标卡片 */}
         <div className="stats-grid">
           {STATS_ITEMS.map((s) => (
@@ -102,7 +195,7 @@ export default function DashboardPage() {
                         itemStyle={{ color: 'var(--color-primary)' }}
                     />
                     <Bar dataKey="total_cost_usd" name="开销 (USD)" fill="var(--color-primary)" barSize={16} radius={[0, 4, 4, 0]}>
-                      {metrics.model_costs.map((entry: any, index: number) => (
+                      {metrics.model_costs.map((_entry: any, index: number) => (
                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                       ))}
                     </Bar>
@@ -129,7 +222,7 @@ export default function DashboardPage() {
                       stroke="transparent"
                       cornerRadius={4}
                     >
-                      {metrics.platform_costs.map((entry: any, index: number) => (
+                      {metrics.platform_costs.map((_entry: any, index: number) => (
                         <Cell key={`cell-${index}`} fill={CHART_COLORS[(index + 3) % CHART_COLORS.length]} />
                       ))}
                     </Pie>

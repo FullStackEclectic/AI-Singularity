@@ -103,6 +103,7 @@ export default function ToolConfigModal({
   const { providers, fetch } = useProviderStore();
   const [localProviders, setLocalProviders] = useState<ProviderConfig[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     setLocalProviders([...providers].sort((a, b) => (a.sort_order || 0) - (b.sort_order || 0)));
@@ -168,7 +169,7 @@ export default function ToolConfigModal({
       await fetch();
       onClose();
     } catch (e) {
-      alert("保存失败：" + String(e));
+      setMessage("保存失败：" + String(e));
     } finally {
       setIsSaving(false);
     }
@@ -191,6 +192,11 @@ export default function ToolConfigModal({
         </div>
 
         <div className="modal-body">
+          {message && (
+            <div className="alert alert-info" style={{ marginBottom: 12 }}>
+              {message}
+            </div>
+          )}
           <div className="form-section-title">灾备队列与节点池 (支持拖拽排序)</div>
           <p className="form-hint" style={{ marginTop: -8, marginBottom: 12 }}>
             勾选你想绑定给该工具的节点。排在最前（P1）的节点将作为代理首发源。

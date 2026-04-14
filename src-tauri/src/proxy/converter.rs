@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 /// 通用消息角色
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[allow(dead_code)]
 pub enum Role {
     System,
     User,
@@ -34,17 +35,23 @@ pub struct OpenAIMessage {
 /// OpenAI → Anthropic 格式转换
 pub fn openai_to_anthropic(req: &OpenAIRequest) -> Value {
     // 提取 system prompt
-    let system_prompt: Option<String> = req.messages.iter()
+    let system_prompt: Option<String> = req
+        .messages
+        .iter()
         .find(|m| m.role == "system")
         .map(|m| m.content.clone());
 
     // 过滤掉 system messages，只保留 user/assistant
-    let messages: Vec<Value> = req.messages.iter()
+    let messages: Vec<Value> = req
+        .messages
+        .iter()
         .filter(|m| m.role != "system")
-        .map(|m| json!({
-            "role": m.role,
-            "content": m.content,
-        }))
+        .map(|m| {
+            json!({
+                "role": m.role,
+                "content": m.content,
+            })
+        })
         .collect();
 
     let mut body = json!({
@@ -74,8 +81,12 @@ pub fn anthropic_to_openai_response(anthropic_resp: &Value) -> Value {
         .and_then(|c| c["text"].as_str())
         .unwrap_or("");
 
-    let input_tokens = anthropic_resp["usage"]["input_tokens"].as_u64().unwrap_or(0);
-    let output_tokens = anthropic_resp["usage"]["output_tokens"].as_u64().unwrap_or(0);
+    let input_tokens = anthropic_resp["usage"]["input_tokens"]
+        .as_u64()
+        .unwrap_or(0);
+    let output_tokens = anthropic_resp["usage"]["output_tokens"]
+        .as_u64()
+        .unwrap_or(0);
 
     json!({
         "id": anthropic_resp["id"],
@@ -100,14 +111,22 @@ pub fn anthropic_to_openai_response(anthropic_resp: &Value) -> Value {
 /// OpenAI → Gemini 格式转换（/v1beta/models/{model}:generateContent）
 pub fn openai_to_gemini(req: &OpenAIRequest) -> (String, Value) {
     // 提取 system instruction
-    let system_instruction = req.messages.iter()
+    let system_instruction = req
+        .messages
+        .iter()
         .find(|m| m.role == "system")
         .map(|m| json!({ "parts": [{ "text": m.content }] }));
 
-    let contents: Vec<Value> = req.messages.iter()
+    let contents: Vec<Value> = req
+        .messages
+        .iter()
         .filter(|m| m.role != "system")
         .map(|m| {
-            let role = if m.role == "assistant" { "model" } else { "user" };
+            let role = if m.role == "assistant" {
+                "model"
+            } else {
+                "user"
+            };
             json!({
                 "role": role,
                 "parts": [{ "text": m.content }],
@@ -144,8 +163,12 @@ pub fn gemini_to_openai_response(gemini_resp: &Value, model: &str) -> Value {
         .and_then(|p| p["text"].as_str())
         .unwrap_or("");
 
-    let prompt_tokens = gemini_resp["usageMetadata"]["promptTokenCount"].as_u64().unwrap_or(0);
-    let output_tokens = gemini_resp["usageMetadata"]["candidatesTokenCount"].as_u64().unwrap_or(0);
+    let prompt_tokens = gemini_resp["usageMetadata"]["promptTokenCount"]
+        .as_u64()
+        .unwrap_or(0);
+    let output_tokens = gemini_resp["usageMetadata"]["candidatesTokenCount"]
+        .as_u64()
+        .unwrap_or(0);
 
     json!({
         "id": format!("gemini-{}", chrono::Utc::now().timestamp()),

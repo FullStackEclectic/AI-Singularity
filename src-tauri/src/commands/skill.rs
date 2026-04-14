@@ -1,8 +1,27 @@
-use crate::services::skill::{SkillService, SkillInfo};
+use crate::services::skill::{SkillInfo, SkillService};
+
+#[derive(serde::Serialize)]
+pub struct SkillStorageInfo {
+    pub primary_path: String,
+    pub legacy_path: String,
+    pub legacy_exists: bool,
+}
 
 #[tauri::command]
 pub async fn list_skills() -> Result<Vec<SkillInfo>, String> {
     SkillService::list_skills().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn get_skill_storage_info() -> Result<SkillStorageInfo, String> {
+    let primary = SkillService::get_primary_skills_dir();
+    let legacy = SkillService::get_legacy_commands_dir();
+
+    Ok(SkillStorageInfo {
+        primary_path: primary.to_string_lossy().to_string(),
+        legacy_path: legacy.to_string_lossy().to_string(),
+        legacy_exists: legacy.exists(),
+    })
 }
 
 #[tauri::command]

@@ -1,9 +1,11 @@
+#![allow(dead_code)]
+
+use anyhow::Result;
 use async_trait::async_trait;
 use serde::de::DeserializeOwned;
-use anyhow::Result;
 
-pub mod openai;
 pub mod anthropic;
+pub mod openai;
 
 /// 映射后的增量响应块
 #[derive(Debug, Clone)]
@@ -25,7 +27,7 @@ pub struct StreamMetadata {
 pub trait ProtocolMapper: Send + Sync + 'static {
     /// 请求类型
     type Request: DeserializeOwned + Send + Sync + 'static;
-    
+
     /// 获取协议标识符
     fn get_protocol() -> String;
 

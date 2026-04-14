@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Shield, Lock, FileText, Activity, RefreshCw, Trash2, CheckCircle2, XCircle, Plus, AlertCircle } from "lucide-react";
+import { Shield, Lock, FileText, Activity, RefreshCw, Trash2, Plus } from "lucide-react";
 import { api } from "../../lib/api";
 
 type TabType = "logs" | "rules";
@@ -16,6 +16,9 @@ export default function SecurityPage() {
   const [newRuleIp, setNewRuleIp] = useState("");
   const [newRuleType, setNewRuleType] = useState<"blacklist" | "whitelist">("blacklist");
   const [newRuleNotes, setNewRuleNotes] = useState("");
+  const [message, setMessage] = useState("");
+  const [confirmClearLogs, setConfirmClearLogs] = useState(false);
+  const [confirmDeleteRuleId, setConfirmDeleteRuleId] = useState<string | null>(null);
 
   const fetchData = async () => {
     setLoading(true);
@@ -44,8 +47,9 @@ export default function SecurityPage() {
   }, [activeTab]);
 
   const handleClearLogs = async () => {
-    if (!confirm("Are you sure you want to clear all proxy access logs?")) return;
     await api.security.clearAccessLogs();
+    setMessage("访问日志已清空");
+    setConfirmClearLogs(false);
     fetchData();
   };
 
@@ -56,20 +60,23 @@ export default function SecurityPage() {
       setNewRuleIp("");
       setNewRuleNotes("");
       setShowAddRule(false);
+      setMessage("规则已添加");
       fetchData();
     } catch (e: any) {
-      alert("Failed to add rule: " + e.toString());
+      setMessage("Failed to add rule: " + e.toString());
     }
   };
 
   const handleDeleteRule = async (id: string) => {
-    if (!confirm("Remove this rule?")) return;
     await api.security.deleteRule(id);
+    setMessage("规则已删除");
+    setConfirmDeleteRuleId(null);
     fetchData();
   };
 
   const handleToggleRule = async (id: string, current: boolean) => {
     await api.security.toggleRule(id, !current);
+    setMessage("规则状态已更新");
     fetchData();
   };
 
@@ -98,6 +105,12 @@ export default function SecurityPage() {
         </div>
       </header>
 
+      {message && (
+        <div className="alert alert-info" style={{ marginBottom: 16 }}>
+          {message}
+        </div>
+      )}
+
       {/* TABS */}
       <div style={{ display: "flex", gap: 16, borderBottom: "1px solid var(--color-border)", marginBottom: 24, paddingBottom: 12 }}>
         <button 
@@ -123,7 +136,7 @@ export default function SecurityPage() {
                <Activity size={18} className="text-primary" style={{ marginRight: 8 }}/>
                实时拦截流水 (Realtime Intercept Logs)
             </div>
-            <button className="btn btn-secondary btn-sm" onClick={handleClearLogs}><Trash2 size={14} /> 清空记录</button>
+            <button className="btn btn-secondary btn-sm" onClick={() => setConfirmClearLogs(true)}><Trash2 size={14} /> 清空记录</button>
           </div>
 
           <div style={{ background: "var(--color-bg-primary)", borderRadius: 8, padding: 12, border: "1px solid var(--color-border)", minHeight: 300, maxHeight: 600, overflowY: "auto" }}>
@@ -232,7 +245,7 @@ export default function SecurityPage() {
                       <input type="checkbox" id={`tg_${r.id}`} checked={r.isActive} onChange={() => handleToggleRule(r.id, r.isActive)} />
                       <label htmlFor={`tg_${r.id}`}></label>
                    </div>
-                   <button className="btn btn-secondary btn-sm" onClick={() => handleDeleteRule(r.id)} style={{ padding: 6, color: "var(--color-error)" }}>
+                   <button className="btn btn-secondary btn-sm" onClick={() => setConfirmDeleteRuleId(r.id)} style={{ padding: 6, color: "var(--color-error)" }}>
                       <Trash2 size={16} />
                    </button>
                 </div>
@@ -240,6 +253,42 @@ export default function SecurityPage() {
             ))}
           </div>
 
+        </div>
+      )}
+
+      {confirmClearLogs && (
+        <div className="modal-overlay" onClick={() => setConfirmClearLogs(false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>清空访问日志</h2>
+              <button className="btn btn-icon" onClick={() => setConfirmClearLogs(false)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>确定要清空所有代理访问日志吗？</p>
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setConfirmClearLogs(false)}>取消</button>
+                <button className="btn btn-danger" onClick={handleClearLogs}>确认清空</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {confirmDeleteRuleId && (
+        <div className="modal-overlay" onClick={() => setConfirmDeleteRuleId(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>删除规则</h2>
+              <button className="btn btn-icon" onClick={() => setConfirmDeleteRuleId(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p>确认删除这条防火墙规则吗？</p>
+              <div className="modal-footer">
+                <button className="btn btn-ghost" onClick={() => setConfirmDeleteRuleId(null)}>取消</button>
+                <button className="btn btn-danger" onClick={() => handleDeleteRule(confirmDeleteRuleId)}>删除</button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

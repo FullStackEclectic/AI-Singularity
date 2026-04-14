@@ -1,5 +1,3 @@
-import React from 'react';
-
 export interface PlatformConfigProps {
   value: any;
   onChange: (val: any) => void;

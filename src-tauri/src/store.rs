@@ -1,9 +1,4 @@
-use crate::{models::ApiKey, AppError, AppResult};
-use aes_gcm::{
-    aead::{Aead, AeadCore, KeyInit, OsRng},
-    Aes256Gcm, Nonce,
-};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use crate::{AppError, AppResult};
 use keyring::Entry;
 
 const SERVICE_NAME: &str = "ai-singularity";

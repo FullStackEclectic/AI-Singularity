@@ -1,14 +1,11 @@
-use std::process::Command;
 use crate::error::AppResult;
+use std::process::Command;
 
 pub struct SandboxManager;
 
 impl SandboxManager {
     /// 拉起一个完全隔离在本地代理环境中的终极子网络沙盒靶场，目标工具启动时只会认 AI Singularity。
-    pub fn launch_tool_sandboxed(
-        target_tool: &str,
-        proxy_port: u16,
-    ) -> AppResult<()> {
+    pub fn launch_tool_sandboxed(target_tool: &str, proxy_port: u16) -> AppResult<()> {
         let proxy_url = format!("http://127.0.0.1:{}", proxy_port);
 
         // 构建 Windows 原生 CMD 启动令
@@ -34,7 +31,7 @@ impl SandboxManager {
         cmd.arg(&init_script);
 
         tracing::info!("🚀 正在呼叫近地轨道打击，开启原生态沙盒舱：{}", target_tool);
-        
+
         let status = cmd.spawn()?;
         tracing::debug!("沙盒宿主进程号启动 PID: {}", status.id());
 

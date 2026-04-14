@@ -3,32 +3,32 @@
 use crate::db::Database;
 use crate::models::Platform;
 use crate::proxy::converter::{
-    openai_to_anthropic, openai_to_gemini, anthropic_to_openai_response, gemini_to_openai_response,
+    anthropic_to_openai_response, gemini_to_openai_response, openai_to_anthropic, openai_to_gemini,
     OpenAIRequest,
 };
-use crate::proxy::security::{SecurityShield, SecurityAction};
 use crate::proxy::router::Router;
+use crate::proxy::security::{SecurityAction, SecurityShield};
 use axum::{
-    body::Body,
     extract::State,
-    http::{Request, Response, StatusCode},
-    response::{IntoResponse, sse::{Event, Sse}},
+    http::StatusCode,
+    response::{
+        sse::{Event, Sse},
+        IntoResponse,
+    },
     routing::post,
     Json, Router as AxumRouter,
 };
-use futures::stream::{StreamExt, Stream};
-use reqwest_eventsource::{EventSource, Event as ReqwestEvent};
+use futures::stream::StreamExt;
+use reqwest_eventsource::{Event as ReqwestEvent, EventSource};
 use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use crate::services::account_pool::AccountPoolManager;
 
 #[derive(Clone)]
 pub struct ProxyState {
     pub router: Arc<Router>,
     pub db: Arc<Database>,
     pub http_client: reqwest::Client,
-    pub account_pool: Arc<AccountPoolManager>,
 }
 
 pub struct ProxyServer {
@@ -47,7 +47,6 @@ impl ProxyServer {
             port,
             state: ProxyState {
                 router: Arc::new(Router::new(db.clone())),
-                account_pool: Arc::new(AccountPoolManager::new(db.clone())),
                 db,
                 http_client: reqwest::Client::builder()
                     .timeout(std::time::Duration::from_secs(120))
@@ -67,7 +66,11 @@ impl ProxyServer {
         let listener = TcpListener::bind(&addr).await?;
         tracing::info!("🚀 AI Singularity 代理已启动：http://{}", addr);
 
-        axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await?;
+        axum::serve(
+            listener,
+            app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+        )
+        .await?;
         Ok(())
     }
 }
@@ -103,7 +106,11 @@ fn get_fallback_model(model: &str) -> Option<&'static str> {
         Some("gemini-1.5-flash")
     } else if lower.contains("claude") {
         Some("gemini-1.5-pro")
-    } else if lower.contains("gpt-4") || lower.contains("gpt-4o") || lower.contains("o1") || lower.contains("o3") {
+    } else if lower.contains("gpt-4")
+        || lower.contains("gpt-4o")
+        || lower.contains("o1")
+        || lower.contains("o3")
+    {
         Some("gemini-1.5-pro")
     } else if lower.contains("gpt-3.5") || lower.contains("gpt-4o-mini") {
         Some("gemini-1.5-flash")
@@ -133,33 +140,45 @@ async fn handle_chat_completions(
     // 1. SaaS 云端管控：验证 UserToken 及其宵禁/IP 等策略
     let auth_header = headers.get("authorization").and_then(|h| h.to_str().ok());
     let mut current_user_token = None;
-    
+
     // 如果存在 sk-ag-xxx 开始的专属分发 Token，则执行核查
     if let Some(auth) = auth_header {
         if auth.starts_with("Bearer sk-ag-") {
             let token_str = &auth[7..];
             let token_service = crate::services::user_token::UserTokenService::new(&state.db);
-            
+
             match token_service.get_token_by_str(token_str) {
                 Ok(Some(ut)) => {
                     if !ut.enabled {
-                        return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": "Token 已被主脑冻结"}}))).into_response();
+                        return (
+                            StatusCode::FORBIDDEN,
+                            Json(json!({"error": {"message": "Token 已被主脑冻结"}})),
+                        )
+                            .into_response();
                     }
                     let now = chrono::Utc::now().timestamp();
                     if ut.expires_type == "absolute" {
                         if let Some(exp) = ut.expires_at {
                             if now > exp {
-                                return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": "Token 绝对有效期已过"}}))).into_response();
+                                return (
+                                    StatusCode::FORBIDDEN,
+                                    Json(json!({"error": {"message": "Token 绝对有效期已过"}})),
+                                )
+                                    .into_response();
                             }
                         }
                     } else if ut.expires_type == "relative" {
                         if let Some(exp) = ut.expires_at {
                             if now > ut.created_at + exp {
-                                return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": "Token 相对配额期已过"}}))).into_response();
+                                return (
+                                    StatusCode::FORBIDDEN,
+                                    Json(json!({"error": {"message": "Token 相对配额期已过"}})),
+                                )
+                                    .into_response();
                             }
                         }
                     }
-                    
+
                     // 宵禁检查
                     if let (Some(cs), Some(ce)) = (&ut.curfew_start, &ut.curfew_end) {
                         let cur_time = chrono::Utc::now().format("%H:%M").to_string();
@@ -174,24 +193,42 @@ async fn handle_chat_completions(
                             }
                         }
                     }
-                    
+
                     // IP 追踪与风控检查
                     let incoming_ip = client_ip.0.ip().to_string();
-                    if let SecurityAction::Deny(reason) = SecurityShield::verify_max_ips(&ut.id, &incoming_ip, ut.max_ips) {
+                    if let SecurityAction::Deny(reason) =
+                        SecurityShield::verify_max_ips(&ut.id, &incoming_ip, ut.max_ips)
+                    {
                         let _db = state.db.clone();
                         let _ip = incoming_ip.clone();
                         let _ut_id = ut.id.clone();
                         let _reason = reason.clone();
                         tokio::spawn(async move {
                             let svc = crate::services::security_db::SecurityDbService::new(&_db);
-                            let _ = svc.log_access(&_ip, "/v1/chat/completions", Some(&_ut_id), "deny", Some(&_reason));
+                            let _ = svc.log_access(
+                                &_ip,
+                                "/v1/chat/completions",
+                                Some(&_ut_id),
+                                "deny",
+                                Some(&_reason),
+                            );
                         });
-                        return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": {"message": reason}}))).into_response();
+                        return (
+                            StatusCode::TOO_MANY_REQUESTS,
+                            Json(json!({"error": {"message": reason}})),
+                        )
+                            .into_response();
                     }
-                    
+
                     current_user_token = Some(ut.id);
                 }
-                _ => return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "无效的 AI Singularity 下发 Token"}}))).into_response(),
+                _ => {
+                    return (
+                        StatusCode::UNAUTHORIZED,
+                        Json(json!({"error": {"message": "无效的 AI Singularity 下发 Token"}})),
+                    )
+                        .into_response()
+                }
             }
         }
     }
@@ -203,9 +240,19 @@ async fn handle_chat_completions(
         let _ip = incoming_ip.clone();
         tokio::spawn(async move {
             let svc = crate::services::security_db::SecurityDbService::new(&_db);
-            let _ = svc.log_access(&_ip, "/v1/chat/completions", None, "deny", Some("外部无鉴权访问"));
+            let _ = svc.log_access(
+                &_ip,
+                "/v1/chat/completions",
+                None,
+                "deny",
+                Some("外部无鉴权访问"),
+            );
         });
-        return (StatusCode::UNAUTHORIZED, Json(json!({"error": {"message": "外部 IP 必须携带合法的网关分发 Token (sk-ag-...)"}}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(json!({"error": {"message": "外部 IP 必须携带合法的网关分发 Token (sk-ag-...)"}})),
+        )
+            .into_response();
     }
 
     // IP 黑白名单过滤盾 (Phase 5)
@@ -216,24 +263,46 @@ async fn handle_chat_completions(
         let _reason = reason.clone();
         tokio::spawn(async move {
             let svc = crate::services::security_db::SecurityDbService::new(&_db);
-            let _ = svc.log_access(&_ip, "/v1/chat/completions", _ut.as_deref(), "blacklisted", Some(&_reason));
+            let _ = svc.log_access(
+                &_ip,
+                "/v1/chat/completions",
+                _ut.as_deref(),
+                "blacklisted",
+                Some(&_reason),
+            );
         });
-        return (StatusCode::FORBIDDEN, Json(json!({"error": {"message": reason}}))).into_response();
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error": {"message": reason}})),
+        )
+            .into_response();
     }
 
     // 全局请求频段限流盾
-    if let SecurityAction::Deny(reason) = SecurityShield::check_rate_limit(&incoming_ip, current_user_token.as_deref()) {
+    if let SecurityAction::Deny(reason) =
+        SecurityShield::check_rate_limit(&incoming_ip, current_user_token.as_deref())
+    {
         let _db = state.db.clone();
         let _ip = incoming_ip.clone();
         let _ut = current_user_token.clone();
         let _reason = reason.clone();
         tokio::spawn(async move {
             let svc = crate::services::security_db::SecurityDbService::new(&_db);
-            let _ = svc.log_access(&_ip, "/v1/chat/completions", _ut.as_deref(), "rate_limit", Some(&_reason));
+            let _ = svc.log_access(
+                &_ip,
+                "/v1/chat/completions",
+                _ut.as_deref(),
+                "rate_limit",
+                Some(&_reason),
+            );
         });
-        return (StatusCode::TOO_MANY_REQUESTS, Json(json!({"error": {"message": reason}}))).into_response();
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({"error": {"message": reason}})),
+        )
+            .into_response();
     }
-    
+
     // 如果全部绿灯放行通过，且是外部 IP 我们也可以简单记个日志作为流水
     if !client_ip.0.ip().is_loopback() {
         let _db = state.db.clone();
@@ -245,12 +314,13 @@ async fn handle_chat_completions(
         });
     }
 
-    let client_app = headers.get("x-client-app")
+    let client_app = headers
+        .get("x-client-app")
         .and_then(|v| v.to_str().ok())
         .or_else(|| headers.get("user-agent").and_then(|v| v.to_str().ok()))
         .unwrap_or("unknown")
         .to_string();
-    
+
     let target_scope = if let Some(auth) = auth_header {
         if auth.starts_with("Bearer sk-ag-") {
             let token_str = &auth[7..];
@@ -295,14 +365,20 @@ async fn handle_chat_completions(
             }
         }
         // 降级 / 兜底机制
-        return (StatusCode::OK, Json(construct_pollinations_response(&img_prompt))).into_response();
+        return (
+            StatusCode::OK,
+            Json(construct_pollinations_response(&img_prompt)),
+        )
+            .into_response();
     }
 
     let is_stream = body.stream.unwrap_or(false);
     let mut current_model = body.model.clone();
-    
+
     // --- 动态模型映射 (Model Mappings) 拦截 ---
-    if let Ok(mappings) = crate::services::model_mapping::ModelMappingService::new(&state.db).get_all() {
+    if let Ok(mappings) =
+        crate::services::model_mapping::ModelMappingService::new(&state.db).get_all()
+    {
         for m in mappings {
             if m.is_active && current_model.eq_ignore_ascii_case(&m.source_model) {
                 tracing::info!("🔄 模型重写触发: {} => {}", current_model, m.target_model);
@@ -316,12 +392,18 @@ async fn handle_chat_completions(
     if let Ok(cfg) = crate::commands::proxy::ENGINE_CONFIG.read() {
         if cfg.advanced_thinking.enabled {
             // 粗略以 3 字符 = 1 token 估算当前负载
-            let estimated_tokens: usize = body.messages.iter().map(|m| m.content.len()).sum::<usize>() / 3;
+            let estimated_tokens: usize =
+                body.messages.iter().map(|m| m.content.len()).sum::<usize>() / 3;
             let budget = cfg.advanced_thinking.budget_limit as usize;
             let threshold = (budget as f64 * cfg.advanced_thinking.compression_threshold) as usize;
 
             if estimated_tokens > threshold && body.messages.len() > 4 {
-                tracing::info!("🧠 高级思维压缩触发: 当前预估 {} tokens，已超过阈值 {} (预算: {})", estimated_tokens, threshold, budget);
+                tracing::info!(
+                    "🧠 高级思维压缩触发: 当前预估 {} tokens，已超过阈值 {} (预算: {})",
+                    estimated_tokens,
+                    threshold,
+                    budget
+                );
                 // 保留 System Prompts (第一个) 和最近的 3 条消息，丢弃中间的上下文
                 let mut compressed_msgs = vec![];
                 if let Some(sys) = body.messages.first() {
@@ -331,7 +413,9 @@ async fn handle_chat_completions(
                 // 中间塞入一条伪造的记忆压缩系统提示
                 compressed_msgs.push(crate::proxy::converter::OpenAIMessage {
                     role: "system".to_string(),
-                    content: "[...Previous context compressed by AI Singularity Cognitive Engine...]".to_string(),
+                    content:
+                        "[...Previous context compressed by AI Singularity Cognitive Engine...]"
+                            .to_string(),
                 });
                 for msg in body.messages.into_iter().skip(len.saturating_sub(3)) {
                     compressed_msgs.push(msg);
@@ -341,13 +425,14 @@ async fn handle_chat_completions(
         }
     }
 
-    let mut attempts = 0;    loop {
+    let mut attempts = 0;
+    loop {
         attempts += 1;
         let platform_str = get_platform_for_model(&current_model);
 
         // 使用重构后的 pick_best_key，传入平台限制以及分发规则作用域 (Scope)
         let target_res = state.router.pick_best_key(platform_str, &target_scope);
-        
+
         let target = if let Some(t) = target_res {
             ForwardTarget {
                 secret: t.secret,
@@ -355,12 +440,16 @@ async fn handle_chat_completions(
                 platform: t.platform,
                 key_id: t.key_id,
                 // 由于目前的重构将 device_profile 提取留在了后续的独立服务逻辑，暂时填充为 none，后续深度劫持池里再补充
-                device_profile: None, 
+                device_profile: None,
             }
         } else {
             if attempts == 1 {
                 if let Some(fallback) = get_fallback_model(&current_model) {
-                    tracing::warn!("⚠️ 模型 {} 无可用 Provider，正在智能回退至备选模型 {}", current_model, fallback);
+                    tracing::warn!(
+                        "⚠️ 模型 {} 无可用 Provider，正在智能回退至备选模型 {}",
+                        current_model,
+                        fallback
+                    );
                     current_model = fallback.to_string();
                     body.model = current_model.clone();
                     continue;
@@ -386,38 +475,102 @@ async fn handle_chat_completions(
         let response_or_stream = if is_stream {
             match &target.platform {
                 Platform::Auth0IDE | Platform::Anthropic => {
-                    handle_anthropic_stream(&state.http_client, &target.secret, &body, target.device_profile.as_ref(), audit_ctx).await
+                    handle_anthropic_stream(
+                        &state.http_client,
+                        &target.secret,
+                        &body,
+                        target.device_profile.as_ref(),
+                        audit_ctx,
+                    )
+                    .await
                 }
                 Platform::Gemini => {
-                    handle_openai_compatible_stream(&state.http_client, &target.secret, platform_base_url(&target.platform), &body, target.device_profile.as_ref(), audit_ctx).await
+                    handle_openai_compatible_stream(
+                        &state.http_client,
+                        &target.secret,
+                        platform_base_url(&target.platform),
+                        &body,
+                        target.device_profile.as_ref(),
+                        audit_ctx,
+                    )
+                    .await
                 }
                 _ => {
-                    let base = target.base_url.as_deref().unwrap_or(platform_base_url(&target.platform));
-                    handle_openai_compatible_stream(&state.http_client, &target.secret, base, &body, target.device_profile.as_ref(), audit_ctx).await
+                    let base = target
+                        .base_url
+                        .as_deref()
+                        .unwrap_or(platform_base_url(&target.platform));
+                    handle_openai_compatible_stream(
+                        &state.http_client,
+                        &target.secret,
+                        base,
+                        &body,
+                        target.device_profile.as_ref(),
+                        audit_ctx,
+                    )
+                    .await
                 }
             }
         } else {
             let result = match &target.platform {
-                Platform::Auth0IDE => forward_to_ide_bypass(&state.http_client, &target.secret, &body, target.device_profile.as_ref()).await,
-                Platform::Anthropic => forward_to_anthropic(&state.http_client, &target.secret, &body, target.device_profile.as_ref()).await,
-                Platform::Gemini => forward_to_gemini(&state.http_client, &target.secret, &body).await,
+                Platform::Auth0IDE => {
+                    forward_to_ide_bypass(
+                        &state.http_client,
+                        &target.secret,
+                        &body,
+                        target.device_profile.as_ref(),
+                    )
+                    .await
+                }
+                Platform::Anthropic => {
+                    forward_to_anthropic(
+                        &state.http_client,
+                        &target.secret,
+                        &body,
+                        target.device_profile.as_ref(),
+                    )
+                    .await
+                }
+                Platform::Gemini => {
+                    forward_to_gemini(&state.http_client, &target.secret, &body).await
+                }
                 _ => {
-                    let base = target.base_url.as_deref()
+                    let base = target
+                        .base_url
+                        .as_deref()
                         .unwrap_or(platform_base_url(&target.platform));
-                    forward_to_openai_compatible(&state.http_client, &target.secret, base, &body, target.device_profile.as_ref()).await
+                    forward_to_openai_compatible(
+                        &state.http_client,
+                        &target.secret,
+                        base,
+                        &body,
+                        target.device_profile.as_ref(),
+                    )
+                    .await
                 }
             };
             result.map(|json_val| {
                 if let Some(usage) = json_val.get("usage") {
-                    let prompt_tokens = usage.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let completion_tokens = usage.get("completion_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
-                    let total_tokens = usage.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let prompt_tokens = usage
+                        .get("prompt_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let completion_tokens = usage
+                        .get("completion_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
+                    let total_tokens = usage
+                        .get("total_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0);
                     audit_ctx.write_usage(prompt_tokens, completion_tokens, total_tokens);
                 }
                 axum::response::Response::builder()
                     .status(StatusCode::OK)
                     .header("Content-Type", "application/json")
-                    .body(axum::body::Body::from(serde_json::to_string(&json_val).unwrap()))
+                    .body(axum::body::Body::from(
+                        serde_json::to_string(&json_val).unwrap(),
+                    ))
                     .unwrap()
             })
         };
@@ -429,12 +582,12 @@ async fn handle_chat_completions(
                 }
                 // 注意：由于转为流式处理等变更，Token 日志审计逻辑这里暂且略过，流式日志可在转接层做异步上报。
                 // 若要保留，需要在这里单独判断并劫持 Stream/Body，目前先保持网关高优通行。
-                
+
                 return axum_resp.into_response();
             }
             Err(e) => {
                 let err_str = e.to_string();
-                
+
                 // 标记 Key 失败状态以便路由更新
                 if target.platform == Platform::Auth0IDE || target.device_profile.is_some() {
                     // 对于 IDE account，目前可以认为是走的 ide account 逻辑。严格来说我们在 router 能区分，不过目前 server 只根据 device proxy。
@@ -443,15 +596,23 @@ async fn handle_chat_completions(
                     // 最好如果 device_profile 存在或者 platform 是 IDE 的传入 true。
                     // 这里为了简化，原代码其实也是拆分的，现在我们统一传：
                     if err_str.contains("401") || err_str.contains("403") {
-                        state.router.mark_key_status(&target.key_id, true, "forbidden");
+                        state
+                            .router
+                            .mark_key_status(&target.key_id, true, "forbidden");
                     } else if err_str.contains("429") {
-                        state.router.mark_key_status(&target.key_id, true, "rate_limited");
+                        state
+                            .router
+                            .mark_key_status(&target.key_id, true, "rate_limited");
                     }
                 } else {
                     if err_str.contains("401") || err_str.contains("403") {
-                        state.router.mark_key_status(&target.key_id, false, "invalid");
+                        state
+                            .router
+                            .mark_key_status(&target.key_id, false, "invalid");
                     } else if err_str.contains("429") {
-                        state.router.mark_key_status(&target.key_id, false, "rate_limit");
+                        state
+                            .router
+                            .mark_key_status(&target.key_id, false, "rate_limit");
                     }
                 }
 
@@ -460,7 +621,8 @@ async fn handle_chat_completions(
                     || err_str.contains("timeout");
 
                 if should_fallback {
-                    let max_retries = if let Ok(cfg) = crate::commands::proxy::ENGINE_CONFIG.read() {
+                    let max_retries = if let Ok(cfg) = crate::commands::proxy::ENGINE_CONFIG.read()
+                    {
                         if cfg.circuit_breaker.enabled {
                             cfg.circuit_breaker.backoff_steps.len()
                         } else {
@@ -475,7 +637,11 @@ async fn handle_chat_completions(
                         continue;
                     }
                     if let Some(fallback) = get_fallback_model(&current_model) {
-                        tracing::warn!("⚠️ 连续熔断！模型 {} 不可用，降灾备份至 {}", current_model, fallback);
+                        tracing::warn!(
+                            "⚠️ 连续熔断！模型 {} 不可用，降灾备份至 {}",
+                            current_model,
+                            fallback
+                        );
                         current_model = fallback.to_string();
                         body.model = current_model.clone();
                         attempts = 0; // 重置尝试次数，下一次循环用备选模型起手
@@ -504,7 +670,7 @@ async fn forward_to_openai_compatible(
     device_profile: Option<&crate::models::DeviceProfile>,
 ) -> anyhow::Result<Value> {
     let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
-    
+
     let mut request = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", secret))
@@ -512,7 +678,10 @@ async fn forward_to_openai_compatible(
 
     // 🏆 **核武护城河：机器指纹拦截欺骗**
     if let Some(dp) = device_profile {
-        tracing::info!("🛡️ 启用指纹降维伪装 [IDE]: 正在向游离服务点重写物理设备信息 - MachineID: {}", dp.machine_id);
+        tracing::info!(
+            "🛡️ 启用指纹降维伪装 [IDE]: 正在向游离服务点重写物理设备信息 - MachineID: {}",
+            dp.machine_id
+        );
         request = request
             .header("x-machine-id", &dp.machine_id)
             .header("x-mac-machine-id", &dp.mac_machine_id)
@@ -548,7 +717,10 @@ async fn forward_to_anthropic(
         .header("Content-Type", "application/json");
 
     if let Some(dp) = device_profile {
-        tracing::info!("🛡️ 启用指纹降维伪装 [Anthropic]: 正在向服务器重写物理指纹 - MachineID: {}", dp.machine_id);
+        tracing::info!(
+            "🛡️ 启用指纹降维伪装 [Anthropic]: 正在向服务器重写物理指纹 - MachineID: {}",
+            dp.machine_id
+        );
         request = request
             .header("x-machine-id", &dp.machine_id)
             .header("x-mac-machine-id", &dp.mac_machine_id);
@@ -578,7 +750,11 @@ struct AuditContext {
 
 impl AuditContext {
     fn write_usage(&self, prompt_tokens: u64, completion_tokens: u64, total_tokens: u64) {
-        let cost = crate::services::pricing::PricingEngine::calculate_cost(&self.model, prompt_tokens, completion_tokens);
+        let cost = crate::services::pricing::PricingEngine::calculate_cost(
+            &self.model,
+            prompt_tokens,
+            completion_tokens,
+        );
         let id = uuid::Uuid::new_v4().to_string();
         let _ = self.db.execute(
             "INSERT INTO token_usage_records (id, key_id, platform, model_name, client_app, prompt_tokens, completion_tokens, total_tokens, total_cost_usd, created_at)
@@ -612,8 +788,8 @@ async fn handle_anthropic_stream(
     device_profile: Option<&crate::models::DeviceProfile>,
     audit: AuditContext,
 ) -> anyhow::Result<axum::response::Response> {
-    use crate::proxy::mappers::{ProtocolMapper, anthropic::AnthropicMapper};
-    
+    use crate::proxy::mappers::{anthropic::AnthropicMapper, ProtocolMapper};
+
     let anthropic_body = openai_to_anthropic(body);
     let mut request = client
         .post("https://api.anthropic.com/v1/messages")
@@ -638,7 +814,7 @@ async fn handle_anthropic_stream(
         // 累计 token 统计
         let mut prompt_tokens: u64 = 0;
         let mut completion_tokens: u64 = 0;
-        
+
         for chunk in AnthropicMapper::initial_chunks() {
             yield Ok::<_, std::convert::Infallible>(Event::default().data(chunk.data));
         }
@@ -686,7 +862,7 @@ async fn handle_anthropic_stream(
             }
         }
     };
-    
+
     Ok(Sse::new(stream).into_response())
 }
 
@@ -698,7 +874,7 @@ async fn handle_openai_compatible_stream(
     device_profile: Option<&crate::models::DeviceProfile>,
     audit: AuditContext,
 ) -> anyhow::Result<axum::response::Response> {
-    use crate::proxy::mappers::{ProtocolMapper, openai::OpenAiMapper};
+    use crate::proxy::mappers::{openai::OpenAiMapper, ProtocolMapper};
 
     let url = format!("{}/v1/chat/completions", base_url.trim_end_matches('/'));
     let mut request = client
@@ -725,7 +901,7 @@ async fn handle_openai_compatible_stream(
         let mut prompt_tokens: u64 = 0;
         let mut completion_tokens: u64 = 0;
         let mut total_tokens: u64 = 0;
-        
+
         for chunk in OpenAiMapper::initial_chunks() {
             yield Ok::<_, std::convert::Infallible>(Event::default().data(chunk.data));
         }
@@ -745,7 +921,7 @@ async fn handle_openai_compatible_stream(
                         yield Ok(Event::default().data("[DONE]"));
                         break;
                     }
-                    
+
                     if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&message.data) {
                         // 拦截末尾 usage 统计帧（部分 OpenAI 兼容端点在流中发送）
                         if let Some(usage) = json_val.get("usage") {
@@ -769,7 +945,7 @@ async fn handle_openai_compatible_stream(
             }
         }
     };
-    
+
     Ok(Sse::new(stream).into_response())
 }
 
@@ -832,13 +1008,13 @@ async fn handle_list_models(State(_state): State<ProxyState>) -> impl IntoRespon
 /// 平台默认 base URL
 fn platform_base_url(platform: &Platform) -> &'static str {
     match platform {
-        Platform::OpenAI   => "https://api.openai.com",
+        Platform::OpenAI => "https://api.openai.com",
         Platform::DeepSeek => "https://api.deepseek.com",
-        Platform::Aliyun   => "https://dashscope.aliyuncs.com/compatible-mode",
+        Platform::Aliyun => "https://dashscope.aliyuncs.com/compatible-mode",
         Platform::Moonshot => "https://api.moonshot.cn",
-        Platform::Zhipu    => "https://open.bigmodel.cn/api/paas",
+        Platform::Zhipu => "https://open.bigmodel.cn/api/paas",
         Platform::Bytedance => "https://ark.cn-beijing.volces.com/api",
-        _                  => "https://api.openai.com",
+        _ => "https://api.openai.com",
     }
 }
 
@@ -929,7 +1105,10 @@ async fn forward_to_gemini_imagen3(
 fn construct_pollinations_response(prompt: &str) -> Value {
     // using purely free text-to-image without API
     let encoded: String = url::form_urlencoded::byte_serialize(prompt.as_bytes()).collect();
-    let img_url = format!("https://image.pollinations.ai/prompt/{}?width=1024&height=1024&nologo=true", encoded);
+    let img_url = format!(
+        "https://image.pollinations.ai/prompt/{}?width=1024&height=1024&nologo=true",
+        encoded
+    );
     json!({
         "id": format!("pollinations-{}", chrono::Utc::now().timestamp()),
         "object": "chat.completion",

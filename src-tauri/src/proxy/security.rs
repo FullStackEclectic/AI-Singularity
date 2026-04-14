@@ -9,7 +9,7 @@ const MAX_REQUESTS_PER_WINDOW: usize = 120; // Default: 120 RPM per IP per token
 lazy_static! {
     // [IP_KEY] -> (Count, Expiration)
     static ref RATE_LIMITER: Mutex<HashMap<String, (usize, Instant)>> = Mutex::new(HashMap::new());
-    
+
     // UserToken_ID -> HashSet<IP>
     static ref TOKEN_IPS: Mutex<HashMap<String, HashSet<String>>> = Mutex::new(HashMap::new());
 
@@ -43,7 +43,7 @@ impl SecurityShield {
                 })
             },
         )?;
-        
+
         if let Ok(mut cache) = IP_RULES_CACHE.write() {
             *cache = rules;
         }
@@ -62,7 +62,7 @@ impl SecurityShield {
                     // For CIDR, simplify logic: just exact string match for now unless full library loaded.
                     // A real app would use a subnet crate like `ipnet`.
                     // But to keep dependencies small, let's just do exact matching or wildcard `*`.
-                    false 
+                    false
                 } else if r.ip_cidr.ends_with("*") {
                     let prefix = r.ip_cidr.trim_end_matches('*');
                     ip.starts_with(prefix)
@@ -72,7 +72,9 @@ impl SecurityShield {
 
                 if r.rule_type == "whitelist" {
                     has_whitelist = true;
-                    if is_match { matched_whitelist = true; }
+                    if is_match {
+                        matched_whitelist = true;
+                    }
                 }
 
                 if r.rule_type == "blacklist" && is_match {
@@ -100,7 +102,9 @@ impl SecurityShield {
         let now = Instant::now();
 
         // 垃圾回收，保持 HashMap 干净（此处简化为每次访问时顺手清理当前 key，实际高并发可用专门线程或更复杂的结构）
-        let (count, expires) = limiter.entry(key.clone()).or_insert((0, now + Duration::from_secs(RATE_LIMIT_WINDOW_SECS)));
+        let (count, expires) = limiter
+            .entry(key.clone())
+            .or_insert((0, now + Duration::from_secs(RATE_LIMIT_WINDOW_SECS)));
 
         if now > *expires {
             *count = 1;
@@ -108,7 +112,10 @@ impl SecurityShield {
             SecurityAction::Allow
         } else {
             if *count >= MAX_REQUESTS_PER_WINDOW {
-                SecurityAction::Deny(format!("Rate limit exceeded: Max {} requests per {} seconds", MAX_REQUESTS_PER_WINDOW, RATE_LIMIT_WINDOW_SECS))
+                SecurityAction::Deny(format!(
+                    "Rate limit exceeded: Max {} requests per {} seconds",
+                    MAX_REQUESTS_PER_WINDOW, RATE_LIMIT_WINDOW_SECS
+                ))
             } else {
                 *count += 1;
                 SecurityAction::Allow
@@ -124,7 +131,9 @@ impl SecurityShield {
         }
 
         let mut token_ip_map = TOKEN_IPS.lock().unwrap();
-        let ips = token_ip_map.entry(token_id.to_string()).or_insert_with(HashSet::new);
+        let ips = token_ip_map
+            .entry(token_id.to_string())
+            .or_insert_with(HashSet::new);
 
         // 如果 IP 已经在池子里，直接放行
         if ips.contains(incoming_ip) {
@@ -133,7 +142,10 @@ impl SecurityShield {
 
         // 如果 IP 不在池子里，且已经达到上限，直接拦截
         if ips.len() as i64 >= max_ips {
-            return SecurityAction::Deny(format!("Token security violation: Reached maximum concurrent bound IPs ({})", max_ips));
+            return SecurityAction::Deny(format!(
+                "Token security violation: Reached maximum concurrent bound IPs ({})",
+                max_ips
+            ));
         }
 
         // 没达到上限，加入池子

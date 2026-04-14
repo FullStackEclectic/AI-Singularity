@@ -1,18 +1,23 @@
-use std::path::Path;
-use std::io::Write;
+#![allow(dead_code)]
+
 use anyhow::Result;
+use std::io::Write;
+use std::path::Path;
 
 /// 原子写入：先写入临时文件，再 rename 替换原文件
 /// 防止写入过程中崩溃导致配置文件损坏
 pub fn atomic_write(target: &Path, content: &[u8]) -> Result<()> {
-    let parent = target.parent().ok_or_else(|| {
-        anyhow::anyhow!("目标文件没有父目录: {:?}", target)
-    })?;
+    let parent = target
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("目标文件没有父目录: {:?}", target))?;
 
     // 创建同目录的临时文件
     let tmp_path = parent.join(format!(
         ".tmp_{}_{}",
-        target.file_name().and_then(|n| n.to_str()).unwrap_or("file"),
+        target
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("file"),
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_millis())
@@ -42,7 +47,10 @@ pub fn atomic_write_json<T: serde::Serialize>(target: &Path, value: &T) -> Resul
 /// 备份轮换：保留最近 N 份备份
 pub fn rotate_backup(target: &Path, keep: usize) -> Result<()> {
     let parent = target.parent().unwrap_or(Path::new("."));
-    let filename = target.file_name().and_then(|n| n.to_str()).unwrap_or("file");
+    let filename = target
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("file");
     let backup_dir = parent.join("backups");
 
     std::fs::create_dir_all(&backup_dir)?;

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::db::Database;
 use crate::models::{AccountStatus, IdeAccount};
 use std::collections::HashMap;
@@ -61,9 +63,11 @@ impl AccountPoolManager {
 
     /// 触发 429 限流保护：标记该账号受限，稍后可复活
     pub fn report_account_rate_limited(&self, id: &str) {
-        let _ = self
-            .db
-            .update_ide_account_status(id, AccountStatus::RateLimited, Some("Rate limited (429)"));
+        let _ = self.db.update_ide_account_status(
+            id,
+            AccountStatus::RateLimited,
+            Some("Rate limited (429)"),
+        );
         tracing::warn!(
             "⚠️ [流量规避] 节点 [ID: {}] 遭到 429 限流，已标记受限，进入冷却周期。",
             id

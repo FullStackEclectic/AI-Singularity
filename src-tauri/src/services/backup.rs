@@ -1,14 +1,14 @@
-use chrono::Utc;
-use serde::{Deserialize, Serialize};
-use std::fs::{self, DirEntry};
-use std::path::PathBuf;
 use crate::db::Database;
 use crate::error::{AppError, AppResult};
-use crate::models::{McpServer, PromptConfig, ProviderConfig, Platform};
+use crate::models::{McpServer, Platform, PromptConfig, ProviderConfig};
 use crate::services::mcp::McpService;
 use crate::services::prompts::PromptService;
 use crate::services::provider::ProviderService;
 use crate::store::SecureStore;
+use chrono::Utc;
+use serde::{Deserialize, Serialize};
+use std::fs::{self, DirEntry};
+use std::path::PathBuf;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct BackupData {
@@ -50,25 +50,29 @@ impl<'a> BackupService<'a> {
         // 读取 Keys 并解密
         let mut api_keys_export = Vec::new();
         let sql = "SELECT id, name, platform, base_url, key_preview, notes FROM api_keys";
-        let keys_res: AppResult<Vec<ApiKeyExport>> = self.db.query_rows(sql, &[], |row: &rusqlite::Row| {
-            let id: String = row.get(0)?;
-            let platform_str: String = row.get(2)?;
-            let platform = serde_json::from_str(&format!("\"{}\"", platform_str)).unwrap_or(Platform::Custom);
-            let secret = match SecureStore::get_key(&id) {
-                Ok(s) => Some(s),
-                Err(_) => None,
-            };
-            Ok(ApiKeyExport {
-                id,
-                name: row.get(1)?,
-                platform,
-                base_url: row.get(3).unwrap_or(None),
-                key_preview: row.get(4)?,
-                secret,
-                notes: row.get(5).unwrap_or(None),
+        let keys_res: AppResult<Vec<ApiKeyExport>> = self
+            .db
+            .query_rows(sql, &[], |row: &rusqlite::Row| {
+                let id: String = row.get(0)?;
+                let platform_str: String = row.get(2)?;
+                let platform = serde_json::from_str(&format!("\"{}\"", platform_str))
+                    .unwrap_or(Platform::Custom);
+                let secret = match SecureStore::get_key(&id) {
+                    Ok(s) => Some(s),
+                    Err(_) => None,
+                };
+                Ok(ApiKeyExport {
+                    id,
+                    name: row.get(1)?,
+                    platform,
+                    base_url: row.get(3).unwrap_or(None),
+                    key_preview: row.get(4)?,
+                    secret,
+                    notes: row.get(5).unwrap_or(None),
+                })
             })
-        }).map_err(Into::into);
-        
+            .map_err(Into::into);
+
         if let Ok(keys) = keys_res {
             api_keys_export = keys;
         }
@@ -93,7 +97,7 @@ impl<'a> BackupService<'a> {
 
         let filename = format!("backup-{}.json", Utc::now().format("%Y%m%d-%H%M%S"));
         let file_path = backup_dir.join(filename);
-        
+
         fs::write(&file_path, json_str)?;
 
         // 轮换：最多保留 10 份
@@ -108,9 +112,15 @@ impl<'a> BackupService<'a> {
             .filter_map(Result::ok)
             .filter(|e: &DirEntry| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
             .collect();
-        
+
         // 按最后修改时间排序（从新到旧）
-        entries.sort_by_key(|e: &DirEntry| std::cmp::Reverse(e.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH)));
+        entries.sort_by_key(|e: &DirEntry| {
+            std::cmp::Reverse(
+                e.metadata()
+                    .and_then(|m| m.modified())
+                    .unwrap_or(std::time::SystemTime::UNIX_EPOCH),
+            )
+        });
 
         if entries.len() > max_files {
             for v in entries.iter().skip(max_files) {
@@ -123,12 +133,23 @@ impl<'a> BackupService<'a> {
     /// 从 JSON 导入配置（支持增量/覆盖）
     pub fn import_config(&self, json_data: &str) -> AppResult<()> {
         let data: BackupData = serde_json::from_str(json_data)?;
-        
+
         // Providers
         for p in data.providers {
-            let platform_str = serde_json::to_string(&p.platform).unwrap_or_default().trim_matches('"').to_string();
-            let category_str = p.category.as_ref().map(|c| serde_json::to_string(c).unwrap_or_default().trim_matches('"').to_string());
-            let tool_targets_str = p.tool_targets.as_ref().map(|t| serde_json::to_string(t).unwrap_or_default());
+            let platform_str = serde_json::to_string(&p.platform)
+                .unwrap_or_default()
+                .trim_matches('"')
+                .to_string();
+            let category_str = p.category.as_ref().map(|c| {
+                serde_json::to_string(c)
+                    .unwrap_or_default()
+                    .trim_matches('"')
+                    .to_string()
+            });
+            let tool_targets_str = p
+                .tool_targets
+                .as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_default());
             self.db.execute(
                 "REPLACE INTO providers (id, name, platform, category, base_url, model_name, is_active, tool_targets, icon, icon_color, website_url, api_key_url, notes, extra_config, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)",
@@ -155,7 +176,10 @@ impl<'a> BackupService<'a> {
 
         // ApiKeys
         for k in data.api_keys {
-            let platform_str = serde_json::to_string(&k.platform).unwrap_or_default().trim_matches('"').to_string();
+            let platform_str = serde_json::to_string(&k.platform)
+                .unwrap_or_default()
+                .trim_matches('"')
+                .to_string();
             self.db.execute(
                 "REPLACE INTO api_keys (id, name, platform, base_url, key_preview, status, notes, created_at, last_checked_at, key_hash)
                  VALUES (?1, ?2, ?3, ?4, ?5, 'unknown', ?6, ?7, NULL, '')",
@@ -168,7 +192,10 @@ impl<'a> BackupService<'a> {
 
         // McpServers
         for m in data.mcp_servers {
-            let tool_targets_str = m.tool_targets.as_ref().map(|t| serde_json::to_string(t).unwrap_or_default());
+            let tool_targets_str = m
+                .tool_targets
+                .as_ref()
+                .map(|t| serde_json::to_string(t).unwrap_or_default());
             self.db.execute(
                 "REPLACE INTO mcp_servers (id, name, command, args, env, description, is_active, tool_targets, created_at, updated_at)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",

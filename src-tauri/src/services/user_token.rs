@@ -3,7 +3,6 @@ use crate::models::{CreateUserTokenReq, UpdateUserTokenReq, UserToken};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use rusqlite::params;
-use std::sync::Arc;
 use uuid::Uuid;
 
 pub struct UserTokenService<'a> {
@@ -20,8 +19,8 @@ impl<'a> UserTokenService<'a> {
     }
 
     pub fn create_token(&self, req: CreateUserTokenReq) -> Result<UserToken> {
-        let mut id = Uuid::new_v4().to_string();
-        let mut token_str = Self::generate_sk_token();
+        let id = Uuid::new_v4().to_string();
+        let token_str = Self::generate_sk_token();
         let now = Utc::now().timestamp();
 
         let user_token = UserToken {
@@ -190,7 +189,8 @@ impl<'a> UserTokenService<'a> {
     }
 
     pub fn delete_token(&self, id: &str) -> Result<()> {
-        self.db.execute("DELETE FROM user_tokens WHERE id = ?1", params![id])?;
+        self.db
+            .execute("DELETE FROM user_tokens WHERE id = ?1", params![id])?;
         Ok(())
     }
 
@@ -204,15 +204,29 @@ impl<'a> UserTokenService<'a> {
     }
 
     pub fn get_summary(&self) -> Result<crate::models::UserTokenSummary> {
-        let total_tokens: i64 = self.db.query_scalar("SELECT COUNT(*) FROM user_tokens", &[])?;
-        let active_tokens: i64 = self.db.query_scalar("SELECT COUNT(*) FROM user_tokens WHERE enabled = 1", &[])?;
-        let total_users: i64 = self.db.query_scalar("SELECT COUNT(DISTINCT username) FROM user_tokens", &[])?;
-        
-        let today_start = Utc::now().date_naive().and_hms_opt(0, 0, 0).unwrap().and_utc().timestamp();
-        let today_requests: i64 = self.db.query_scalar(
-            "SELECT COALESCE(SUM(total_requests), 0) FROM user_tokens WHERE last_used_at >= ?", 
-            &[&today_start]
-        ).unwrap_or(0);
+        let total_tokens: i64 = self
+            .db
+            .query_scalar("SELECT COUNT(*) FROM user_tokens", &[])?;
+        let active_tokens: i64 = self
+            .db
+            .query_scalar("SELECT COUNT(*) FROM user_tokens WHERE enabled = 1", &[])?;
+        let total_users: i64 = self
+            .db
+            .query_scalar("SELECT COUNT(DISTINCT username) FROM user_tokens", &[])?;
+
+        let today_start = Utc::now()
+            .date_naive()
+            .and_hms_opt(0, 0, 0)
+            .unwrap()
+            .and_utc()
+            .timestamp();
+        let today_requests: i64 = self
+            .db
+            .query_scalar(
+                "SELECT COALESCE(SUM(total_requests), 0) FROM user_tokens WHERE last_used_at >= ?",
+                &[&today_start],
+            )
+            .unwrap_or(0);
 
         Ok(crate::models::UserTokenSummary {
             total_tokens,

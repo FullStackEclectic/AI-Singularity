@@ -305,13 +305,14 @@ export interface IdeAccount {
   is_proxy_disabled: boolean;
   device_profile?: DeviceProfile;
   quota_json?: string;
+  project_id?: string;
+  meta_json?: string;
+  label?: string;
   created_at: string;
   updated_at: string;
   last_used: string;
   /** 用户自定义标签 */
   tags?: string[];
-  /** 用户自定义标注（备注名）*/
-  label?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

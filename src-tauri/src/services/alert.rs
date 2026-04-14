@@ -1,7 +1,6 @@
 use crate::db::Database;
-use crate::models::{AlertItem, AlertLevel, KeyStatus};
+use crate::models::{AlertItem, AlertLevel};
 use chrono::{Duration, Utc};
-use rusqlite::params;
 use uuid::Uuid;
 
 pub struct AlertService<'a> {
@@ -45,7 +44,10 @@ impl<'a> AlertService<'a> {
                             id: Uuid::new_v4().to_string(),
                             level: AlertLevel::Critical,
                             title: format!("Key 无效: {}", name),
-                            message: format!("{} 的 API Key「{}」已失效，请及时更新", platform, name),
+                            message: format!(
+                                "{} 的 API Key「{}」已失效，请及时更新",
+                                platform, name
+                            ),
                             platform: Some(platform),
                             key_id: Some(id),
                         });
@@ -65,7 +67,10 @@ impl<'a> AlertService<'a> {
                             id: Uuid::new_v4().to_string(),
                             level: AlertLevel::Warning,
                             title: format!("Key 已过期: {}", name),
-                            message: format!("{} 的 API Key「{}」已过期，请重新申请", platform, name),
+                            message: format!(
+                                "{} 的 API Key「{}」已过期，请重新申请",
+                                platform, name
+                            ),
                             platform: Some(platform),
                             key_id: Some(id),
                         });
@@ -122,7 +127,10 @@ impl<'a> AlertService<'a> {
                         id: Uuid::new_v4().to_string(),
                         level: AlertLevel::Warning,
                         title: format!("{} 余额不足", platform),
-                        message: format!("{} 账户余额仅剩 {}，请及时充值以避免服务中断", platform, amount),
+                        message: format!(
+                            "{} 账户余额仅剩 {}，请及时充值以避免服务中断",
+                            platform, amount
+                        ),
                         platform: Some(platform),
                         key_id: Some(key_id),
                     });
@@ -134,7 +142,7 @@ impl<'a> AlertService<'a> {
     /// 发送 OS 原生通知（带频率控制，同一条 Alert 24 小时内只推一次）
     pub fn notify_os_throttle(&self, app: &tauri::AppHandle, alerts: Vec<AlertItem>) {
         use tauri_plugin_notification::NotificationExt;
-        
+
         for alert in alerts {
             let should_notify = match alert.level {
                 AlertLevel::Critical | AlertLevel::Warning => true,
@@ -148,10 +156,15 @@ impl<'a> AlertService<'a> {
                 } else {
                     continue; // 无法确定身份的告警跳过自动推送
                 };
-                
+
                 // 检查最后发送时间过滤
                 let sql = "SELECT last_sent_at FROM alert_history WHERE alert_id = ?1";
-                if let Ok(ts_str) = self.db.query_row(sql, rusqlite::params![&stable_id], |r: &rusqlite::Row| r.get::<_, String>(0)) {
+                if let Ok(ts_str) =
+                    self.db
+                        .query_row(sql, rusqlite::params![&stable_id], |r: &rusqlite::Row| {
+                            r.get::<_, String>(0)
+                        })
+                {
                     if let Ok(last_sent) = ts_str.parse::<chrono::DateTime<Utc>>() {
                         if Utc::now() - last_sent < Duration::hours(24) {
                             continue; // 24小时内不重复轰炸
@@ -162,18 +175,14 @@ impl<'a> AlertService<'a> {
                 // 发送 OS 通知
                 let title = alert.title.clone();
                 let msg = alert.message.clone();
-                let _ = app.notification()
-                    .builder()
-                    .title(&title)
-                    .body(&msg)
-                    .show();
-                    
+                let _ = app.notification().builder().title(&title).body(&msg).show();
+
                 tracing::warn!("📳 OS 高危弹窗已推送: {} - {}", title, msg);
 
                 // 记录已发送
                 let _ = self.db.execute(
                     "INSERT OR REPLACE INTO alert_history (alert_id, last_sent_at) VALUES (?1, ?2)",
-                    rusqlite::params![&stable_id, &Utc::now().to_rfc3339()]
+                    rusqlite::params![&stable_id, &Utc::now().to_rfc3339()],
                 );
             }
         }
