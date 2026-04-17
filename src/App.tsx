@@ -21,11 +21,13 @@ import SecurityPage from "./components/security/SecurityPage";
 import MfaVaultPage from "./components/mfa/MfaVaultPage";
 import WebReportPage from "./components/report/WebReportPage";
 import WakeupPage from "./components/wakeup/WakeupPage";
+import TokenCalculatorPage from "./components/tokenCalculator/TokenCalculatorPage";
+import FloatingAccountCardsLayer from "./components/floating/FloatingAccountCardsLayer";
 import { message } from "@tauri-apps/plugin-dialog";
 import { api } from "./lib/api";
 import "./App.css";
 
-export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "mfa" | "wakeup" | "speedtest" | "analytics" | "report" | "logs" | "sessions" | "settings" | "security";
+export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" | "providers" | "mcp" | "skills" | "prompts" | "tools" | "tokenCalculator" | "mfa" | "wakeup" | "speedtest" | "analytics" | "report" | "logs" | "sessions" | "settings" | "security";
 
 import { listen } from "@tauri-apps/api/event";
 import { useProviderStore } from "./stores/providerStore";
@@ -37,6 +39,34 @@ export default function App() {
   useEffect(() => {
     const unlistenProvider = listen("provider_switched", () => {
       useProviderStore.getState().fetch();
+    });
+    const unlistenNavigate = listen<string>("navigate_to_page", (event) => {
+      const target = String(event.payload || "").trim() as NavPage;
+      const allowed: NavPage[] = [
+        "dashboard",
+        "accounts",
+        "sharing",
+        "models",
+        "proxy",
+        "providers",
+        "mcp",
+        "skills",
+        "prompts",
+        "tools",
+        "tokenCalculator",
+        "mfa",
+        "wakeup",
+        "speedtest",
+        "analytics",
+        "report",
+        "logs",
+        "sessions",
+        "settings",
+        "security",
+      ];
+      if (allowed.includes(target)) {
+        setActivePage(target);
+      }
     });
 
     const unlistenRefresh = listen("force_refresh_analytics", () => {
@@ -84,6 +114,7 @@ export default function App() {
 
     return () => {
       unlistenProvider.then((unlisten: () => void) => unlisten());
+      unlistenNavigate.then((unlisten: () => void) => unlisten());
       unlistenRefresh.then((unlisten: () => void) => unlisten());
       unlistenWatcher.then((unlisten: () => void) => unlisten());
       unlistenDataChanged.then((unlisten: () => void) => unlisten());
@@ -101,6 +132,7 @@ export default function App() {
       case "mcp":        return <McpPage />;
       case "skills":     return <SkillsPage />;
       case "tools":      return <ToolDepotPage />;
+      case "tokenCalculator": return <TokenCalculatorPage />;
       case "mfa":        return <MfaVaultPage />;
       case "wakeup":     return <WakeupPage />;
       case "prompts":    return <PromptsPage />;
@@ -121,6 +153,7 @@ export default function App() {
       <main className="main-content animate-fade-in">
         {renderPage()}
       </main>
+      <FloatingAccountCardsLayer />
       <DeepLinkHandler />
     </div>
   );

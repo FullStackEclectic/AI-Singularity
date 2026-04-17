@@ -6,14 +6,47 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { check, Update as TauriUpdate } from "@tauri-apps/plugin-updater";
 import {
   api,
+  type CurrentAccountSnapshot,
   type GeminiInstanceRecord,
   type OAuthEnvStatusItem,
+  type FloatingAccountCard,
   type LinuxReleaseInfo,
   type SkillStorageInfo,
   type UpdateRuntimeInfo,
   type UpdateSettings,
+  type WebReportStatus,
   type WebSocketStatus,
 } from "../../lib/api";
+import type { IdeAccount } from "../../types";
+
+const normalizeReminderStrategy = (value?: string | null) => {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "daily") return "daily";
+  if (normalized === "weekly") return "weekly";
+  return "immediate";
+};
+
+const normalizeSkipVersion = (value?: string | null) => {
+  const normalized = String(value || "").trim();
+  return normalized || null;
+};
+
+const reminderReasonMessage = (reason: string, version: string) => {
+  const normalizedVersion = version.trim() || "unknown";
+  if (reason === "skipped_version") {
+    return `发现版本 ${normalizedVersion}，但该版本已在“跳过版本”策略中。`;
+  }
+  if (reason === "reminders_disabled") {
+    return `发现版本 ${normalizedVersion}，但你已关闭更新提醒。`;
+  }
+  if (reason === "silent_window_active") {
+    return `发现版本 ${normalizedVersion}，已按静默提醒策略延后展示。`;
+  }
+  if (reason === "invalid_version") {
+    return "发现更新，但版本号异常，已跳过提醒。";
+  }
+  return `发现新版本 ${normalizedVersion}`;
+};
 
 export default function SettingsPage() {
   const { t, i18n } = useTranslation();
@@ -27,6 +60,10 @@ export default function SettingsPage() {
   const [linuxInstallBusyUrl, setLinuxInstallBusyUrl] = useState<string | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<TauriUpdate | null>(null);
   const [websocketStatus, setWebsocketStatus] = useState<WebSocketStatus | null>(null);
+  const [webReportStatus, setWebReportStatus] = useState<WebReportStatus | null>(null);
+  const [currentSnapshots, setCurrentSnapshots] = useState<CurrentAccountSnapshot[]>([]);
+  const [floatingCards, setFloatingCards] = useState<FloatingAccountCard[]>([]);
+  const [floatingCardMsg, setFloatingCardMsg] = useState("");
   const [updateProgress, setUpdateProgress] = useState<{ phase: "idle" | "checking" | "downloading" | "installing" | "finished"; downloaded: number; total: number }>({
     phase: "idle",
     downloaded: 0,
@@ -40,17 +77,21 @@ export default function SettingsPage() {
   const [webdavLoading, setWebdavLoading] = useState(false);
   const [skillStorage, setSkillStorage] = useState<SkillStorageInfo | null>(null);
   const [oauthEnvStatus, setOauthEnvStatus] = useState<OAuthEnvStatusItem[]>([]);
+  const [ideAccounts, setIdeAccounts] = useState<IdeAccount[]>([]);
+  const [currentGeminiAccountId, setCurrentGeminiAccountId] = useState<string | null>(null);
   const [geminiInstances, setGeminiInstances] = useState<GeminiInstanceRecord[]>([]);
   const [defaultGeminiInstance, setDefaultGeminiInstance] = useState<GeminiInstanceRecord | null>(null);
   const [geminiInstanceName, setGeminiInstanceName] = useState("");
   const [geminiInstanceDir, setGeminiInstanceDir] = useState("");
   const [geminiInstanceMsg, setGeminiInstanceMsg] = useState("");
   const [geminiInstanceLoading, setGeminiInstanceLoading] = useState(false);
+  const [geminiRefreshLoading, setGeminiRefreshLoading] = useState(false);
   const [geminiEditDialog, setGeminiEditDialog] = useState<{
     instance: GeminiInstanceRecord;
     extraArgs: string;
     bindAccountId: string;
     projectId: string;
+    followLocalAccount: boolean;
   } | null>(null);
   const [confirmDeleteGeminiId, setConfirmDeleteGeminiId] = useState<string | null>(null);
   const [confirmWebdavPull, setConfirmWebdavPull] = useState(false);
@@ -62,9 +103,12 @@ export default function SettingsPage() {
     const loadRuntimeInfo = async () => {
       setRuntimeLoading(true);
       try {
-        const [storageInfo, oauthInfo, instanceList, defaultInstance] = await Promise.all([
+        const [storageInfo, oauthInfo, ideAccountsList, snapshots, floatingCardList, instanceList, defaultInstance] = await Promise.all([
           api.skills.getStorageInfo(),
           api.oauth.getEnvStatus(),
+          api.ideAccounts.list(),
+          api.providerCurrent.listSnapshots(),
+          api.floatingCards.list().catch(() => []),
           api.geminiInstances.list(),
           api.geminiInstances.getDefault(),
         ]);
@@ -73,14 +117,20 @@ export default function SettingsPage() {
           api.update.getSettings(),
         ]);
         const wsStatus = await api.websocket.getStatus();
+        const reportStatus = await api.webReport.getStatus().catch(() => null);
         if (!cancelled) {
           setSkillStorage(storageInfo);
           setOauthEnvStatus(oauthInfo);
+          setIdeAccounts(ideAccountsList);
+          setCurrentSnapshots(snapshots);
+          setFloatingCards(floatingCardList);
+          setCurrentGeminiAccountId(snapshots.find((item) => item.platform === "gemini")?.account_id ?? null);
           setGeminiInstances(instanceList);
           setDefaultGeminiInstance(defaultInstance);
           setUpdateRuntimeInfo(runtimeInfo);
           setUpdateSettings(savedUpdateSettings);
           setWebsocketStatus(wsStatus);
+          setWebReportStatus(reportStatus);
         }
         if (!cancelled && runtimeInfo.platform === "linux") {
           api.update.getLinuxReleaseInfo().then(setLinuxReleaseInfo).catch((error) => {
@@ -103,12 +153,187 @@ export default function SettingsPage() {
   }, []);
 
   const reloadGeminiInstances = async () => {
-    const [instanceList, defaultInstance] = await Promise.all([
+    const [instanceList, defaultInstance, snapshots, accounts] = await Promise.all([
       api.geminiInstances.list(),
       api.geminiInstances.getDefault(),
+      api.providerCurrent.listSnapshots().catch(() => []),
+      api.ideAccounts.list(),
     ]);
+    setIdeAccounts(accounts);
+    setCurrentSnapshots(snapshots);
+    setCurrentGeminiAccountId(snapshots.find((item) => item.platform === "gemini")?.account_id ?? null);
     setGeminiInstances(instanceList);
     setDefaultGeminiInstance(defaultInstance);
+  };
+
+  const reloadFloatingCards = async () => {
+    const cards = await api.floatingCards.list().catch(() => []);
+    setFloatingCards(cards);
+  };
+
+  const handleFloatingCardError = async (error: unknown, fallback = "浮窗操作失败") => {
+    if (String(error).includes("floating_card_conflict")) {
+      setFloatingCardMsg("浮窗已在其他窗口更新，已刷新到最新状态");
+      await reloadFloatingCards();
+      return;
+    }
+    setFloatingCardMsg(`${fallback}: ${error}`);
+  };
+
+  const handleCreateGlobalFloatingCard = async () => {
+    try {
+      await api.floatingCards.create({
+        scope: "global",
+        title: "全局账号浮窗",
+        bound_platforms: ["codex", "gemini"],
+        window_label: "main",
+      });
+      setFloatingCardMsg("已创建全局浮窗");
+      await reloadFloatingCards();
+    } catch (error) {
+      await handleFloatingCardError(error, "创建全局浮窗失败");
+    }
+  };
+
+  const handleToggleFloatingCardVisible = async (card: FloatingAccountCard) => {
+    try {
+      await api.floatingCards.update(
+        card.id,
+        { visible: !card.visible },
+        card.updated_at
+      );
+      await reloadFloatingCards();
+    } catch (error) {
+      await handleFloatingCardError(error, "更新浮窗可见状态失败");
+    }
+  };
+
+  const handleToggleFloatingCardTop = async (card: FloatingAccountCard) => {
+    try {
+      await api.floatingCards.update(
+        card.id,
+        { always_on_top: !card.always_on_top },
+        card.updated_at
+      );
+      await reloadFloatingCards();
+    } catch (error) {
+      await handleFloatingCardError(error, "更新浮窗置顶状态失败");
+    }
+  };
+
+  const handleDeleteFloatingCard = async (card: FloatingAccountCard) => {
+    try {
+      await api.floatingCards.delete(card.id);
+      setFloatingCardMsg("浮窗已删除");
+      await reloadFloatingCards();
+    } catch (error) {
+      await handleFloatingCardError(error, "删除浮窗失败");
+    }
+  };
+
+  const geminiAccounts = ideAccounts.filter((item) => item.origin_platform === "gemini");
+  const getGeminiAccount = (accountId?: string | null) =>
+    accountId ? geminiAccounts.find((item) => item.id === accountId) || null : null;
+  const getGeminiAccountLabel = (accountId?: string | null) => {
+    if (!accountId) return "未绑定账号";
+    const matched = getGeminiAccount(accountId);
+    if (!matched) return accountId;
+    return matched.label?.trim() || matched.email;
+  };
+  const isCurrentLocalGeminiAccount = (accountId?: string | null) =>
+    !!accountId && !!currentGeminiAccountId && accountId === currentGeminiAccountId;
+  const currentGeminiAccountLabel = getGeminiAccountLabel(currentGeminiAccountId);
+  const getGeminiAccountProjectLabel = (accountId?: string | null) => {
+    const matched = getGeminiAccount(accountId);
+    return matched?.project_id?.trim() || null;
+  };
+  const getEffectiveGeminiAccountId = (instance: GeminiInstanceRecord) =>
+    instance.is_default && instance.follow_local_account
+      ? currentGeminiAccountId
+      : instance.bind_account_id || null;
+  const getEffectiveGeminiProjectId = (instance: GeminiInstanceRecord) =>
+    instance.project_id?.trim() || getGeminiAccountProjectLabel(getEffectiveGeminiAccountId(instance));
+  const formatGeminiLaunchTime = (value?: string | null) =>
+    value ? new Date(value).toLocaleString() : "尚未启动";
+  const sortedGeminiInstances = [...geminiInstances].sort((a, b) => {
+    const aTime = a.last_launched_at ? new Date(a.last_launched_at).getTime() : 0;
+    const bTime = b.last_launched_at ? new Date(b.last_launched_at).getTime() : 0;
+    if (aTime !== bTime) return bTime - aTime;
+    return a.name.localeCompare(b.name, "zh-CN");
+  });
+  const allVisibleGeminiInstances = defaultGeminiInstance
+    ? [defaultGeminiInstance, ...sortedGeminiInstances]
+    : sortedGeminiInstances;
+  const geminiConflictCount = allVisibleGeminiInstances.filter((instance) => {
+    const effectiveAccountId = getEffectiveGeminiAccountId(instance);
+    return !!effectiveAccountId && !!currentGeminiAccountId && effectiveAccountId !== currentGeminiAccountId;
+  }).length;
+  const geminiProjectOverrideCount = allVisibleGeminiInstances.filter((instance) => !!instance.project_id?.trim()).length;
+  const geminiUninitializedCount = allVisibleGeminiInstances.filter((instance) => !instance.initialized).length;
+  const geminiUnboundCount = allVisibleGeminiInstances.filter((instance) => !getEffectiveGeminiAccountId(instance)).length;
+  const getGeminiInstanceWarnings = (instance: GeminiInstanceRecord) => {
+    const warnings: Array<{ tone: "warning" | "info" | "success"; text: string }> = [];
+    const effectiveAccountId = getEffectiveGeminiAccountId(instance);
+    const effectiveProjectId =
+      instance.project_id?.trim() || getGeminiAccountProjectLabel(effectiveAccountId);
+
+    if (instance.is_default && instance.follow_local_account) {
+      if (!currentGeminiAccountId) {
+        warnings.push({
+          tone: "warning",
+          text: "已开启跟随当前本地账号，但当前没有可解析的 Gemini 本地账号。",
+        });
+      } else {
+        warnings.push({
+          tone: "success",
+          text: `默认实例启动时会跟随当前本地账号：${getGeminiAccountLabel(currentGeminiAccountId)}。`,
+        });
+      }
+    } else if (!effectiveAccountId) {
+      warnings.push({
+        tone: "warning",
+        text: "当前没有有效绑定账号，启动前无法写入 Gemini 本地凭据。",
+      });
+    } else if (currentGeminiAccountId && effectiveAccountId !== currentGeminiAccountId) {
+      warnings.push({
+        tone: "warning",
+        text: `启动时会用 ${getGeminiAccountLabel(effectiveAccountId)} 覆盖当前本地账号 ${getGeminiAccountLabel(currentGeminiAccountId)}。`,
+      });
+    } else if (effectiveAccountId) {
+      warnings.push({
+        tone: "success",
+        text: `启动时会使用 ${getGeminiAccountLabel(effectiveAccountId)}。`,
+      });
+    }
+
+    if (instance.project_id?.trim()) {
+      const accountProject = getGeminiAccountProjectLabel(effectiveAccountId);
+      if (accountProject && accountProject !== instance.project_id?.trim()) {
+        warnings.push({
+          tone: "info",
+          text: `实例项目 ${instance.project_id?.trim()} 会覆盖账号默认项目 ${accountProject}。`,
+        });
+      } else {
+        warnings.push({
+          tone: "info",
+          text: `实例已固定项目 ${instance.project_id?.trim()}。`,
+        });
+      }
+    } else if (effectiveProjectId) {
+      warnings.push({
+        tone: "info",
+        text: `当前将沿用账号项目 ${effectiveProjectId}。`,
+      });
+    }
+
+    if (!instance.initialized) {
+      warnings.push({
+        tone: "info",
+        text: "该实例目录尚未初始化，首次启动后才会生成本地 .gemini 凭据文件。",
+      });
+    }
+
+    return warnings;
   };
 
   const handlePickGeminiDir = async () => {
@@ -147,7 +372,52 @@ export default function SettingsPage() {
       extraArgs: instance.extra_args || "",
       bindAccountId: instance.bind_account_id || "",
       projectId: instance.project_id || "",
+      followLocalAccount: !!instance.follow_local_account,
     });
+  };
+
+  const handleQuickUpdateGeminiInstance = async (
+    instance: GeminiInstanceRecord,
+    patch: {
+      extraArgs?: string | null;
+      bindAccountId?: string | null;
+      projectId?: string | null;
+      followLocalAccount?: boolean | null;
+    },
+    successMessage: string,
+  ) => {
+    try {
+      await api.geminiInstances.update(
+        instance.id,
+        patch.extraArgs ?? instance.extra_args ?? "",
+        patch.bindAccountId !== undefined
+          ? patch.bindAccountId
+          : instance.bind_account_id ?? null,
+        patch.projectId !== undefined
+          ? patch.projectId
+          : instance.project_id ?? null,
+        instance.is_default
+          ? (patch.followLocalAccount !== undefined
+              ? patch.followLocalAccount
+              : instance.follow_local_account ?? false)
+          : null,
+      );
+      setGeminiInstanceMsg(successMessage);
+      await reloadGeminiInstances();
+    } catch (e) {
+      setGeminiInstanceMsg(`更新 Gemini 实例失败: ${e}`);
+    }
+  };
+
+  const editEffectiveGeminiAccountId = geminiEditDialog
+    ? geminiEditDialog.instance.is_default && geminiEditDialog.followLocalAccount
+      ? currentGeminiAccountId
+      : geminiEditDialog.bindAccountId || null
+    : null;
+  const editSelectedGeminiProjectId = geminiEditDialog?.projectId.trim() || null;
+  const editAccountProjectId = getGeminiAccountProjectLabel(editEffectiveGeminiAccountId);
+  const applyGeminiEditPatch = (patch: Partial<NonNullable<typeof geminiEditDialog>>) => {
+    setGeminiEditDialog((current) => (current ? { ...current, ...patch } : current));
   };
 
   const handleCopyGeminiLaunchCommand = async (id: string) => {
@@ -178,6 +448,19 @@ export default function SettingsPage() {
       await reloadGeminiInstances();
     } catch (e) {
       setGeminiInstanceMsg(`删除 Gemini 实例失败: ${e}`);
+    }
+  };
+
+  const handleRefreshGeminiRuntime = async () => {
+    try {
+      setGeminiRefreshLoading(true);
+      const refreshed = await api.ideAccounts.refreshAllByPlatform("gemini");
+      await reloadGeminiInstances();
+      setGeminiInstanceMsg(`Gemini 账号状态已刷新，共处理 ${refreshed} 个账号`);
+    } catch (e) {
+      setGeminiInstanceMsg(`刷新 Gemini 账号状态失败: ${e}`);
+    } finally {
+      setGeminiRefreshLoading(false);
     }
   };
 
@@ -246,11 +529,24 @@ export default function SettingsPage() {
       setUpdateSettings(settings);
       const update = await check();
       if (update) {
-        setAvailableUpdate(update);
-        setUpdateMsg(`发现新版本 ${update.version}`);
-        if (updateSettings?.auto_install && updateRuntimeInfo?.can_auto_install !== false) {
-          await handleInstallUpdate(update);
+        const version = String(update.version || "").trim();
+        const decision = await api.update.evaluateReminderPolicy(version);
+        setUpdateSettings(decision.settings);
+        if (decision.should_notify) {
+          setAvailableUpdate(update);
+          setUpdateMsg(reminderReasonMessage("allow_immediate", version));
+          const reminded = await api.update.markReminded(version).catch(() => null);
+          if (reminded) {
+            setUpdateSettings(reminded);
+          }
+          if (decision.settings.auto_install && updateRuntimeInfo?.can_auto_install !== false) {
+            await handleInstallUpdate(update);
+          } else {
+            setUpdateProgress({ phase: "idle", downloaded: 0, total: 0 });
+          }
         } else {
+          setAvailableUpdate(null);
+          setUpdateMsg(reminderReasonMessage(decision.reason, version));
           setUpdateProgress({ phase: "idle", downloaded: 0, total: 0 });
         }
       } else {
@@ -305,6 +601,8 @@ export default function SettingsPage() {
   ) => {
     if (!updateSettings) return;
     const next = { ...updateSettings, ...patch };
+    next.skip_version = normalizeSkipVersion(next.skip_version);
+    next.silent_reminder_strategy = normalizeReminderStrategy(next.silent_reminder_strategy);
     setUpdateSettings(next);
     try {
       await api.update.saveSettings(next);
@@ -314,6 +612,30 @@ export default function SettingsPage() {
       setUpdateSettings(updateSettings);
     }
   };
+
+  const handleSkipFoundVersion = async () => {
+    const version = normalizeSkipVersion(availableUpdate?.version);
+    if (!version) {
+      setUpdateMsg("当前没有可跳过的目标版本");
+      return;
+    }
+    await handleUpdateSettingChange(
+      { skip_version: version },
+      `已跳过版本 ${version}`
+    );
+    setAvailableUpdate(null);
+  };
+
+  const handleClearSkipVersion = async () => {
+    await handleUpdateSettingChange(
+      { skip_version: null },
+      "已清除跳过版本策略"
+    );
+  };
+
+  const selectedReminderStrategy = normalizeReminderStrategy(
+    updateSettings?.silent_reminder_strategy
+  );
 
   const handleExport = async () => {
     try {
@@ -460,6 +782,147 @@ export default function SettingsPage() {
               <div className="text-muted" style={{ fontSize: 13 }}>未能读取 WebSocket 状态</div>
             )}
           </div>
+
+          <div style={{ background: "var(--surface-sunken)", padding: "var(--space-4)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>本地 Web Report 状态页</div>
+            {runtimeLoading ? (
+              <div className="text-muted" style={{ fontSize: 13 }}>加载中...</div>
+            ) : webReportStatus ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <div style={{ fontSize: 13 }}>
+                  地址：
+                  <code style={{ marginLeft: 6 }}>
+                    {webReportStatus.local_url || "—"}
+                  </code>
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  健康检查：
+                  <code style={{ marginLeft: 6 }}>
+                    {webReportStatus.health_url || "—"}
+                  </code>
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  JSON 状态：
+                  <code style={{ marginLeft: 6 }}>
+                    {webReportStatus.status_api_url || "—"}
+                  </code>
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  JSON 快照：
+                  <code style={{ marginLeft: 6 }}>
+                    {webReportStatus.snapshot_api_url || "—"}
+                  </code>
+                </div>
+                <div style={{ fontSize: 13 }}>
+                  JSON 认证：
+                  <strong style={{ marginLeft: 6 }}>
+                    {webReportStatus.auth_enabled ? "已启用（需携带 token）" : "未启用"}
+                  </strong>
+                </div>
+                <div className="text-muted" style={{ fontSize: 12 }}>
+                  现在除了 HTML 状态页，也能给外部客户端直接消费 `status/snapshot` JSON；如配置环境变量 `AIS_WEB_REPORT_TOKEN`，JSON 接口会要求认证。
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                <div className="text-muted" style={{ fontSize: 13 }}>未能读取 Web Report 状态</div>
+              </div>
+            )}
+          </div>
+
+          <div style={{ background: "var(--surface-sunken)", padding: "var(--space-4)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>当前账号快照</div>
+            {runtimeLoading ? (
+              <div className="text-muted" style={{ fontSize: 13 }}>加载中...</div>
+            ) : currentSnapshots.length > 0 ? (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 }}>
+                {currentSnapshots.map((item) => (
+                  <div
+                    key={item.platform}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--color-border)",
+                      background: "rgba(255,255,255,0.04)",
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>{item.platform}</div>
+                    <div style={{ fontSize: 13 }}>{item.label || "未解析到当前账号"}</div>
+                    <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
+                      {item.email || "—"} · {item.status || "unknown"}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-muted" style={{ fontSize: 13 }}>当前没有可展示的账号快照</div>
+            )}
+          </div>
+
+          <div style={{ background: "var(--surface-sunken)", padding: "var(--space-4)", borderRadius: "var(--radius-md)" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ fontWeight: 600 }}>浮动账号卡片</div>
+              <button className="btn btn-secondary" onClick={handleCreateGlobalFloatingCard}>
+                新建全局浮窗
+              </button>
+            </div>
+            <div className="text-muted" style={{ fontSize: 12, marginTop: 6 }}>
+              浮窗支持实例绑定、拖拽定位记忆和跨窗口同步，账号切换会自动广播到所有窗口。
+            </div>
+            <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
+              {floatingCards.length === 0 ? (
+                <div className="text-muted" style={{ fontSize: 13 }}>当前还没有浮动账号卡片</div>
+              ) : (
+                floatingCards.map((card) => (
+                  <div
+                    key={card.id}
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "var(--radius-sm)",
+                      border: "1px solid var(--color-border)",
+                      background: "rgba(255,255,255,0.04)",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      alignItems: "center",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>{card.title}</div>
+                      <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
+                        {card.scope === "instance"
+                          ? `实例绑定: ${card.instance_id || "未知实例"}`
+                          : "全局浮窗"}
+                        {" · "}
+                        {`平台 ${card.bound_platforms?.join(", ") || "codex, gemini"}`}
+                        {" · "}
+                        {card.visible ? "可见" : "已隐藏"}
+                        {" · "}
+                        {card.always_on_top ? "置顶" : "普通"}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      <button className="btn btn-secondary" onClick={() => void handleToggleFloatingCardVisible(card)}>
+                        {card.visible ? "隐藏" : "显示"}
+                      </button>
+                      <button className="btn btn-secondary" onClick={() => void handleToggleFloatingCardTop(card)}>
+                        {card.always_on_top ? "取消置顶" : "设为置顶"}
+                      </button>
+                      <button className="btn btn-danger" onClick={() => void handleDeleteFloatingCard(card)}>
+                        删除
+                      </button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            {floatingCardMsg && (
+              <div className="text-muted" style={{ fontSize: 12, marginTop: 8 }}>
+                {floatingCardMsg}
+              </div>
+            )}
+          </div>
         </div>
 
         <h3 style={{ marginBottom: "var(--space-2)" }}>Gemini 实例</h3>
@@ -467,18 +930,147 @@ export default function SettingsPage() {
           管理 Gemini CLI 的默认实例与额外实例目录，支持实例级绑定账号、项目 ID 和启动参数。
         </p>
         <div style={{ background: "var(--surface-sunken)", padding: "var(--space-4)", borderRadius: "var(--radius-md)", marginBottom: "var(--space-6)", display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(5, minmax(120px, 1fr))", gap: "var(--space-3)", flex: "1 1 760px" }}>
+              <div style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.04)" }}>
+                <div className="text-muted" style={{ fontSize: 12, marginBottom: 4 }}>实例总数</div>
+                <div style={{ fontWeight: 700, fontSize: 20 }}>{allVisibleGeminiInstances.length}</div>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(16,185,129,0.10)" }}>
+                <div className="text-muted" style={{ fontSize: 12, marginBottom: 4 }}>已初始化</div>
+                <div style={{ fontWeight: 700, fontSize: 20 }}>{allVisibleGeminiInstances.length - geminiUninitializedCount}</div>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(245,158,11,0.10)" }}>
+                <div className="text-muted" style={{ fontSize: 12, marginBottom: 4 }}>账号冲突</div>
+                <div style={{ fontWeight: 700, fontSize: 20 }}>{geminiConflictCount}</div>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(59,130,246,0.10)" }}>
+                <div className="text-muted" style={{ fontSize: 12, marginBottom: 4 }}>项目覆盖</div>
+                <div style={{ fontWeight: 700, fontSize: 20 }}>{geminiProjectOverrideCount}</div>
+              </div>
+              <div style={{ padding: "10px 12px", borderRadius: "var(--radius-sm)", background: "rgba(239,68,68,0.10)" }}>
+                <div className="text-muted" style={{ fontSize: 12, marginBottom: 4 }}>无有效账号</div>
+                <div style={{ fontWeight: 700, fontSize: 20 }}>{geminiUnboundCount}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+              <button className="btn btn-secondary" onClick={handleRefreshGeminiRuntime} disabled={geminiRefreshLoading}>
+                {geminiRefreshLoading ? "刷新中..." : "刷新 Gemini 账号状态"}
+              </button>
+            </div>
+          </div>
+
           {defaultGeminiInstance && (
             <div style={{ padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.02)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
                 <div>
                   <div style={{ fontWeight: 600 }}>默认实例</div>
                   <div className="text-muted" style={{ fontSize: 12, wordBreak: "break-all" }}>{defaultGeminiInstance.user_data_dir}</div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "rgba(59,130,246,0.12)", color: "var(--color-primary)" }}>
+                      当前本地账号：{currentGeminiAccountLabel}
+                    </span>
+                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "var(--color-text-secondary)" }}>
+                      实际生效账号：{getGeminiAccountLabel(getEffectiveGeminiAccountId(defaultGeminiInstance))}
+                    </span>
+                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "var(--color-text-secondary)" }}>
+                      实际生效项目：{getEffectiveGeminiProjectId(defaultGeminiInstance) || "沿用本地默认行为"}
+                    </span>
+                    <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: defaultGeminiInstance.follow_local_account ? "rgba(16,185,129,0.12)" : "rgba(148,163,184,0.16)", color: defaultGeminiInstance.follow_local_account ? "var(--color-success)" : "var(--color-text-secondary)" }}>
+                      {defaultGeminiInstance.follow_local_account ? "跟随当前本地账号" : "固定绑定模式"}
+                    </span>
+                    {defaultGeminiInstance.bind_account_id && (
+                      <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: isCurrentLocalGeminiAccount(defaultGeminiInstance.bind_account_id) ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.08)", color: isCurrentLocalGeminiAccount(defaultGeminiInstance.bind_account_id) ? "var(--color-success)" : "var(--color-text-secondary)" }}>
+                        绑定账号：{getGeminiAccountLabel(defaultGeminiInstance.bind_account_id)}
+                        {isCurrentLocalGeminiAccount(defaultGeminiInstance.bind_account_id) ? " · 当前本地" : ""}
+                      </span>
+                    )}
+                  </div>
                   <div className="text-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                    {defaultGeminiInstance.bind_account_id ? `绑定账号 ${defaultGeminiInstance.bind_account_id}` : "未绑定账号"}
+                    {defaultGeminiInstance.follow_local_account
+                      ? `跟随当前本地账号 (${getGeminiAccountLabel(currentGeminiAccountId)})`
+                      : `绑定账号 ${getGeminiAccountLabel(defaultGeminiInstance.bind_account_id)}`}
+                    {" · "}
+                    {defaultGeminiInstance.follow_local_account ? "跟随当前本地账号" : "固定绑定模式"}
                     {" · "}
                     {defaultGeminiInstance.project_id ? `项目 ${defaultGeminiInstance.project_id}` : "无项目覆盖"}
                     {" · "}
                     {defaultGeminiInstance.extra_args ? `参数 ${defaultGeminiInstance.extra_args}` : "无额外参数"}
+                    {" · "}
+                    {`最近启动 ${formatGeminiLaunchTime(defaultGeminiInstance.last_launched_at)}`}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                    {getGeminiInstanceWarnings(defaultGeminiInstance).map((item, index) => (
+                      <div
+                        key={`default-warning-${index}`}
+                        style={{
+                          padding: "8px 10px",
+                          borderRadius: "var(--radius-sm)",
+                          fontSize: 12,
+                          lineHeight: 1.5,
+                          background:
+                            item.tone === "warning"
+                              ? "rgba(245,158,11,0.12)"
+                              : item.tone === "success"
+                                ? "rgba(16,185,129,0.12)"
+                                : "rgba(59,130,246,0.12)",
+                          color:
+                            item.tone === "warning"
+                              ? "var(--color-warning)"
+                              : item.tone === "success"
+                                ? "var(--color-success)"
+                                : "var(--color-primary)",
+                        }}
+                      >
+                        {item.text}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                    {!defaultGeminiInstance.follow_local_account && currentGeminiAccountId && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() =>
+                          handleQuickUpdateGeminiInstance(
+                            defaultGeminiInstance,
+                            { bindAccountId: null, followLocalAccount: true },
+                            "默认 Gemini 实例已改为跟随当前本地账号",
+                          )
+                        }
+                      >
+                        跟随当前本地账号
+                      </button>
+                    )}
+                    {!defaultGeminiInstance.follow_local_account &&
+                      currentGeminiAccountId &&
+                      defaultGeminiInstance.bind_account_id !== currentGeminiAccountId && (
+                        <button
+                          className="btn btn-secondary"
+                          onClick={() =>
+                            handleQuickUpdateGeminiInstance(
+                              defaultGeminiInstance,
+                              { bindAccountId: currentGeminiAccountId, followLocalAccount: false },
+                              "默认 Gemini 实例已绑定当前本地账号",
+                            )
+                          }
+                        >
+                          绑定当前本地账号
+                        </button>
+                      )}
+                    {defaultGeminiInstance.project_id && (
+                      <button
+                        className="btn btn-secondary"
+                        onClick={() =>
+                          handleQuickUpdateGeminiInstance(
+                            defaultGeminiInstance,
+                            { projectId: null },
+                            "默认 Gemini 实例已清除项目覆盖",
+                          )
+                        }
+                      >
+                        清除项目覆盖
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -529,20 +1121,114 @@ export default function SettingsPage() {
             {geminiInstances.length === 0 ? (
               <div className="text-muted" style={{ fontSize: 13 }}>当前还没有额外 Gemini 实例</div>
             ) : (
-              geminiInstances.map((instance) => (
+              sortedGeminiInstances.map((instance) => (
                 <div key={instance.id} style={{ padding: "var(--space-3)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", background: "rgba(255,255,255,0.02)" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-3)" }}>
                     <div>
                       <div style={{ fontWeight: 600 }}>{instance.name}</div>
                       <div className="text-muted" style={{ fontSize: 12, wordBreak: "break-all" }}>{instance.user_data_dir}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                        {instance.bind_account_id ? (
+                          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: isCurrentLocalGeminiAccount(instance.bind_account_id) ? "rgba(16,185,129,0.12)" : "rgba(255,255,255,0.08)", color: isCurrentLocalGeminiAccount(instance.bind_account_id) ? "var(--color-success)" : "var(--color-text-secondary)" }}>
+                            绑定账号：{getGeminiAccountLabel(instance.bind_account_id)}
+                            {isCurrentLocalGeminiAccount(instance.bind_account_id) ? " · 当前本地" : ""}
+                          </span>
+                        ) : (
+                          <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "var(--color-text-secondary)" }}>
+                            未绑定账号
+                          </span>
+                        )}
+                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "var(--color-text-secondary)" }}>
+                          实际生效账号：{getGeminiAccountLabel(getEffectiveGeminiAccountId(instance))}
+                        </span>
+                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "var(--color-text-secondary)" }}>
+                          实际生效项目：{getEffectiveGeminiProjectId(instance) || "沿用本地默认行为"}
+                        </span>
+                        <span style={{ fontSize: 11, padding: "2px 8px", borderRadius: 999, background: instance.initialized ? "rgba(16,185,129,0.12)" : "rgba(245,158,11,0.12)", color: instance.initialized ? "var(--color-success)" : "var(--color-warning)" }}>
+                          {instance.initialized ? "已初始化" : "未初始化"}
+                        </span>
+                      </div>
                       <div className="text-muted" style={{ fontSize: 12, marginTop: 6 }}>
-                        {instance.bind_account_id ? `绑定账号 ${instance.bind_account_id}` : "未绑定账号"}
+                        {instance.bind_account_id ? `绑定账号 ${getGeminiAccountLabel(instance.bind_account_id)}` : "未绑定账号"}
                         {" · "}
                         {instance.project_id ? `项目 ${instance.project_id}` : "无项目覆盖"}
                         {" · "}
                         {instance.extra_args ? `参数 ${instance.extra_args}` : "无额外参数"}
                         {" · "}
                         {instance.initialized ? "已初始化" : "未初始化"}
+                        {" · "}
+                        {`最近启动 ${formatGeminiLaunchTime(instance.last_launched_at)}`}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 10 }}>
+                        {getGeminiInstanceWarnings(instance).map((item, index) => (
+                          <div
+                            key={`${instance.id}-warning-${index}`}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: "var(--radius-sm)",
+                              fontSize: 12,
+                              lineHeight: 1.5,
+                              background:
+                                item.tone === "warning"
+                                  ? "rgba(245,158,11,0.12)"
+                                  : item.tone === "success"
+                                    ? "rgba(16,185,129,0.12)"
+                                    : "rgba(59,130,246,0.12)",
+                              color:
+                                item.tone === "warning"
+                                  ? "var(--color-warning)"
+                                  : item.tone === "success"
+                                    ? "var(--color-success)"
+                                    : "var(--color-primary)",
+                            }}
+                          >
+                            {item.text}
+                          </div>
+                        ))}
+                      </div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 }}>
+                        {currentGeminiAccountId && instance.bind_account_id !== currentGeminiAccountId && (
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() =>
+                              handleQuickUpdateGeminiInstance(
+                                instance,
+                                { bindAccountId: currentGeminiAccountId },
+                                `${instance.name} 已绑定当前本地账号`,
+                              )
+                            }
+                          >
+                            绑定当前本地账号
+                          </button>
+                        )}
+                        {instance.project_id && (
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() =>
+                              handleQuickUpdateGeminiInstance(
+                                instance,
+                                { projectId: null },
+                                `${instance.name} 已清除项目覆盖`,
+                              )
+                            }
+                          >
+                            清除项目覆盖
+                          </button>
+                        )}
+                        {!instance.project_id && getGeminiAccountProjectLabel(instance.bind_account_id) && (
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() =>
+                              handleQuickUpdateGeminiInstance(
+                                instance,
+                                { projectId: getGeminiAccountProjectLabel(instance.bind_account_id) },
+                                `${instance.name} 已固定为账号默认项目`,
+                              )
+                            }
+                          >
+                            固定为账号默认项目
+                          </button>
+                        )}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -686,6 +1372,74 @@ export default function SettingsPage() {
               />
               自动安装更新
             </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+              <input
+                type="checkbox"
+                checked={!!updateSettings?.disable_reminders}
+                onChange={(e) =>
+                  handleUpdateSettingChange(
+                    { disable_reminders: e.target.checked },
+                    e.target.checked ? "已关闭更新提醒" : "已恢复更新提醒"
+                  )
+                }
+              />
+              关闭更新提醒（仅手动检查时显示结果）
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+              <span>静默提醒策略</span>
+              <select
+                className="form-input"
+                value={selectedReminderStrategy}
+                onChange={(e) =>
+                  handleUpdateSettingChange(
+                    { silent_reminder_strategy: e.target.value },
+                    "静默提醒策略已保存"
+                  )
+                }
+                disabled={!!updateSettings?.disable_reminders}
+              >
+                <option value="immediate">即时提醒（每次命中都提示）</option>
+                <option value="daily">每日一次（同版本 24 小时内不重复提醒）</option>
+                <option value="weekly">每周一次（同版本 7 天内不重复提醒）</option>
+              </select>
+            </label>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr auto auto", gap: 8, alignItems: "end" }}>
+              <label style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+                <span>跳过指定版本</span>
+                <input
+                  className="form-input"
+                  value={updateSettings?.skip_version || ""}
+                  placeholder="例如 0.1.12"
+                  onChange={(e) =>
+                    handleUpdateSettingChange(
+                      { skip_version: e.target.value || null },
+                      "跳过版本策略已保存"
+                    )
+                  }
+                />
+              </label>
+              <button
+                className="btn btn-secondary"
+                onClick={handleSkipFoundVersion}
+                disabled={!availableUpdate?.version}
+              >
+                跳过当前发现版本
+              </button>
+              <button
+                className="btn btn-secondary"
+                onClick={handleClearSkipVersion}
+                disabled={!updateSettings?.skip_version}
+              >
+                清除跳过
+              </button>
+            </div>
+            <div className="text-muted" style={{ fontSize: 12 }}>
+              当前策略：
+              {updateSettings?.disable_reminders
+                ? " 已关闭提醒"
+                : ` ${selectedReminderStrategy === "weekly" ? "每周一次" : selectedReminderStrategy === "daily" ? "每日一次" : "即时提醒"}`}
+              {updateSettings?.skip_version ? ` · 已跳过 ${updateSettings.skip_version}` : " · 未设置跳过版本"}
+            </div>
             {updateRuntimeInfo?.warning && (
               <div className="alert alert-info" style={{ fontSize: 13 }}>
                 {updateRuntimeInfo.warning}
@@ -845,6 +1599,13 @@ export default function SettingsPage() {
                 <button
                   className="btn btn-secondary"
                   disabled={isCheckingUpdate}
+                  onClick={handleSkipFoundVersion}
+                >
+                  跳过此版本
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  disabled={isCheckingUpdate}
                   onClick={() => setAvailableUpdate(null)}
                 >
                   收起更新详情
@@ -875,11 +1636,133 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="form-label">绑定账号 ID</label>
-                <input className="form-input" value={geminiEditDialog.bindAccountId} onChange={(e) => setGeminiEditDialog({ ...geminiEditDialog, bindAccountId: e.target.value })} />
+                <select
+                  className="form-input"
+                  value={geminiEditDialog.bindAccountId}
+                  onChange={(e) => setGeminiEditDialog({ ...geminiEditDialog, bindAccountId: e.target.value })}
+                  disabled={geminiEditDialog.instance.is_default && geminiEditDialog.followLocalAccount}
+                >
+                  <option value="">未绑定账号</option>
+                  {geminiAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {(account.label?.trim() || account.email)}{currentGeminiAccountId === account.id ? " (当前本地)" : ""}
+                    </option>
+                  ))}
+                </select>
+                <div className="text-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                  {geminiEditDialog.instance.is_default && geminiEditDialog.followLocalAccount
+                    ? `当前会跟随本地 Gemini 账号：${getGeminiAccountLabel(currentGeminiAccountId)}`
+                    : `当前选择：${getGeminiAccountLabel(geminiEditDialog.bindAccountId || null)}`}
+                </div>
               </div>
               <div>
                 <label className="form-label">项目 ID</label>
                 <input className="form-input" value={geminiEditDialog.projectId} onChange={(e) => setGeminiEditDialog({ ...geminiEditDialog, projectId: e.target.value })} />
+                <div className="text-muted" style={{ fontSize: 12, marginTop: 6 }}>
+                  {editSelectedGeminiProjectId
+                    ? `实例会固定使用项目 ${editSelectedGeminiProjectId}`
+                    : editAccountProjectId
+                      ? `当前会沿用账号默认项目 ${editAccountProjectId}`
+                      : "当前没有项目覆盖，会直接沿用本地 Gemini 默认行为"}
+                </div>
+              </div>
+              {geminiEditDialog.instance.is_default && (
+                <label style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 13 }}>
+                  <input
+                    type="checkbox"
+                    checked={geminiEditDialog.followLocalAccount}
+                    onChange={(e) => setGeminiEditDialog({ ...geminiEditDialog, followLocalAccount: e.target.checked })}
+                  />
+                  跟随当前本地 Gemini 账号
+                </label>
+              )}
+              {geminiEditDialog.instance.is_default && geminiEditDialog.followLocalAccount && !currentGeminiAccountId && (
+                <div className="alert alert-info" style={{ fontSize: 13 }}>
+                  当前没有解析到本地 Gemini 账号。若继续保持跟随模式，默认实例启动时不会有可注入的账号。
+                </div>
+              )}
+              {!geminiEditDialog.instance.is_default || !geminiEditDialog.followLocalAccount ? (
+                editEffectiveGeminiAccountId && currentGeminiAccountId && editEffectiveGeminiAccountId !== currentGeminiAccountId ? (
+                  <div className="alert alert-info" style={{ fontSize: 13 }}>
+                    这个实例启动时会把当前本地账号从 {getGeminiAccountLabel(currentGeminiAccountId)} 切换为 {getGeminiAccountLabel(editEffectiveGeminiAccountId)}。
+                  </div>
+                ) : null
+              ) : null}
+              {editSelectedGeminiProjectId && editAccountProjectId && editSelectedGeminiProjectId !== editAccountProjectId && (
+                <div className="alert alert-info" style={{ fontSize: 13 }}>
+                  实例项目 {editSelectedGeminiProjectId} 会覆盖账号默认项目 {editAccountProjectId}。
+                </div>
+              )}
+              <div
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: "var(--radius-sm)",
+                  background: "rgba(255,255,255,0.04)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                }}
+              >
+                <div style={{ fontSize: 12, fontWeight: 600 }}>快捷修正建议</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {geminiEditDialog.instance.is_default && currentGeminiAccountId && !geminiEditDialog.followLocalAccount && (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => applyGeminiEditPatch({ followLocalAccount: true, bindAccountId: "" })}
+                    >
+                      改为跟随当前本地账号
+                    </button>
+                  )}
+                  {!geminiEditDialog.followLocalAccount && currentGeminiAccountId && geminiEditDialog.bindAccountId !== currentGeminiAccountId && (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => applyGeminiEditPatch({ bindAccountId: currentGeminiAccountId })}
+                    >
+                      改为绑定当前本地账号
+                    </button>
+                  )}
+                  {!geminiEditDialog.followLocalAccount && !geminiEditDialog.bindAccountId && currentGeminiAccountId && (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => applyGeminiEditPatch({ bindAccountId: currentGeminiAccountId })}
+                    >
+                      绑定当前本地账号
+                    </button>
+                  )}
+                  {editSelectedGeminiProjectId && (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => applyGeminiEditPatch({ projectId: "" })}
+                    >
+                      清除实例项目覆盖
+                    </button>
+                  )}
+                  {!editSelectedGeminiProjectId && editAccountProjectId && (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => applyGeminiEditPatch({ projectId: editAccountProjectId })}
+                    >
+                      固定为账号默认项目
+                    </button>
+                  )}
+                  {geminiEditDialog.followLocalAccount && !currentGeminiAccountId && geminiAccounts.length > 0 && (
+                    <button
+                      className="btn btn-secondary"
+                      type="button"
+                      onClick={() => applyGeminiEditPatch({ followLocalAccount: false, bindAccountId: geminiAccounts[0]?.id || "" })}
+                    >
+                      改为固定绑定账号
+                    </button>
+                  )}
+                </div>
+                <div className="text-muted" style={{ fontSize: 12 }}>
+                  这些操作只会改当前弹层里的配置草稿，真正生效仍然要点保存。
+                </div>
               </div>
               <div className="modal-footer">
                 <button className="btn btn-ghost" onClick={() => setGeminiEditDialog(null)}>取消</button>
@@ -890,8 +1773,11 @@ export default function SettingsPage() {
                       await api.geminiInstances.update(
                         geminiEditDialog.instance.id,
                         geminiEditDialog.extraArgs,
-                        geminiEditDialog.bindAccountId.trim() || null,
+                        geminiEditDialog.instance.is_default && geminiEditDialog.followLocalAccount
+                          ? null
+                          : geminiEditDialog.bindAccountId.trim() || null,
                         geminiEditDialog.projectId.trim() || null,
+                        geminiEditDialog.instance.is_default ? geminiEditDialog.followLocalAccount : null,
                       );
                       setGeminiInstanceMsg("Gemini 实例设置已更新");
                       setGeminiEditDialog(null);

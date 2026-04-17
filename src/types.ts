@@ -315,6 +315,14 @@ export interface IdeAccount {
   tags?: string[];
 }
 
+export interface AccountGroup {
+  id: string;
+  name: string;
+  account_ids: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 渠道专属模型配置（存储在 ProviderConfig.extra_config 字段中）
 // ─────────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 use crate::services::update_manager::{
-    LinuxInstallResult, LinuxReleaseInfo, UpdateManager, UpdateRuntimeInfo, UpdateSettings,
+    LinuxInstallResult, LinuxReleaseInfo, UpdateManager, UpdateReminderDecision, UpdateRuntimeInfo,
+    UpdateSettings,
 };
 use tauri::{AppHandle, Manager};
 use tauri_plugin_opener::OpenerExt;
@@ -23,6 +24,19 @@ pub fn save_update_settings(app: AppHandle, settings: UpdateSettings) -> Result<
 #[tauri::command]
 pub fn update_last_check_time(app: AppHandle) -> Result<UpdateSettings, String> {
     UpdateManager::mark_checked_now(&app_data_dir(&app)?)
+}
+
+#[tauri::command]
+pub fn mark_update_reminded(app: AppHandle, version: String) -> Result<UpdateSettings, String> {
+    UpdateManager::mark_reminded_now(&app_data_dir(&app)?, &version)
+}
+
+#[tauri::command]
+pub fn evaluate_update_reminder_policy(
+    app: AppHandle,
+    version: String,
+) -> Result<UpdateReminderDecision, String> {
+    UpdateManager::evaluate_reminder_policy(&app_data_dir(&app)?, &version)
 }
 
 #[tauri::command]

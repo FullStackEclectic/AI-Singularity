@@ -52,6 +52,8 @@ pub fn wakeup_run_verification_batch(
     prompt: String,
     command_template: String,
     timeout_seconds: Option<u64>,
+    retry_failed_times: Option<u8>,
+    run_id: Option<String>,
 ) -> Result<WakeupVerificationBatchResult, String> {
     WakeupService::run_verification_batch(
         &app,
@@ -60,7 +62,14 @@ pub fn wakeup_run_verification_batch(
         &prompt,
         &command_template,
         timeout_seconds.unwrap_or(120).max(10),
+        retry_failed_times.unwrap_or(1).min(5) as usize,
+        run_id.as_deref(),
     )
+}
+
+#[tauri::command]
+pub fn wakeup_cancel_verification_run(run_id: String) -> Result<bool, String> {
+    WakeupService::cancel_verification_run(&run_id)
 }
 
 #[tauri::command]

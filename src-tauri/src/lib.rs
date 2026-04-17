@@ -76,6 +76,9 @@ pub fn run() {
 
             // --- 本地 WebSocket 广播服务 ---
             tauri::async_runtime::spawn(crate::services::websocket::start_server());
+            tauri::async_runtime::spawn(crate::services::web_report::start_server(
+                app_data_dir.clone(),
+            ));
 
             app.manage(db);
 
@@ -134,6 +137,16 @@ pub fn run() {
             commands::announcement::announcement_mark_as_read,
             commands::announcement::announcement_mark_all_as_read,
             commands::announcement::announcement_force_refresh,
+            commands::account_group::list_account_groups,
+            commands::account_group::create_account_group,
+            commands::account_group::rename_account_group,
+            commands::account_group::delete_account_group,
+            commands::account_group::assign_ide_accounts_to_group,
+            commands::account_group::remove_ide_accounts_from_group,
+            commands::floating_account_card::list_floating_account_cards,
+            commands::floating_account_card::create_floating_account_card,
+            commands::floating_account_card::update_floating_account_card,
+            commands::floating_account_card::delete_floating_account_card,
             commands::logs::list_desktop_logs,
             commands::logs::read_desktop_log,
             commands::logs::export_desktop_log,
@@ -172,7 +185,9 @@ pub fn run() {
             commands::provider::delete_provider,
             commands::provider::update_providers_order,
             commands::provider::fetch_provider_models,
+            commands::token_calculator::fetch_remote_model_pricing,
             commands::provider_current::get_provider_current_account_id,
+            commands::provider_current::list_provider_current_account_snapshots,
             commands::mcp::get_mcps,
             commands::mcp::add_mcp,
             commands::mcp::toggle_mcp,
@@ -210,6 +225,7 @@ pub fn run() {
             commands::session::sync_codex_threads_across_instances,
             commands::session::list_codex_instances,
             commands::session::get_default_codex_instance,
+            commands::session::sync_codex_instance_shared_resources,
             commands::session::add_codex_instance,
             commands::session::delete_codex_instance,
             commands::session::update_codex_instance_settings,
@@ -237,14 +253,18 @@ pub fn run() {
             commands::ide_account::get_all_ide_accounts,
             commands::ide_account::import_ide_accounts,
             commands::ide_account::delete_ide_account,
+            commands::ide_account::batch_delete_ide_accounts,
             commands::ide_account::update_ide_account_tags,
+            commands::ide_account::batch_update_ide_account_tags,
             commands::ide_account::update_ide_account_label,
             commands::ide_account::update_api_key_tags,
             commands::ide_account::refresh_ide_account,
             commands::ide_account::refresh_all_ide_accounts_by_platform,
+            commands::ide_account::batch_refresh_ide_accounts,
             commands::ide_account::list_gemini_cloud_projects_for_ide_account,
             commands::ide_account::set_gemini_project_for_ide_account,
             commands::ide_account::update_codex_api_key_credentials_for_ide_account,
+            commands::ide_account::execute_ide_account_status_action,
             commands::ide_account::export_ide_accounts,
             // 本地 IDE 账号扫描器
             commands::ide_scanner::scan_ide_accounts_from_local,
@@ -267,9 +287,13 @@ pub fn run() {
             // 局域网兵工厂分发
             commands::tools::check_tool_status,
             commands::tools::deploy_tool,
+            commands::tray::tray_get_platform_scope,
+            commands::tray::tray_set_platform_scope,
             commands::update::get_update_settings,
             commands::update::save_update_settings,
             commands::update::update_last_check_time,
+            commands::update::mark_update_reminded,
+            commands::update::evaluate_update_reminder_policy,
             commands::update::get_update_runtime_info,
             commands::update::get_linux_update_release_info,
             commands::update::open_update_asset_url,
@@ -280,8 +304,11 @@ pub fn run() {
             commands::wakeup::wakeup_add_history,
             commands::wakeup::wakeup_clear_history,
             commands::wakeup::wakeup_run_verification_batch,
+            commands::wakeup::wakeup_cancel_verification_run,
             commands::wakeup::wakeup_run_task_now,
             commands::websocket::get_websocket_status,
+            commands::web_report::get_web_report_port,
+            commands::web_report::get_web_report_status,
             // 洗脑芯片 (强连)
             commands::injector::force_inject_ide,
             // SaaS 分发管理 (User Tokens)

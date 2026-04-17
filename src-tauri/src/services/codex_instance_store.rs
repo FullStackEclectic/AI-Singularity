@@ -2,6 +2,7 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
+use crate::services::codex_shared::inspect_instance_shared_resources;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +30,20 @@ pub struct CodexInstanceRecord {
     pub is_default: bool,
     #[serde(default)]
     pub follow_local_account: bool,
+    #[serde(default)]
+    pub has_shared_skills: bool,
+    #[serde(default)]
+    pub has_shared_rules: bool,
+    #[serde(default)]
+    pub has_shared_vendor_imports_skills: bool,
+    #[serde(default)]
+    pub has_shared_agents_file: bool,
+    #[serde(default)]
+    pub has_shared_conflicts: bool,
+    #[serde(default)]
+    pub shared_conflict_paths: Vec<String>,
+    #[serde(default)]
+    pub shared_strategy_version: String,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -121,6 +136,7 @@ impl CodexInstanceStore {
         follow_local_account: bool,
     ) -> CodexInstanceRecord {
         let dir = PathBuf::from(&user_data_dir);
+        let shared = inspect_instance_shared_resources(&dir);
         CodexInstanceRecord {
             id,
             name,
@@ -135,6 +151,13 @@ impl CodexInstanceStore {
             running: last_pid.is_some_and(crate::services::codex_runtime::is_pid_running),
             is_default,
             follow_local_account,
+            has_shared_skills: shared.has_skills,
+            has_shared_rules: shared.has_rules,
+            has_shared_vendor_imports_skills: shared.has_vendor_imports_skills,
+            has_shared_agents_file: shared.has_agents_file,
+            has_shared_conflicts: shared.has_conflicts,
+            shared_conflict_paths: shared.conflict_paths,
+            shared_strategy_version: shared.shared_strategy_version,
         }
     }
 

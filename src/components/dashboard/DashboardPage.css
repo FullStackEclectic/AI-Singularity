@@ -162,6 +162,64 @@
   color: var(--color-text-muted);
 }
 
+.current-account-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: var(--space-4);
+}
+
+.current-account-panel-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.current-account-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.current-account-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.current-account-platform {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  min-width: 72px;
+}
+
+.current-account-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.current-account-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  word-break: break-all;
+}
+
+.current-account-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
 /* 图表网格系统 */
 .charts-grid {
   display: grid;
@@ -218,5 +276,15 @@
 @media (max-width: 1400px) {
   .advanced-charts-grid {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .current-account-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 900px) {
+  .current-account-list {
+    grid-template-columns: 1fr;
   }
 }

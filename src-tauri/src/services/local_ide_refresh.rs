@@ -46,6 +46,38 @@ impl LocalIdeRefreshService {
         Self::merge_scanned_account(db, id, scanned)
     }
 
+    pub fn refresh_codebuddy_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        let scanned = IdeScanner::import_codebuddy_from_local()?
+            .into_iter()
+            .next()
+            .ok_or_else(|| "未读取到可用的 CodeBuddy 本地登录态".to_string())?;
+        Self::merge_scanned_account(db, id, scanned)
+    }
+
+    pub fn refresh_codebuddy_cn_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        let scanned = IdeScanner::import_codebuddy_cn_from_local()?
+            .into_iter()
+            .next()
+            .ok_or_else(|| "未读取到可用的 CodeBuddy CN 本地登录态".to_string())?;
+        Self::merge_scanned_account(db, id, scanned)
+    }
+
+    pub fn refresh_workbuddy_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        let scanned = IdeScanner::import_workbuddy_from_local()?
+            .into_iter()
+            .next()
+            .ok_or_else(|| "未读取到可用的 WorkBuddy 本地登录态".to_string())?;
+        Self::merge_scanned_account(db, id, scanned)
+    }
+
+    pub fn refresh_zed_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        let scanned = IdeScanner::import_zed_from_local()?
+            .into_iter()
+            .next()
+            .ok_or_else(|| "未读取到可用的 Zed 本地登录态".to_string())?;
+        Self::merge_scanned_account(db, id, scanned)
+    }
+
     pub fn refresh_all_by_platform(db: &Database, platform: &str) -> Result<usize, String> {
         let platform_lower = platform.to_ascii_lowercase();
         let target_ids = db
@@ -64,6 +96,10 @@ impl LocalIdeRefreshService {
                 "kiro" => Self::refresh_kiro_account(db, &id),
                 "qoder" => Self::refresh_qoder_account(db, &id),
                 "trae" => Self::refresh_trae_account(db, &id),
+                "codebuddy" => Self::refresh_codebuddy_account(db, &id),
+                "codebuddy_cn" => Self::refresh_codebuddy_cn_account(db, &id),
+                "workbuddy" => Self::refresh_workbuddy_account(db, &id),
+                "zed" => Self::refresh_zed_account(db, &id),
                 _ => Err(format!("{} 暂不支持本地刷新", platform)),
             };
             if result.is_ok() {

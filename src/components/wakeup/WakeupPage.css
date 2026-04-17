@@ -92,6 +92,11 @@
   background: var(--color-bg-secondary);
 }
 
+.wakeup-history-subitem {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
 .wakeup-task-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
@@ -156,6 +161,56 @@
   line-height: 1.55;
 }
 
+.wakeup-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(120px, 1fr));
+  gap: 8px;
+}
+
+.wakeup-category-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  font-size: 12px;
+}
+
+.wakeup-category-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+}
+
+.wakeup-category-badge.success {
+  color: var(--color-success);
+  border-color: color-mix(in srgb, var(--color-success) 40%, transparent);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+}
+
+.wakeup-category-badge.warning {
+  color: var(--color-warning);
+  border-color: color-mix(in srgb, var(--color-warning) 40%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+}
+
+.wakeup-category-badge.danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 40%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+}
+
+.wakeup-category-badge.muted {
+  color: var(--color-text-muted);
+}
+
 .wakeup-verification-config,
 .wakeup-verification-result {
   display: flex;
@@ -183,6 +238,19 @@
   background: var(--color-bg-secondary);
 }
 
+.wakeup-group-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.wakeup-group-filters .btn.active {
+  border-color: var(--accent-primary, #2563eb);
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--accent-primary, #2563eb);
+}
+
 .wakeup-verification-account {
   display: flex;
   align-items: center;
@@ -207,6 +275,10 @@
   .wakeup-overview,
   .wakeup-layout {
     grid-template-columns: 1fr;
+  }
+
+  .wakeup-category-grid {
+    grid-template-columns: repeat(2, minmax(120px, 1fr));
   }
 }
 

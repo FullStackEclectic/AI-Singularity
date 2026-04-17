@@ -5,6 +5,7 @@ use crate::services::codex_ide::CodexIdeService;
 use crate::services::event_bus::EventBus;
 use crate::services::gemini_ide::{GeminiCloudProject, GeminiIdeService};
 use crate::services::local_ide_refresh::LocalIdeRefreshService;
+use crate::services::platform_status_action::{IdeStatusActionResult, PlatformStatusActionService};
 use tauri::{AppHandle, State};
 
 #[derive(serde::Serialize)]
@@ -36,6 +37,7 @@ pub async fn import_ide_accounts(
         }
     }
     if count > 0 {
+        crate::tray::update_tray_menu(&app);
         EventBus::emit_data_changed(&app, "ide_accounts", "import", "ide_account.import");
     }
     Ok(count)
@@ -45,9 +47,30 @@ pub async fn import_ide_accounts(
 pub async fn delete_ide_account(app: AppHandle, db: State<'_, Database>, id: String) -> AppResult<usize> {
     let count = db.delete_ide_account(&id)?;
     if count > 0 {
+        crate::tray::update_tray_menu(&app);
         EventBus::emit_data_changed(&app, "ide_accounts", "delete", "ide_account.delete");
     }
     Ok(count)
+}
+
+#[tauri::command]
+pub async fn batch_delete_ide_accounts(
+    app: AppHandle,
+    db: State<'_, Database>,
+    ids: Vec<String>,
+) -> AppResult<usize> {
+    let mut deleted = 0usize;
+    for id in ids {
+        let count = db.delete_ide_account(&id)?;
+        if count > 0 {
+            deleted += count;
+        }
+    }
+    if deleted > 0 {
+        crate::tray::update_tray_menu(&app);
+        EventBus::emit_data_changed(&app, "ide_accounts", "batch_delete", "ide_account.batch_delete");
+    }
+    Ok(deleted)
 }
 
 /// 更新 IDE 账号标签列表
@@ -62,6 +85,26 @@ pub async fn update_ide_account_tags(
     db.update_ide_account_tags(&id, &tags_json)?;
     EventBus::emit_data_changed(&app, "ide_accounts", "update_tags", "ide_account.update_tags");
     Ok(())
+}
+
+#[tauri::command]
+pub async fn batch_update_ide_account_tags(
+    app: AppHandle,
+    db: State<'_, Database>,
+    ids: Vec<String>,
+    tags: Vec<String>,
+) -> AppResult<usize> {
+    let tags_json = serde_json::to_string(&tags).unwrap_or_else(|_| "[]".to_string());
+    let mut updated = 0usize;
+    for id in ids {
+        if db.update_ide_account_tags(&id, &tags_json)? > 0 {
+            updated += 1;
+        }
+    }
+    if updated > 0 {
+        EventBus::emit_data_changed(&app, "ide_accounts", "batch_update_tags", "ide_account.batch_update_tags");
+    }
+    Ok(updated)
 }
 
 #[tauri::command]
@@ -111,8 +154,13 @@ pub async fn refresh_ide_account(
         "kiro" => LocalIdeRefreshService::refresh_kiro_account(&*db, &account.id),
         "qoder" => LocalIdeRefreshService::refresh_qoder_account(&*db, &account.id),
         "trae" => LocalIdeRefreshService::refresh_trae_account(&*db, &account.id),
+        "codebuddy" => LocalIdeRefreshService::refresh_codebuddy_account(&*db, &account.id),
+        "codebuddy_cn" => LocalIdeRefreshService::refresh_codebuddy_cn_account(&*db, &account.id),
+        "workbuddy" => LocalIdeRefreshService::refresh_workbuddy_account(&*db, &account.id),
+        "zed" => LocalIdeRefreshService::refresh_zed_account(&*db, &account.id),
         other => Err(format!("{} 暂不支持刷新账号状态", other)),
     }?;
+    crate::tray::update_tray_menu(&app);
     EventBus::emit_data_changed(&app, "ide_accounts", "refresh", "ide_account.refresh");
     Ok(refreshed)
 }
@@ -131,10 +179,56 @@ pub async fn refresh_all_ide_accounts_by_platform(
         "kiro" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "kiro"),
         "qoder" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "qoder"),
         "trae" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "trae"),
+        "codebuddy" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "codebuddy"),
+        "codebuddy_cn" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "codebuddy_cn"),
+        "workbuddy" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "workbuddy"),
+        "zed" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "zed"),
         other => Err(format!("{} 暂不支持批量刷新", other)),
     }?;
     if count > 0 {
+        crate::tray::update_tray_menu(&app);
         EventBus::emit_data_changed(&app, "ide_accounts", "refresh_all", "ide_account.refresh_all");
+    }
+    Ok(count)
+}
+
+#[tauri::command]
+pub async fn batch_refresh_ide_accounts(
+    app: AppHandle,
+    db: State<'_, Database>,
+    ids: Vec<String>,
+) -> Result<usize, String> {
+    let accounts = db.get_all_ide_accounts().map_err(|e| e.to_string())?;
+    let mut count = 0usize;
+
+    for id in ids {
+        let Some(account) = accounts.iter().find(|item| item.id == id) else {
+            continue;
+        };
+
+        let result = match account.origin_platform.to_ascii_lowercase().as_str() {
+            "gemini" => GeminiIdeService::refresh_account(&*db, &account.id).await.map(|_| ()),
+            "codex" => CodexIdeService::refresh_account(&*db, &account.id).await.map(|_| ()),
+            "cursor" => LocalIdeRefreshService::refresh_cursor_account(&*db, &account.id).map(|_| ()),
+            "windsurf" => LocalIdeRefreshService::refresh_windsurf_account(&*db, &account.id).map(|_| ()),
+            "kiro" => LocalIdeRefreshService::refresh_kiro_account(&*db, &account.id).map(|_| ()),
+            "qoder" => LocalIdeRefreshService::refresh_qoder_account(&*db, &account.id).map(|_| ()),
+            "trae" => LocalIdeRefreshService::refresh_trae_account(&*db, &account.id).map(|_| ()),
+            "codebuddy" => LocalIdeRefreshService::refresh_codebuddy_account(&*db, &account.id).map(|_| ()),
+            "codebuddy_cn" => LocalIdeRefreshService::refresh_codebuddy_cn_account(&*db, &account.id).map(|_| ()),
+            "workbuddy" => LocalIdeRefreshService::refresh_workbuddy_account(&*db, &account.id).map(|_| ()),
+            "zed" => LocalIdeRefreshService::refresh_zed_account(&*db, &account.id).map(|_| ()),
+            _ => Err(format!("{} 暂不支持批量刷新", account.origin_platform)),
+        };
+
+        if result.is_ok() {
+            count += 1;
+        }
+    }
+
+    if count > 0 {
+        crate::tray::update_tray_menu(&app);
+        EventBus::emit_data_changed(&app, "ide_accounts", "batch_refresh", "ide_account.batch_refresh");
     }
     Ok(count)
 }
@@ -155,6 +249,7 @@ pub async fn set_gemini_project_for_ide_account(
     project_id: Option<String>,
 ) -> Result<IdeAccount, String> {
     let account = GeminiIdeService::set_project_id(&*db, &id, project_id.as_deref())?;
+    crate::tray::update_tray_menu(&app);
     EventBus::emit_data_changed(&app, "ide_accounts", "set_project", "ide_account.set_gemini_project");
     Ok(account)
 }
@@ -168,8 +263,24 @@ pub async fn update_codex_api_key_credentials_for_ide_account(
     api_base_url: Option<String>,
 ) -> Result<IdeAccount, String> {
     let account = CodexIdeService::update_api_key_credentials(&*db, &id, &api_key, api_base_url.as_deref())?;
+    crate::tray::update_tray_menu(&app);
     EventBus::emit_data_changed(&app, "ide_accounts", "update_codex_api_key", "ide_account.update_codex_api_key");
     Ok(account)
+}
+
+#[tauri::command]
+pub async fn execute_ide_account_status_action(
+    app: AppHandle,
+    db: State<'_, Database>,
+    id: String,
+    action: String,
+    retry_failed_times: Option<u8>,
+) -> Result<IdeStatusActionResult, String> {
+    let result =
+        PlatformStatusActionService::execute(&*db, &id, &action, retry_failed_times).await?;
+    crate::tray::update_tray_menu(&app);
+    EventBus::emit_data_changed(&app, "ide_accounts", "status_action", "ide_account.status_action");
+    Ok(result)
 }
 
 #[tauri::command]

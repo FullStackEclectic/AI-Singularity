@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { ApiKey, Balance, BalanceSummary, DashboardStats, Platform, ProviderConfig, McpServer, EnvConflict, TokenUsageStat, Model } from "../types";
+import type { ApiKey, Balance, BalanceSummary, DashboardStats, Platform, ProviderConfig, McpServer, EnvConflict, TokenUsageStat, Model, AccountGroup } from "../types";
 
 export interface AddKeyRequest {
   name: string;
@@ -36,6 +36,7 @@ export interface GeminiInstanceRecord {
   last_launched_at?: string | null;
   initialized: boolean;
   is_default?: boolean;
+  follow_local_account?: boolean;
 }
 
 export interface GeminiInstanceLaunchInfo {
@@ -60,10 +61,50 @@ export interface DesktopLogReadResult {
   content: string;
 }
 
+export interface TokenCalculatorRemoteModelPricing {
+  id: string;
+  name?: string | null;
+  description?: string | null;
+  input_price_per_1m?: number | null;
+  output_price_per_1m?: number | null;
+  cache_read_price_per_1m?: number | null;
+  fixed_price_usd?: number | null;
+  quota_type?: number | null;
+  model_ratio?: number | null;
+  completion_ratio?: number | null;
+  cache_ratio?: number | null;
+  model_price?: number | null;
+  enable_groups?: string[];
+  vendor_id?: number | null;
+  recommended_group?: string | null;
+}
+
+export interface FetchRemoteModelPricingResponse {
+  models: TokenCalculatorRemoteModelPricing[];
+  source_endpoint: string;
+  warnings: string[];
+  provider_kind?: string | null;
+  quota_per_unit?: number | null;
+  group_ratios: Record<string, number>;
+  group_labels: Record<string, string>;
+  auto_groups: string[];
+}
+
 export interface UpdateSettings {
   auto_check: boolean;
   auto_install: boolean;
+  skip_version?: string | null;
+  disable_reminders?: boolean;
+  silent_reminder_strategy?: "immediate" | "daily" | "weekly" | string;
+  last_reminded_at?: string | null;
+  last_reminded_version?: string | null;
   last_check_at?: string | null;
+}
+
+export interface UpdateReminderDecision {
+  should_notify: boolean;
+  reason: string;
+  settings: UpdateSettings;
 }
 
 export interface UpdateRuntimeInfo {
@@ -105,6 +146,87 @@ export interface WebSocketStatus {
   client_count: number;
 }
 
+export interface CurrentAccountSnapshot {
+  platform: string;
+  account_id?: string | null;
+  label?: string | null;
+  email?: string | null;
+  status?: string | null;
+}
+
+export interface IdeStatusActionResult {
+  account_id: string;
+  platform: string;
+  action: string;
+  success: boolean;
+  message: string;
+  reward?: Record<string, unknown> | null;
+  next_checkin_in?: number | null;
+  attempts: number;
+  retried: boolean;
+  retryable: boolean;
+  executed_at: string;
+}
+
+export type FloatingAccountCardScope = "global" | "instance";
+
+export interface FloatingAccountCard {
+  id: string;
+  scope: FloatingAccountCardScope;
+  instance_id?: string | null;
+  title: string;
+  bound_platforms: string[];
+  window_label?: string | null;
+  always_on_top: boolean;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  collapsed: boolean;
+  visible: boolean;
+  updated_at: string;
+}
+
+export interface CreateFloatingAccountCardRequest {
+  scope?: FloatingAccountCardScope;
+  instance_id?: string | null;
+  title?: string | null;
+  bound_platforms?: string[];
+  window_label?: string | null;
+  always_on_top?: boolean;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  collapsed?: boolean;
+  visible?: boolean;
+}
+
+export interface UpdateFloatingAccountCardPatch {
+  scope?: FloatingAccountCardScope;
+  instance_id?: string | null;
+  title?: string;
+  bound_platforms?: string[];
+  window_label?: string | null;
+  always_on_top?: boolean;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  collapsed?: boolean;
+  visible?: boolean;
+}
+
+export interface WebReportStatus {
+  running: boolean;
+  port?: number | null;
+  local_url?: string | null;
+  health_url?: string | null;
+  status_api_url?: string | null;
+  snapshot_api_url?: string | null;
+  auth_enabled: boolean;
+}
+
 export interface AnnouncementAction {
   type: string;
   target: string;
@@ -138,17 +260,27 @@ export interface WakeupTask {
   name: string;
   enabled: boolean;
   account_id: string;
+  trigger_mode?: string;
+  reset_window?: string;
+  window_day_policy?: string;
+  window_fallback_policy?: string;
+  client_version_mode?: string;
+  client_version_fallback_mode?: string;
   command_template: string;
   model: string;
   prompt: string;
   cron: string;
   notes?: string | null;
   timeout_seconds: number;
+  retry_failed_times?: number;
+  pause_after_failures?: number;
   created_at: string;
   updated_at: string;
   last_run_at?: string | null;
   last_status?: string | null;
+  last_category?: string | null;
   last_message?: string | null;
+  consecutive_failures?: number;
 }
 
 export interface WakeupState {
@@ -158,11 +290,13 @@ export interface WakeupState {
 
 export interface WakeupHistoryItem {
   id: string;
+  run_id?: string | null;
   task_id?: string | null;
   task_name: string;
   account_id: string;
   model: string;
   status: string;
+  category?: string;
   message?: string | null;
   created_at: string;
 }
@@ -171,13 +305,23 @@ export interface WakeupVerificationBatchItem {
   account_id: string;
   email: string;
   status: string;
+  category: string;
+  attempts: number;
   message: string;
+}
+
+export interface WakeupCategoryCount {
+  category: string;
+  count: number;
 }
 
 export interface WakeupVerificationBatchResult {
   executed_count: number;
   success_count: number;
   failed_count: number;
+  retried_count: number;
+  canceled: boolean;
+  category_counts: WakeupCategoryCount[];
   items: WakeupVerificationBatchItem[];
 }
 
@@ -230,6 +374,14 @@ export const api = {
     byPlatform: (platform: string): Promise<Model[]> => invoke("get_platform_models", { platform }),
   },
 
+  tokenCalculator: {
+    fetchRemotePricing: (request: {
+      base_url: string;
+      api_key?: string;
+    }): Promise<FetchRemoteModelPricingResponse> =>
+      invoke("fetch_remote_model_pricing", { request }),
+  },
+
   providers: {
     list:   (): Promise<ProviderConfig[]>       => invoke("get_providers"),
     add:    (provider: any): Promise<void>      => invoke("add_provider", { provider }),
@@ -249,6 +401,27 @@ export const api = {
   providerCurrent: {
     getAccountId: (platform: string): Promise<string | null> =>
       invoke("get_provider_current_account_id", { platform }),
+    listSnapshots: (): Promise<CurrentAccountSnapshot[]> =>
+      invoke("list_provider_current_account_snapshots"),
+  },
+
+  floatingCards: {
+    list: (): Promise<FloatingAccountCard[]> =>
+      invoke("list_floating_account_cards"),
+    create: (request: CreateFloatingAccountCardRequest): Promise<FloatingAccountCard> =>
+      invoke("create_floating_account_card", { request }),
+    update: (
+      id: string,
+      patch: UpdateFloatingAccountCardPatch,
+      expectedUpdatedAt?: string | null,
+    ): Promise<FloatingAccountCard> =>
+      invoke("update_floating_account_card", {
+        id,
+        patch,
+        expectedUpdatedAt: expectedUpdatedAt ?? null,
+      }),
+    delete: (id: string): Promise<boolean> =>
+      invoke("delete_floating_account_card", { id }),
   },
 
   mcp: {
@@ -277,14 +450,30 @@ export const api = {
 
   ideAccounts: {
     list:   (): Promise<any[]>                  => invoke("get_all_ide_accounts"),
+    listGroups: (): Promise<AccountGroup[]>    => invoke("list_account_groups"),
+    createGroup: (name: string): Promise<AccountGroup>  => invoke("create_account_group", { name }),
+    renameGroup: (id: string, name: string): Promise<AccountGroup> =>
+      invoke("rename_account_group", { id, name }),
+    deleteGroup: (id: string): Promise<boolean> =>
+      invoke("delete_account_group", { id }),
+    assignToGroup: (groupId: string, ids: string[]): Promise<AccountGroup> =>
+      invoke("assign_ide_accounts_to_group", { groupId, ids }),
+    removeFromGroup: (groupId: string, ids: string[]): Promise<AccountGroup> =>
+      invoke("remove_ide_accounts_from_group", { groupId, ids }),
     import: (accounts: any[]): Promise<number>  => invoke("import_ide_accounts", { accounts }),
     export: (ids: string[]): Promise<string>    => invoke("export_ide_accounts", { ids }),
     delete: (id: string): Promise<number>       => invoke("delete_ide_account", { id }),
+    batchDelete: (ids: string[]): Promise<number> =>
+      invoke("batch_delete_ide_accounts", { ids }),
+    batchUpdateTags: (ids: string[], tags: string[]): Promise<number> =>
+      invoke("batch_update_ide_account_tags", { ids, tags }),
     updateLabel: (id: string, label?: string | null): Promise<void> =>
       invoke("update_ide_account_label", { id, label: label ?? null }),
     refresh: (id: string): Promise<any>         => invoke("refresh_ide_account", { id }),
     refreshAllByPlatform: (platform: string): Promise<number> =>
       invoke("refresh_all_ide_accounts_by_platform", { platform }),
+    batchRefresh: (ids: string[]): Promise<number> =>
+      invoke("batch_refresh_ide_accounts", { ids }),
     listGeminiProjects: (id: string): Promise<GeminiCloudProject[]> =>
       invoke("list_gemini_cloud_projects_for_ide_account", { id }),
     setGeminiProject: (id: string, projectId?: string | null): Promise<any> =>
@@ -294,6 +483,16 @@ export const api = {
         id,
         apiKey,
         apiBaseUrl: apiBaseUrl ?? null,
+      }),
+    runStatusAction: (
+      id: string,
+      action: string,
+      retryFailedTimes?: number | null,
+    ): Promise<IdeStatusActionResult> =>
+      invoke("execute_ide_account_status_action", {
+        id,
+        action,
+        retryFailedTimes: retryFailedTimes ?? null,
       }),
     launchSandbox: (commandStr: string, proxyPort: number): Promise<void> => 
       invoke("launch_tool_sandboxed", { commandStr, proxyPort }),
@@ -329,6 +528,10 @@ export const api = {
     getSettings: (): Promise<UpdateSettings> => invoke("get_update_settings"),
     saveSettings: (settings: UpdateSettings): Promise<void> => invoke("save_update_settings", { settings }),
     markCheckedNow: (): Promise<UpdateSettings> => invoke("update_last_check_time"),
+    markReminded: (version: string): Promise<UpdateSettings> =>
+      invoke("mark_update_reminded", { version }),
+    evaluateReminderPolicy: (version: string): Promise<UpdateReminderDecision> =>
+      invoke("evaluate_update_reminder_policy", { version }),
     getRuntimeInfo: (): Promise<UpdateRuntimeInfo> => invoke("get_update_runtime_info"),
     getLinuxReleaseInfo: (): Promise<LinuxReleaseInfo> => invoke("get_linux_update_release_info"),
     openAssetUrl: (url: string): Promise<void> => invoke("open_update_asset_url", { url }),
@@ -346,6 +549,11 @@ export const api = {
 
   websocket: {
     getStatus: (): Promise<WebSocketStatus> => invoke("get_websocket_status"),
+  },
+
+  webReport: {
+    getPort: (): Promise<number | null> => invoke("get_web_report_port"),
+    getStatus: (): Promise<WebReportStatus> => invoke("get_web_report_status"),
   },
 
   announcements: {
@@ -372,6 +580,8 @@ export const api = {
       prompt: string;
       commandTemplate: string;
       timeoutSeconds?: number;
+      retryFailedTimes?: number;
+      runId?: string;
     }): Promise<WakeupVerificationBatchResult> =>
       invoke("wakeup_run_verification_batch", {
         accountIds: request.accountIds,
@@ -379,7 +589,11 @@ export const api = {
         prompt: request.prompt,
         commandTemplate: request.commandTemplate,
         timeoutSeconds: request.timeoutSeconds ?? 120,
+        retryFailedTimes: request.retryFailedTimes ?? 1,
+        runId: request.runId ?? null,
       }),
+    cancelVerificationRun: (runId: string): Promise<boolean> =>
+      invoke("wakeup_cancel_verification_run", { runId }),
   },
 
   oauth: {
@@ -398,12 +612,14 @@ export const api = {
       extraArgs?: string | null,
       bindAccountId?: string | null,
       projectId?: string | null,
+      followLocalAccount?: boolean | null,
     ): Promise<GeminiInstanceRecord> =>
       invoke("update_gemini_instance_settings", {
         id,
         extraArgs: extraArgs ?? null,
         bindAccountId: bindAccountId ?? null,
         projectId: projectId ?? null,
+        followLocalAccount: followLocalAccount ?? null,
       }),
     getLaunchCommand: (id: string): Promise<GeminiInstanceLaunchInfo> =>
       invoke("get_gemini_instance_launch_command", { id }),

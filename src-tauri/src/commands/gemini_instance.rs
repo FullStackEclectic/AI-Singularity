@@ -1,6 +1,7 @@
 use crate::db::Database;
 use crate::services::gemini_instance_store::{GeminiInstanceRecord, GeminiInstanceStore};
 use crate::services::ide_injector::inject_gemini_cli_account_to_root;
+use crate::services::provider_current::ProviderCurrentService;
 use tauri::State;
 
 #[derive(serde::Serialize)]
@@ -111,12 +112,14 @@ pub fn update_gemini_instance_settings(
     extra_args: Option<String>,
     bind_account_id: Option<String>,
     project_id: Option<String>,
+    follow_local_account: Option<bool>,
 ) -> Result<GeminiInstanceRecord, String> {
     if id == "__default__" {
         return GeminiInstanceStore::update_default_settings(
             extra_args,
             Some(bind_account_id),
             Some(project_id),
+            follow_local_account,
         );
     }
     GeminiInstanceStore::update_instance_settings(
@@ -145,7 +148,7 @@ pub fn launch_gemini_instance(
     db: State<'_, Database>,
     id: String,
 ) -> Result<String, String> {
-    let instance = if id == "__default__" {
+    let mut instance = if id == "__default__" {
         GeminiInstanceStore::get_default_instance()?
     } else {
         GeminiInstanceStore::list_instances()?
@@ -153,6 +156,10 @@ pub fn launch_gemini_instance(
             .find(|item| item.id == id)
             .ok_or("未找到对应的 Gemini 实例".to_string())?
     };
+
+    if instance.is_default && instance.follow_local_account {
+        instance.bind_account_id = ProviderCurrentService::get_current_account_id(&db, "gemini")?;
+    }
 
     inject_bound_account_if_needed(
         &db,

@@ -21,6 +21,8 @@ pub struct GeminiInstanceRecord {
     pub initialized: bool,
     #[serde(default)]
     pub is_default: bool,
+    #[serde(default)]
+    pub follow_local_account: bool,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -50,6 +52,8 @@ struct GeminiDefaultInstanceSettings {
     pub project_id: Option<String>,
     #[serde(default)]
     pub last_launched_at: Option<String>,
+    #[serde(default)]
+    pub follow_local_account: bool,
 }
 
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -107,6 +111,7 @@ impl GeminiInstanceStore {
         project_id: Option<String>,
         last_launched_at: Option<String>,
         is_default: bool,
+        follow_local_account: bool,
     ) -> GeminiInstanceRecord {
         GeminiInstanceRecord {
             id,
@@ -118,6 +123,7 @@ impl GeminiInstanceStore {
             project_id,
             last_launched_at,
             is_default,
+            follow_local_account,
         }
     }
 
@@ -134,6 +140,7 @@ impl GeminiInstanceStore {
                     item.bind_account_id,
                     item.project_id,
                     item.last_launched_at,
+                    false,
                     false,
                 )
             })
@@ -154,6 +161,7 @@ impl GeminiInstanceStore {
             file.default_settings.project_id,
             file.default_settings.last_launched_at,
             true,
+            file.default_settings.follow_local_account,
         ))
     }
 
@@ -202,6 +210,7 @@ impl GeminiInstanceStore {
             stored.project_id,
             stored.last_launched_at,
             false,
+            false,
         ))
     }
 
@@ -249,6 +258,7 @@ impl GeminiInstanceStore {
             updated.project_id,
             updated.last_launched_at,
             false,
+            false,
         ))
     }
 
@@ -256,6 +266,7 @@ impl GeminiInstanceStore {
         extra_args: Option<String>,
         bind_account_id: Option<Option<String>>,
         project_id: Option<Option<String>>,
+        follow_local_account: Option<bool>,
     ) -> Result<GeminiInstanceRecord, String> {
         let mut file = Self::load_file()?;
         if let Some(extra_args) = extra_args {
@@ -267,6 +278,12 @@ impl GeminiInstanceStore {
         }
         if let Some(project_id) = project_id {
             file.default_settings.project_id = project_id.filter(|item| !item.trim().is_empty());
+        }
+        if let Some(follow_local_account) = follow_local_account {
+            file.default_settings.follow_local_account = follow_local_account;
+            if follow_local_account {
+                file.default_settings.bind_account_id = None;
+            }
         }
         Self::save_file(&file)?;
         Self::get_default_instance()
@@ -299,6 +316,7 @@ impl GeminiInstanceStore {
             updated.bind_account_id,
             updated.project_id,
             updated.last_launched_at,
+            false,
             false,
         ))
     }

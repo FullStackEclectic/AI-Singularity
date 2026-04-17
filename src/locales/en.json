@@ -6,6 +6,7 @@
     "mcp": "MCP Server",
     "skills": "Skills",
     "prompts": "System Prompts",
+    "tokenCalculator": "Token Calculator",
     "proxy": "Local Proxy",
     "analytics": "Balance Analytics",
     "speedtest": "Speed Test",

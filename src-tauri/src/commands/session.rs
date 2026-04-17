@@ -9,7 +9,7 @@ use crate::services::session_manager::{
     SessionTrashSummary, ZombieProcess,
 };
 use std::path::Path;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 #[tauri::command]
 pub fn list_sessions() -> Result<Vec<ChatSession>, String> {
@@ -74,17 +74,42 @@ pub fn get_default_codex_instance() -> Result<CodexInstanceRecord, String> {
     CodexInstanceStore::get_default_instance()
 }
 
+fn find_codex_instance(id: &str) -> Result<CodexInstanceRecord, String> {
+    if id == "__default__" {
+        return CodexInstanceStore::get_default_instance();
+    }
+    CodexInstanceStore::list_instances()?
+        .into_iter()
+        .find(|item| item.id == id)
+        .ok_or("未找到对应的 Codex 实例".to_string())
+}
+
+#[tauri::command]
+pub fn sync_codex_instance_shared_resources(id: String) -> Result<CodexInstanceRecord, String> {
+    let instance = find_codex_instance(&id)?;
+    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(
+        &instance.user_data_dir,
+    ))?;
+    find_codex_instance(&id)
+}
+
 #[tauri::command]
 pub fn add_codex_instance(
     name: String,
     user_data_dir: String,
 ) -> Result<CodexInstanceRecord, String> {
+    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(&user_data_dir))?;
     CodexInstanceStore::add_instance(name, user_data_dir)
 }
 
 #[tauri::command]
-pub fn delete_codex_instance(id: String) -> Result<(), String> {
-    CodexInstanceStore::delete_instance(&id)
+pub fn delete_codex_instance(app: AppHandle, id: String) -> Result<(), String> {
+    CodexInstanceStore::delete_instance(&id)?;
+    let _ = crate::commands::floating_account_card::reconcile_floating_cards_instance_bindings(
+        &app,
+        "codex_instance.delete",
+    );
+    Ok(())
 }
 
 fn inject_bound_account_if_needed(
@@ -135,19 +160,13 @@ pub fn start_codex_instance(
     db: State<'_, Database>,
     id: String,
 ) -> Result<CodexInstanceRecord, String> {
-    let mut instance = if id == "__default__" {
-        CodexInstanceStore::get_default_instance()?
-    } else {
-        CodexInstanceStore::list_instances()?
-            .into_iter()
-            .find(|item| item.id == id)
-            .ok_or("未找到对应的 Codex 实例".to_string())?
-    };
+    let mut instance = find_codex_instance(&id)?;
 
     codex_runtime::validate_user_data_dir(&instance.user_data_dir)?;
     if instance.is_default && instance.follow_local_account {
         instance.bind_account_id = ProviderCurrentService::get_current_account_id(&db, "codex")?;
     }
+    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(&instance.user_data_dir))?;
     SyncService::new(&db)
         .sync_codex_dir_with_provider_id(
             &std::path::PathBuf::from(&instance.user_data_dir),
@@ -173,14 +192,7 @@ pub fn start_codex_instance(
 
 #[tauri::command]
 pub fn stop_codex_instance(id: String) -> Result<CodexInstanceRecord, String> {
-    let instance = if id == "__default__" {
-        CodexInstanceStore::get_default_instance()?
-    } else {
-        CodexInstanceStore::list_instances()?
-            .into_iter()
-            .find(|item| item.id == id)
-            .ok_or("未找到对应的 Codex 实例".to_string())?
-    };
+    let instance = find_codex_instance(&id)?;
 
     if let Some(pid) = instance.last_pid.filter(|pid| codex_runtime::is_pid_running(*pid)) {
         codex_runtime::stop_pid(pid)?;
@@ -195,14 +207,7 @@ pub fn stop_codex_instance(id: String) -> Result<CodexInstanceRecord, String> {
 
 #[tauri::command]
 pub fn open_codex_instance_window(id: String) -> Result<(), String> {
-    let instance = if id == "__default__" {
-        CodexInstanceStore::get_default_instance()?
-    } else {
-        CodexInstanceStore::list_instances()?
-            .into_iter()
-            .find(|item| item.id == id)
-            .ok_or("未找到对应的 Codex 实例".to_string())?
-    };
+    let instance = find_codex_instance(&id)?;
 
     let pid = instance
         .last_pid

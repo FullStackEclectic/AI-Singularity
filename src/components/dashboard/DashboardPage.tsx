@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
+import type { CurrentAccountSnapshot } from "../../lib/api";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -29,6 +30,11 @@ export default function DashboardPage() {
     queryKey: ["announcement-state", i18n.language],
     queryFn: () => api.announcements.getState(i18n.language),
     staleTime: 60_000,
+  });
+  const { data: currentSnapshots = [] } = useQuery<CurrentAccountSnapshot[]>({
+    queryKey: ["provider-current-snapshots"],
+    queryFn: () => api.providerCurrent.listSnapshots(),
+    refetchInterval: 15_000,
   });
 
   const STATS_ITEMS = [
@@ -142,6 +148,27 @@ export default function DashboardPage() {
               <div className="stat-label">{s.label}</div>
             </div>
           ))}
+        </div>
+
+        <div className="card current-account-panel">
+          <div className="current-account-panel-header">
+            <h3 className="chart-title">当前账号快照</h3>
+            <div className="announcement-panel-meta">统一读取本地当前账号状态，供 Dashboard / Settings / Web report 共用</div>
+          </div>
+          <div className="current-account-list">
+            {currentSnapshots.map((item) => (
+              <div key={item.platform} className="current-account-item">
+                <div className="current-account-platform">{item.platform}</div>
+                <div className="current-account-main">
+                  <div className="current-account-label">{item.label || "未解析到当前账号"}</div>
+                  <div className="current-account-meta">
+                    <span>{item.email || "—"}</span>
+                    <span>{item.status || "unknown"}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
 
         {metrics && (
