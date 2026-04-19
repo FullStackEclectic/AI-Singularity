@@ -1,4 +1,6 @@
 import type { ChatMessage } from "./sessionTypes";
+import "./SessionsDialogs.css";
+import "./SessionDetailPane.css";
 
 type ExpandedMessageModalProps = {
   message: ChatMessage | null;

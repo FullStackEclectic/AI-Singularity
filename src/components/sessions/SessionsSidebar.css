@@ -1,0 +1,195 @@
+.cyber-sidebar {
+  width: 320px;
+  background: rgba(10, 15, 25, 0.9);
+  border-right: 1px solid rgba(0, 255, 170, 0.2);
+  display: flex;
+  flex-direction: column;
+  box-shadow: inset -5px 0 20px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.cyber-sidebar::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(to bottom, transparent, rgba(0, 255, 170, 0.5), transparent);
+}
+
+.sessions-header {
+  padding: var(--space-4);
+  border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.cyber-title-sm {
+  font-size: 13px;
+  font-weight: 700;
+  color: #00ffaa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-shadow: 0 0 5px rgba(0, 255, 170, 0.3);
+  letter-spacing: 1px;
+}
+
+.cyber-icon-btn {
+  background: transparent;
+  border: 1px solid rgba(0, 255, 170, 0.3);
+  color: #00ffaa;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.cyber-icon-btn:hover {
+  background: rgba(0, 255, 170, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 170, 0.2);
+}
+
+.sessions-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cyber-icon-btn.danger {
+  color: #ff5c87;
+  border-color: rgba(255, 92, 135, 0.35);
+}
+
+.cyber-icon-btn.danger:hover {
+  background: rgba(255, 92, 135, 0.12);
+  box-shadow: 0 0 10px rgba(255, 92, 135, 0.25);
+}
+
+.sessions-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-batch-bar {
+  margin: 10px 12px 0;
+  padding: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-batch-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d7fff4;
+}
+
+.session-batch-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.session-batch-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.section-divider {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 1px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: repeating-linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.1),
+    rgba(255, 255, 255, 0.1) 2px,
+    transparent 2px,
+    transparent 4px
+  );
+}
+
+.mt-4 {
+  margin-top: 16px;
+}
+
+.zombie-item {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px dashed rgba(255, 51, 102, 0.3);
+  padding: var(--space-3);
+  font-size: 12px;
+}
+
+.zombie-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  color: #ff3366;
+  font-weight: bold;
+}
+
+.zombie-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.zombie-pid {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.zombie-meta {
+  display: flex;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 10px;
+  margin-bottom: 8px;
+}
+
+.zombie-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.cyber-btn-mini.toxic {
+  background: rgba(255, 51, 102, 0.1);
+  border: 1px solid rgba(255, 51, 102, 0.5);
+  color: #ff3366;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  padding: 4px 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.cyber-btn-mini.toxic:hover {
+  background: rgba(255, 51, 102, 0.2);
+  box-shadow: 0 0 10px rgba(255, 51, 102, 0.3);
+}

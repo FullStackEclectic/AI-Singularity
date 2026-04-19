@@ -18,9 +18,14 @@ pub struct AccountGroup {
 pub struct AccountGroupStore;
 
 impl AccountGroupStore {
-    pub fn list_groups(app_data_dir: &Path, valid_account_ids: &[String]) -> Result<Vec<AccountGroup>, String> {
+    pub fn list_groups(
+        app_data_dir: &Path,
+        valid_account_ids: &[String],
+    ) -> Result<Vec<AccountGroup>, String> {
         let mut groups = Self::load_groups(app_data_dir)?;
-        let valid_ids = valid_account_ids.iter().collect::<std::collections::HashSet<_>>();
+        let valid_ids = valid_account_ids
+            .iter()
+            .collect::<std::collections::HashSet<_>>();
         let mut changed = false;
 
         for group in &mut groups {
@@ -124,7 +129,9 @@ impl AccountGroupStore {
         account_ids: &[String],
     ) -> Result<AccountGroup, String> {
         let mut groups = Self::list_groups(app_data_dir, valid_account_ids)?;
-        let valid_set = valid_account_ids.iter().collect::<std::collections::HashSet<_>>();
+        let valid_set = valid_account_ids
+            .iter()
+            .collect::<std::collections::HashSet<_>>();
         let target_ids = account_ids
             .iter()
             .filter(|id| valid_set.contains(id))
@@ -138,7 +145,9 @@ impl AccountGroupStore {
             if group.id == group_id {
                 continue;
             }
-            group.account_ids.retain(|id| !target_ids.iter().any(|target| target == id));
+            group
+                .account_ids
+                .retain(|id| !target_ids.iter().any(|target| target == id));
         }
 
         let target_group = groups
@@ -195,8 +204,7 @@ impl AccountGroupStore {
         fs::create_dir_all(app_data_dir).map_err(|e| format!("创建应用目录失败: {}", e))?;
         let content = serde_json::to_string_pretty(groups)
             .map_err(|e| format!("序列化账号分组失败: {}", e))?;
-        fs::write(file_path(app_data_dir), content)
-            .map_err(|e| format!("写入账号分组失败: {}", e))
+        fs::write(file_path(app_data_dir), content).map_err(|e| format!("写入账号分组失败: {}", e))
     }
 }
 

@@ -1,0 +1,126 @@
+.accounts-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.38);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 20px;
+}
+
+.accounts-modal {
+  width: min(100%, 480px);
+  background: #ffffff;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.18);
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.accounts-modal-title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.accounts-modal-desc {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-secondary, #475569);
+  line-height: 1.5;
+}
+
+.accounts-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.accounts-form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.accounts-form-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--text-secondary, #475569);
+}
+
+.accounts-form-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  font-size: 0.85rem;
+  color: var(--text-primary, #0f172a);
+  background: #ffffff;
+  outline: none;
+}
+
+.accounts-form-input:focus {
+  border-color: var(--accent-primary, #2563eb);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.accounts-inline-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.accounts-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 52vh;
+  overflow: auto;
+}
+
+.accounts-group-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(248, 250, 252, 0.88);
+}
+
+.accounts-group-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.accounts-group-name {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--text-primary, #0f172a);
+}
+
+.accounts-group-meta {
+  font-size: 0.78rem;
+  color: var(--text-secondary, #64748b);
+}
+
+.accounts-group-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.empty-text {
+  font-size: 0.82rem;
+  color: var(--text-muted, #64748b);
+}

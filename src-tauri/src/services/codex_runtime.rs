@@ -19,7 +19,9 @@ fn ps_single_quote(input: &str) -> String {
 
 #[cfg(target_os = "windows")]
 fn parse_extra_args(raw: &str) -> Vec<String> {
-    raw.split_whitespace().map(|item| item.to_string()).collect()
+    raw.split_whitespace()
+        .map(|item| item.to_string())
+        .collect()
 }
 
 #[cfg(target_os = "windows")]
@@ -161,10 +163,7 @@ pub fn validate_user_data_dir(path: &str) -> Result<(), String> {
         return Err(format!("实例目录不存在: {}", target.display()));
     }
     if !target.join("state_5.sqlite").exists() {
-        return Err(format!(
-            "实例目录缺少 state_5.sqlite: {}",
-            target.display()
-        ));
+        return Err(format!("实例目录缺少 state_5.sqlite: {}", target.display()));
     }
     Ok(())
 }

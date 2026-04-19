@@ -1,8 +1,8 @@
 use crate::db::Database;
 use crate::error::AppResult;
 use crate::models::{Platform, ProviderConfig};
-use crate::services::provider::ProviderService;
 use crate::services::event_bus::EventBus;
+use crate::services::provider::ProviderService;
 use crate::store::SecureStore;
 use anyhow::anyhow;
 use tauri::{AppHandle, State};

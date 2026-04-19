@@ -107,11 +107,18 @@ impl AnnouncementService {
 
     pub async fn mark_all_as_read(app_data_dir: &Path, locale: &str) -> Result<(), String> {
         let state = Self::get_state(app_data_dir, locale).await?;
-        let ids: Vec<String> = state.announcements.iter().map(|item| item.id.clone()).collect();
+        let ids: Vec<String> = state
+            .announcements
+            .iter()
+            .map(|item| item.id.clone())
+            .collect();
         save_read_ids(app_data_dir, &ids)
     }
 
-    pub async fn force_refresh(app_data_dir: &Path, locale: &str) -> Result<AnnouncementState, String> {
+    pub async fn force_refresh(
+        app_data_dir: &Path,
+        locale: &str,
+    ) -> Result<AnnouncementState, String> {
         remove_cache(app_data_dir)?;
         Self::get_state(app_data_dir, locale).await
     }
@@ -182,8 +189,8 @@ fn load_cache(app_data_dir: &Path) -> Result<Option<AnnouncementCache>, String> 
     if content.trim().is_empty() {
         return Ok(None);
     }
-    let cache =
-        serde_json::from_str::<AnnouncementCache>(&content).map_err(|e| format!("解析公告缓存失败: {}", e))?;
+    let cache = serde_json::from_str::<AnnouncementCache>(&content)
+        .map_err(|e| format!("解析公告缓存失败: {}", e))?;
     Ok(Some(cache))
 }
 
@@ -222,7 +229,8 @@ fn save_read_ids(app_data_dir: &Path, ids: &[String]) -> Result<(), String> {
     fs::create_dir_all(app_data_dir).map_err(|e| format!("创建应用目录失败: {}", e))?;
     let content =
         serde_json::to_string_pretty(ids).map_err(|e| format!("序列化公告已读状态失败: {}", e))?;
-    fs::write(read_ids_path(app_data_dir), content).map_err(|e| format!("写入公告已读状态失败: {}", e))
+    fs::write(read_ids_path(app_data_dir), content)
+        .map_err(|e| format!("写入公告已读状态失败: {}", e))
 }
 
 fn parse_datetime_millis(value: &str) -> Option<i64> {
@@ -288,7 +296,11 @@ fn is_language_match(current_locale: &str, target_languages: &[String]) -> bool 
     })
 }
 
-fn filter_announcements(raw: Vec<Announcement>, current_version: &str, locale: &str) -> Vec<Announcement> {
+fn filter_announcements(
+    raw: Vec<Announcement>,
+    current_version: &str,
+    locale: &str,
+) -> Vec<Announcement> {
     let now = Utc::now().timestamp_millis();
     let mut filtered: Vec<Announcement> = raw
         .into_iter()

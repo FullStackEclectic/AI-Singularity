@@ -10,6 +10,7 @@
 import { useMemo, useState } from "react";
 import type { ToolTarget, ToolSpecificConfigs } from "../../types";
 import { TOOL_TARGET_LABELS, TOOL_TARGET_CONFIG_PATH } from "../../types";
+import "./ConfigPreview.css";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 配置内容生成函数

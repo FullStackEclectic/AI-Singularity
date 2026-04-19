@@ -70,13 +70,20 @@ pub async fn start_server() {
     }
 
     let Some(listener) = listener else {
-        tracing::warn!("[WebSocket] 无法绑定本地端口 {}-{}", PORT_RANGE_START, PORT_RANGE_START + PORT_RANGE_LEN - 1);
+        tracing::warn!(
+            "[WebSocket] 无法绑定本地端口 {}-{}",
+            PORT_RANGE_START,
+            PORT_RANGE_START + PORT_RANGE_LEN - 1
+        );
         return;
     };
     if let Ok(mut guard) = srv.port.write() {
         *guard = bound_port;
     }
-    tracing::info!("[WebSocket] 本地广播服务已启动: ws://127.0.0.1:{}", bound_port.unwrap_or(PORT_RANGE_START));
+    tracing::info!(
+        "[WebSocket] 本地广播服务已启动: ws://127.0.0.1:{}",
+        bound_port.unwrap_or(PORT_RANGE_START)
+    );
 
     loop {
         match listener.accept().await {

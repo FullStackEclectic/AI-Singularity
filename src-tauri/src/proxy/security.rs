@@ -1,5 +1,6 @@
 use lazy_static::lazy_static;
 use std::collections::{HashMap, HashSet};
+use std::net::IpAddr;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
@@ -22,6 +23,67 @@ pub struct SecurityShield;
 pub enum SecurityAction {
     Allow,
     Deny(String), // Deny reason
+}
+
+fn ip_rule_matches(ip: &str, rule: &str) -> bool {
+    let rule = rule.trim();
+    let ip = ip.trim();
+
+    if rule.is_empty() || ip.is_empty() {
+        return false;
+    }
+
+    if rule.contains('/') {
+        return cidr_matches(ip, rule);
+    }
+
+    if rule.ends_with('*') {
+        let prefix = rule.trim_end_matches('*');
+        return !prefix.is_empty() && ip.starts_with(prefix);
+    }
+
+    match (ip.parse::<IpAddr>(), rule.parse::<IpAddr>()) {
+        (Ok(ip_addr), Ok(rule_addr)) => ip_addr == rule_addr,
+        _ => ip == rule,
+    }
+}
+
+fn cidr_matches(ip: &str, cidr: &str) -> bool {
+    let (network, prefix) = match cidr.split_once('/') {
+        Some(parts) => parts,
+        None => return false,
+    };
+
+    let prefix = match prefix.trim().parse::<u8>() {
+        Ok(prefix) => prefix,
+        Err(_) => return false,
+    };
+
+    match (ip.parse::<IpAddr>(), network.trim().parse::<IpAddr>()) {
+        (Ok(IpAddr::V4(ip_addr)), Ok(IpAddr::V4(network_addr))) => {
+            if prefix > 32 {
+                return false;
+            }
+            let mask = if prefix == 0 {
+                0
+            } else {
+                u32::MAX << (32 - prefix)
+            };
+            (u32::from(ip_addr) & mask) == (u32::from(network_addr) & mask)
+        }
+        (Ok(IpAddr::V6(ip_addr)), Ok(IpAddr::V6(network_addr))) => {
+            if prefix > 128 {
+                return false;
+            }
+            let mask = if prefix == 0 {
+                0
+            } else {
+                u128::MAX << (128 - prefix)
+            };
+            (u128::from(ip_addr) & mask) == (u128::from(network_addr) & mask)
+        }
+        _ => false,
+    }
 }
 
 impl SecurityShield {
@@ -57,18 +119,7 @@ impl SecurityShield {
             let mut matched_whitelist = false;
 
             for r in rules.iter() {
-                // TODO: 完整的 CIDR 支持，这里目前仅支持精确匹配或者前缀匹配做简化
-                let is_match = if r.ip_cidr.contains("/") {
-                    // For CIDR, simplify logic: just exact string match for now unless full library loaded.
-                    // A real app would use a subnet crate like `ipnet`.
-                    // But to keep dependencies small, let's just do exact matching or wildcard `*`.
-                    false
-                } else if r.ip_cidr.ends_with("*") {
-                    let prefix = r.ip_cidr.trim_end_matches('*');
-                    ip.starts_with(prefix)
-                } else {
-                    ip == r.ip_cidr
-                };
+                let is_match = ip_rule_matches(ip, &r.ip_cidr);
 
                 if r.rule_type == "whitelist" {
                     has_whitelist = true;
@@ -151,5 +202,72 @@ impl SecurityShield {
         // 没达到上限，加入池子
         ips.insert(incoming_ip.to_string());
         SecurityAction::Allow
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn set_test_rules(rules: Vec<crate::models::IpRule>) {
+        let mut cache = IP_RULES_CACHE.write().unwrap();
+        *cache = rules;
+    }
+
+    fn test_rule(ip_cidr: &str, rule_type: &str) -> crate::models::IpRule {
+        crate::models::IpRule {
+            id: format!("{}-{}", rule_type, ip_cidr),
+            ip_cidr: ip_cidr.to_string(),
+            rule_type: rule_type.to_string(),
+            notes: None,
+            is_active: true,
+            created_at: 0,
+        }
+    }
+
+    #[test]
+    fn matches_exact_and_wildcard_rules() {
+        assert!(ip_rule_matches("127.0.0.1", "127.0.0.1"));
+        assert!(ip_rule_matches("127.0.0.42", "127.0.0.*"));
+        assert!(!ip_rule_matches("127.0.1.42", "127.0.0.*"));
+    }
+
+    #[test]
+    fn matches_ipv4_and_ipv6_cidr_rules() {
+        assert!(cidr_matches("192.168.1.24", "192.168.1.0/24"));
+        assert!(!cidr_matches("192.168.2.24", "192.168.1.0/24"));
+        assert!(cidr_matches("2001:db8::10", "2001:db8::/64"));
+        assert!(!cidr_matches("2001:db9::10", "2001:db8::/64"));
+    }
+
+    #[test]
+    fn rejects_invalid_cidr_rules() {
+        assert!(!cidr_matches("192.168.1.24", "192.168.1.0/not-a-prefix"));
+        assert!(!cidr_matches("192.168.1.24", "192.168.1.0/33"));
+        assert!(!cidr_matches("2001:db8::10", "2001:db8::/129"));
+        assert!(!cidr_matches("192.168.1.24", "not-an-ip/24"));
+    }
+
+    #[test]
+    fn denies_blacklisted_ip_when_rule_matches() {
+        set_test_rules(vec![test_rule("10.0.0.0/8", "blacklist")]);
+
+        let result = SecurityShield::verify_ip_rule("10.12.3.4");
+        assert!(matches!(result, SecurityAction::Deny(_)));
+
+        set_test_rules(Vec::new());
+    }
+
+    #[test]
+    fn denies_non_whitelisted_ip_when_whitelist_exists() {
+        set_test_rules(vec![test_rule("192.168.0.0/16", "whitelist")]);
+
+        let denied = SecurityShield::verify_ip_rule("10.0.0.1");
+        let allowed = SecurityShield::verify_ip_rule("192.168.1.10");
+
+        assert!(matches!(denied, SecurityAction::Deny(_)));
+        assert!(matches!(allowed, SecurityAction::Allow));
+
+        set_test_rules(Vec::new());
     }
 }

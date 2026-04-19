@@ -1,6 +1,7 @@
 import { Search, X } from "lucide-react";
 import type { SessionGroup } from "./sessionTypes";
 import type { AccountGroup } from "../../types";
+import "./SessionsFiltersPanel.css";
 
 type SessionsFiltersPanelProps = {
   sessionOverview: {

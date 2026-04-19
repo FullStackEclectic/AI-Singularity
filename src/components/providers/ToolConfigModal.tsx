@@ -21,6 +21,7 @@ import {
   useSortable
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import "./ProviderModal.css";
 
 // --- 可拖拽的备选源条目 ---
 function SortableProviderRow({ 

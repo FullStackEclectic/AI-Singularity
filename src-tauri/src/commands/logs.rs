@@ -21,14 +21,15 @@ pub fn read_desktop_log(
     lines: Option<usize>,
     query: Option<String>,
 ) -> Result<DesktopLogReadResult, String> {
-    LogsService::read_log(&logs_dir(&app)?, &name, lines.unwrap_or(500), query.as_deref())
+    LogsService::read_log(
+        &logs_dir(&app)?,
+        &name,
+        lines.unwrap_or(500),
+        query.as_deref(),
+    )
 }
 
 #[tauri::command]
-pub fn export_desktop_log(
-    app: AppHandle,
-    name: String,
-    destination: String,
-) -> Result<(), String> {
+pub fn export_desktop_log(app: AppHandle, name: String, destination: String) -> Result<(), String> {
     LogsService::export_log(&logs_dir(&app)?, &name, std::path::Path::new(&destination))
 }

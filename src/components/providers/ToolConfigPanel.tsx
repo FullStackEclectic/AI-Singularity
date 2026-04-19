@@ -13,6 +13,7 @@ import type {
   GeminiToolConfig,
 } from "../../types";
 import { TOOL_TARGET_LABELS, TOOL_TARGET_CONFIG_PATH } from "../../types";
+import "./ToolConfigPanel.css";
 
 const TOOL_ICONS: Record<ToolTarget, string> = {
   claude_code: "🤖",

@@ -1,0 +1,125 @@
+.sessions-filter-bar {
+  padding: 10px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sessions-overview-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.sessions-overview-stat {
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sessions-overview-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #d7fff4;
+}
+
+.sessions-overview-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.sessions-search-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sessions-search-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e0e0e0;
+  font-size: 12px;
+  padding: 8px 0;
+}
+
+.sessions-search-box input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.sessions-search-clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.55);
+  padding: 2px;
+}
+
+.sessions-tool-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessions-view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessions-view-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sessions-view-chip.warning {
+  color: #ffd089;
+  border-color: rgba(245, 158, 11, 0.28);
+  background: rgba(245, 158, 11, 0.08);
+}
+
+.sessions-tool-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.sessions-tool-chip.active {
+  color: #d7fff4;
+  border-color: rgba(0, 255, 170, 0.28);
+  background: rgba(0, 255, 170, 0.08);
+}
+
+.sessions-tool-chip.danger {
+  color: #ffb6c8;
+  border-color: rgba(255, 92, 135, 0.25);
+  background: rgba(255, 92, 135, 0.08);
+}
+
+.sessions-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sessions-filter-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+}

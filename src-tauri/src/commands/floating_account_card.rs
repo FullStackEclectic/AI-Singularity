@@ -1,7 +1,8 @@
 use crate::services::codex_instance_store::CodexInstanceStore;
 use crate::services::event_bus::EventBus;
 use crate::services::floating_account_card_store::{
-    CreateFloatingAccountCardInput, FloatingAccountCard, FloatingAccountCardPatch, FloatingAccountCardStore,
+    CreateFloatingAccountCardInput, FloatingAccountCard, FloatingAccountCardPatch,
+    FloatingAccountCardStore,
 };
 use chrono::Utc;
 use serde::Serialize;
@@ -39,7 +40,10 @@ fn emit_deleted_event(app: &AppHandle, card_id: &str) {
     let _ = app.emit("floating.card.deleted", payload);
 }
 
-fn update_event_name(before: Option<&FloatingAccountCard>, after: &FloatingAccountCard) -> &'static str {
+fn update_event_name(
+    before: Option<&FloatingAccountCard>,
+    after: &FloatingAccountCard,
+) -> &'static str {
     if let Some(previous) = before {
         if previous.visible != after.visible {
             return "floating.card.visibility_changed";
@@ -126,12 +130,8 @@ pub fn update_floating_account_card(
     let before = FloatingAccountCardStore::list_cards(&path)?
         .into_iter()
         .find(|card| card.id == id);
-    let updated = FloatingAccountCardStore::update_card(
-        &path,
-        &id,
-        patch,
-        expected_updated_at.as_deref(),
-    )?;
+    let updated =
+        FloatingAccountCardStore::update_card(&path, &id, patch, expected_updated_at.as_deref())?;
     emit_card_event(&app, update_event_name(before.as_ref(), &updated), &updated);
     EventBus::emit_data_changed(&app, "floating_cards", "update", "floating.card.updated");
     Ok(updated)

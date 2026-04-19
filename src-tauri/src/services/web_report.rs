@@ -1,5 +1,5 @@
-use crate::services::session_manager::SessionManager;
 use crate::services::provider_current::{CurrentAccountSnapshot, ProviderCurrentService};
+use crate::services::session_manager::SessionManager;
 use crate::services::wakeup::WakeupService;
 use crate::services::websocket::{get_status as get_websocket_status, WebSocketStatus};
 use chrono::Utc;
@@ -138,7 +138,9 @@ pub fn get_status() -> WebReportStatus {
         running: port.is_some(),
         port,
         health_url: local_url.as_ref().map(|base| format!("{}/healthz", base)),
-        status_api_url: local_url.as_ref().map(|base| format!("{}/api/status", base)),
+        status_api_url: local_url
+            .as_ref()
+            .map(|base| format!("{}/api/status", base)),
         snapshot_api_url: local_url
             .as_ref()
             .map(|base| format!("{}/api/snapshot", base)),
@@ -241,12 +243,19 @@ fn build_snapshot(app_data_dir: &Path) -> WebReportSnapshot {
 
     let mut category_counts = HashMap::<String, usize>::new();
     for task in &wakeup_state.tasks {
-        if let Some(category) = task.last_category.clone().filter(|value| !value.trim().is_empty()) {
+        if let Some(category) = task
+            .last_category
+            .clone()
+            .filter(|value| !value.trim().is_empty())
+        {
             *category_counts.entry(category).or_insert(0) += 1;
         }
     }
 
-    let transcript_count = sessions.iter().filter(|item| item.messages_count > 0).count();
+    let transcript_count = sessions
+        .iter()
+        .filter(|item| item.messages_count > 0)
+        .count();
     let workspace_history_count = sessions
         .iter()
         .filter(|item| item.source_kind.as_deref() == Some("workspace_history"))
@@ -260,8 +269,16 @@ fn build_snapshot(app_data_dir: &Path) -> WebReportSnapshot {
         wakeup: WebReportWakeupSnapshot {
             enabled: wakeup_state.enabled,
             task_count: wakeup_state.tasks.len(),
-            active_task_count: wakeup_state.tasks.iter().filter(|item| item.enabled).count(),
-            paused_task_count: wakeup_state.tasks.iter().filter(|item| !item.enabled).count(),
+            active_task_count: wakeup_state
+                .tasks
+                .iter()
+                .filter(|item| item.enabled)
+                .count(),
+            paused_task_count: wakeup_state
+                .tasks
+                .iter()
+                .filter(|item| !item.enabled)
+                .count(),
             failing_task_count: wakeup_state
                 .tasks
                 .iter()
@@ -396,7 +413,11 @@ fn build_status_page(app_data_dir: &Path) -> String {
         env!("CARGO_PKG_VERSION"),
         if ws.running { "在线" } else { "离线" },
         ws.client_count,
-        if report.auth_enabled { "已开启" } else { "未开启" },
+        if report.auth_enabled {
+            "已开启"
+        } else {
+            "未开启"
+        },
         current_accounts_html,
         ws.port
             .map(|value| value.to_string())

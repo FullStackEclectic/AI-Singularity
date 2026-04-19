@@ -20,7 +20,12 @@ pub fn add_mcp(mcp: McpServer, db: State<'_, Database>, app: AppHandle) -> AppRe
 }
 
 #[tauri::command]
-pub fn toggle_mcp(id: String, is_active: bool, db: State<'_, Database>, app: AppHandle) -> AppResult<()> {
+pub fn toggle_mcp(
+    id: String,
+    is_active: bool,
+    db: State<'_, Database>,
+    app: AppHandle,
+) -> AppResult<()> {
     let service = McpService::new(&*db);
     service.toggle_mcp(&id, is_active)?;
     EventBus::emit_data_changed(&app, "mcp", "toggle", "mcp.toggle");

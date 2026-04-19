@@ -1,4 +1,4 @@
-use crate::services::announcement::{AnnouncementState, AnnouncementService};
+use crate::services::announcement::{AnnouncementService, AnnouncementState};
 use tauri::{AppHandle, Manager};
 
 fn app_data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
@@ -8,7 +8,10 @@ fn app_data_dir(app: &AppHandle) -> Result<std::path::PathBuf, String> {
 }
 
 #[tauri::command]
-pub async fn announcement_get_state(app: AppHandle, locale: Option<String>) -> Result<AnnouncementState, String> {
+pub async fn announcement_get_state(
+    app: AppHandle,
+    locale: Option<String>,
+) -> Result<AnnouncementState, String> {
     AnnouncementService::get_state(&app_data_dir(&app)?, locale.as_deref().unwrap_or("zh-CN")).await
 }
 
@@ -18,11 +21,22 @@ pub async fn announcement_mark_as_read(app: AppHandle, id: String) -> Result<(),
 }
 
 #[tauri::command]
-pub async fn announcement_mark_all_as_read(app: AppHandle, locale: Option<String>) -> Result<(), String> {
-    AnnouncementService::mark_all_as_read(&app_data_dir(&app)?, locale.as_deref().unwrap_or("zh-CN")).await
+pub async fn announcement_mark_all_as_read(
+    app: AppHandle,
+    locale: Option<String>,
+) -> Result<(), String> {
+    AnnouncementService::mark_all_as_read(
+        &app_data_dir(&app)?,
+        locale.as_deref().unwrap_or("zh-CN"),
+    )
+    .await
 }
 
 #[tauri::command]
-pub async fn announcement_force_refresh(app: AppHandle, locale: Option<String>) -> Result<AnnouncementState, String> {
-    AnnouncementService::force_refresh(&app_data_dir(&app)?, locale.as_deref().unwrap_or("zh-CN")).await
+pub async fn announcement_force_refresh(
+    app: AppHandle,
+    locale: Option<String>,
+) -> Result<AnnouncementState, String> {
+    AnnouncementService::force_refresh(&app_data_dir(&app)?, locale.as_deref().unwrap_or("zh-CN"))
+        .await
 }

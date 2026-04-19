@@ -1,0 +1,129 @@
+.cfg-preview-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.cfg-preview-toggle-btn {
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.cfg-preview-toggle-btn:hover,
+.cfg-preview-toggle-btn.active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: rgba(122, 162, 247, 0.08);
+}
+
+.cfg-preview-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cfg-preview-hint {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-left: var(--space-2);
+}
+
+.cfg-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.cfg-preview-block {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  overflow: hidden;
+}
+
+.cfg-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  gap: var(--space-2);
+}
+
+.cfg-preview-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.cfg-preview-tool {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  white-space: nowrap;
+}
+
+.cfg-preview-path {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cfg-preview-lang-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  background: rgba(158, 206, 106, 0.12);
+  border: 1px solid rgba(158, 206, 106, 0.25);
+  border-radius: 99px;
+  color: var(--color-success);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cfg-copy-btn {
+  font-size: 11px;
+  padding: 2px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.cfg-copy-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.cfg-preview-code {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+  background: transparent;
+  overflow-x: auto;
+  white-space: pre;
+  max-height: 280px;
+  overflow-y: auto;
+}

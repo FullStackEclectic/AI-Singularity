@@ -87,7 +87,10 @@ pub fn inspect_instance_shared_resources(profile_dir: &Path) -> CodexSharedResou
     for relative in SHARED_DIRS.iter().chain(SHARED_FILES.iter()) {
         let source = default_codex_home.join(relative);
         let target = profile_dir.join(relative);
-        let managed = managed_state.managed_paths.iter().any(|item| item == *relative);
+        let managed = managed_state
+            .managed_paths
+            .iter()
+            .any(|item| item == *relative);
         if source.exists() && target.exists() && !managed {
             status.conflict_paths.push((*relative).to_string());
         }
@@ -164,9 +167,10 @@ fn sync_shared_file(
 }
 
 fn copy_dir_recursive(source: &Path, target: &Path) -> Result<(), String> {
-    fs::create_dir_all(target).map_err(|e| format!("创建目录失败 ({}): {}", target.display(), e))?;
-    let entries = fs::read_dir(source)
-        .map_err(|e| format!("读取目录失败 ({}): {}", source.display(), e))?;
+    fs::create_dir_all(target)
+        .map_err(|e| format!("创建目录失败 ({}): {}", target.display(), e))?;
+    let entries =
+        fs::read_dir(source).map_err(|e| format!("读取目录失败 ({}): {}", source.display(), e))?;
     for entry in entries {
         let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
         let source_path = entry.path();
@@ -258,8 +262,10 @@ fn files_equal(left: &Path, right: &Path) -> Result<bool, String> {
     if left_meta.len() != right_meta.len() {
         return Ok(false);
     }
-    let left_bytes = fs::read(left).map_err(|e| format!("读取文件失败 ({}): {}", left.display(), e))?;
-    let right_bytes = fs::read(right).map_err(|e| format!("读取文件失败 ({}): {}", right.display(), e))?;
+    let left_bytes =
+        fs::read(left).map_err(|e| format!("读取文件失败 ({}): {}", left.display(), e))?;
+    let right_bytes =
+        fs::read(right).map_err(|e| format!("读取文件失败 ({}): {}", right.display(), e))?;
     Ok(left_bytes == right_bytes)
 }
 
@@ -342,7 +348,8 @@ mod tests {
     use super::*;
 
     fn make_temp_dir(tag: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join(format!("ai-singularity-{}-{}", tag, uuid::Uuid::new_v4()));
+        let dir =
+            std::env::temp_dir().join(format!("ai-singularity-{}-{}", tag, uuid::Uuid::new_v4()));
         fs::create_dir_all(&dir).expect("create temp dir");
         dir
     }
@@ -370,7 +377,8 @@ mod tests {
         fs::write(profile_dir.join("AGENTS.md"), "user-content").expect("write target");
 
         let mut state = ManagedResourceState::default();
-        sync_shared_file(&profile_dir, &source_root, "AGENTS.md", &mut state).expect("sync shared file");
+        sync_shared_file(&profile_dir, &source_root, "AGENTS.md", &mut state)
+            .expect("sync shared file");
         let content = fs::read_to_string(profile_dir.join("AGENTS.md")).expect("read target");
         assert_eq!(content, "user-content");
         assert!(!state.managed_paths.iter().any(|item| item == "AGENTS.md"));
@@ -388,7 +396,8 @@ mod tests {
 
         let mut state = ManagedResourceState::default();
         state.managed_paths.push("AGENTS.md".to_string());
-        sync_shared_file(&profile_dir, &source_root, "AGENTS.md", &mut state).expect("sync shared file");
+        sync_shared_file(&profile_dir, &source_root, "AGENTS.md", &mut state)
+            .expect("sync shared file");
         let content = fs::read_to_string(profile_dir.join("AGENTS.md")).expect("read target");
         assert_eq!(content, "source-content");
 

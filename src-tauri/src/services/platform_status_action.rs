@@ -65,12 +65,13 @@ impl PlatformStatusActionService {
 
         let platform = account.origin_platform.to_ascii_lowercase();
         if !matches!(platform.as_str(), "codebuddy_cn" | "workbuddy") {
-            return Err(format!("{} 暂不支持 daily_checkin", account.origin_platform));
+            return Err(format!(
+                "{} 暂不支持 daily_checkin",
+                account.origin_platform
+            ));
         }
 
-        let retry_limit = retry_failed_times
-            .unwrap_or(1)
-            .min(MAX_RETRY_FAILED_TIMES) as u32;
+        let retry_limit = retry_failed_times.unwrap_or(1).min(MAX_RETRY_FAILED_TIMES) as u32;
         let mut attempts = 0u32;
         let mut last_err: Option<String> = None;
 
@@ -137,7 +138,10 @@ impl PlatformStatusActionService {
             .timeout(Duration::from_secs(20))
             .build()
             .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
-        let url = format!("{}/v2/billing/meter/daily-checkin", CODEBUDDY_CN_API_ENDPOINT);
+        let url = format!(
+            "{}/v2/billing/meter/daily-checkin",
+            CODEBUDDY_CN_API_ENDPOINT
+        );
 
         let mut req = client
             .post(&url)

@@ -31,7 +31,8 @@ impl LogsService {
         let runtime_log_path = logs_dir.join("runtime.log");
         let writer_path = runtime_log_path.clone();
 
-        let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
+        let env_filter =
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
         let subscriber = tracing_subscriber::fmt()
             .with_env_filter(env_filter)
@@ -56,7 +57,8 @@ impl LogsService {
         fs::create_dir_all(logs_dir).map_err(|e| format!("创建日志目录失败: {}", e))?;
         let mut files = Vec::new();
 
-        for entry in fs::read_dir(logs_dir).map_err(|e| format!("读取日志目录失败: {}", e))? {
+        for entry in fs::read_dir(logs_dir).map_err(|e| format!("读取日志目录失败: {}", e))?
+        {
             let entry = entry.map_err(|e| format!("读取日志条目失败: {}", e))?;
             let path = entry.path();
             if !path.is_file() {
@@ -92,7 +94,11 @@ impl LogsService {
             });
         }
 
-        files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at).then_with(|| a.name.cmp(&b.name)));
+        files.sort_by(|a, b| {
+            b.modified_at
+                .cmp(&a.modified_at)
+                .then_with(|| a.name.cmp(&b.name))
+        });
         Ok(files)
     }
 

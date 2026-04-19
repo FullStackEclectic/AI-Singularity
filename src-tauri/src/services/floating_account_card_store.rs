@@ -102,7 +102,9 @@ pub struct FloatingAccountCardStore;
 
 impl FloatingAccountCardStore {
     pub fn list_cards(app_data_dir: &Path) -> Result<Vec<FloatingAccountCard>, String> {
-        let _guard = STORE_LOCK.lock().map_err(|_| "浮窗存储锁获取失败".to_string())?;
+        let _guard = STORE_LOCK
+            .lock()
+            .map_err(|_| "浮窗存储锁获取失败".to_string())?;
         let (cards, changed) = Self::load_and_normalize_cards(app_data_dir)?;
         if changed {
             Self::save_cards_unlocked(app_data_dir, &cards)?;
@@ -114,7 +116,9 @@ impl FloatingAccountCardStore {
         app_data_dir: &Path,
         input: CreateFloatingAccountCardInput,
     ) -> Result<FloatingAccountCard, String> {
-        let _guard = STORE_LOCK.lock().map_err(|_| "浮窗存储锁获取失败".to_string())?;
+        let _guard = STORE_LOCK
+            .lock()
+            .map_err(|_| "浮窗存储锁获取失败".to_string())?;
         let (mut cards, changed) = Self::load_and_normalize_cards(app_data_dir)?;
         if changed {
             Self::save_cards_unlocked(app_data_dir, &cards)?;
@@ -158,7 +162,9 @@ impl FloatingAccountCardStore {
         patch: FloatingAccountCardPatch,
         expected_updated_at: Option<&str>,
     ) -> Result<FloatingAccountCard, String> {
-        let _guard = STORE_LOCK.lock().map_err(|_| "浮窗存储锁获取失败".to_string())?;
+        let _guard = STORE_LOCK
+            .lock()
+            .map_err(|_| "浮窗存储锁获取失败".to_string())?;
         let (mut cards, changed) = Self::load_and_normalize_cards(app_data_dir)?;
         if changed {
             Self::save_cards_unlocked(app_data_dir, &cards)?;
@@ -169,7 +175,10 @@ impl FloatingAccountCardStore {
             .position(|card| card.id == id)
             .ok_or_else(|| "未找到对应浮窗".to_string())?;
 
-        if let Some(expected) = expected_updated_at.map(|value| value.trim()).filter(|value| !value.is_empty()) {
+        if let Some(expected) = expected_updated_at
+            .map(|value| value.trim())
+            .filter(|value| !value.is_empty())
+        {
             if cards[idx].updated_at != expected {
                 return Err(format!("floating_card_conflict:{}", cards[idx].updated_at));
             }
@@ -235,7 +244,9 @@ impl FloatingAccountCardStore {
     }
 
     pub fn delete_card(app_data_dir: &Path, id: &str) -> Result<bool, String> {
-        let _guard = STORE_LOCK.lock().map_err(|_| "浮窗存储锁获取失败".to_string())?;
+        let _guard = STORE_LOCK
+            .lock()
+            .map_err(|_| "浮窗存储锁获取失败".to_string())?;
         let (mut cards, changed) = Self::load_and_normalize_cards(app_data_dir)?;
         if changed {
             Self::save_cards_unlocked(app_data_dir, &cards)?;
@@ -255,7 +266,9 @@ impl FloatingAccountCardStore {
         app_data_dir: &Path,
         valid_instance_ids: &[String],
     ) -> Result<Vec<FloatingAccountCard>, String> {
-        let _guard = STORE_LOCK.lock().map_err(|_| "浮窗存储锁获取失败".to_string())?;
+        let _guard = STORE_LOCK
+            .lock()
+            .map_err(|_| "浮窗存储锁获取失败".to_string())?;
         let (mut cards, mut changed) = Self::load_and_normalize_cards(app_data_dir)?;
 
         let valid_set = valid_instance_ids
@@ -293,7 +306,9 @@ impl FloatingAccountCardStore {
         Ok(downgraded)
     }
 
-    fn load_and_normalize_cards(app_data_dir: &Path) -> Result<(Vec<FloatingAccountCard>, bool), String> {
+    fn load_and_normalize_cards(
+        app_data_dir: &Path,
+    ) -> Result<(Vec<FloatingAccountCard>, bool), String> {
         let cards = Self::load_cards_unlocked(app_data_dir)?;
         let mut changed = false;
         let mut normalized = Vec::with_capacity(cards.len());
@@ -326,13 +341,15 @@ impl FloatingAccountCardStore {
             .map_err(|e| format!("解析浮窗配置失败: {}", e))
     }
 
-    fn save_cards_unlocked(app_data_dir: &Path, cards: &[FloatingAccountCard]) -> Result<(), String> {
+    fn save_cards_unlocked(
+        app_data_dir: &Path,
+        cards: &[FloatingAccountCard],
+    ) -> Result<(), String> {
         fs::create_dir_all(app_data_dir).map_err(|e| format!("创建应用目录失败: {}", e))?;
         let path = store_path(app_data_dir);
         let content = serde_json::to_string_pretty(cards)
             .map_err(|e| format!("序列化浮窗配置失败: {}", e))?;
-        fs::write(path, format!("{}\n", content))
-            .map_err(|e| format!("写入浮窗配置失败: {}", e))
+        fs::write(path, format!("{}\n", content)).map_err(|e| format!("写入浮窗配置失败: {}", e))
     }
 }
 
@@ -386,19 +403,30 @@ fn normalize_optional_string(raw: Option<&str>) -> Option<String> {
 }
 
 fn normalize_bound_platforms(raw: Option<Vec<String>>) -> Vec<String> {
-    let source = raw.unwrap_or_else(|| DEFAULT_BOUND_PLATFORMS.iter().map(|item| item.to_string()).collect());
+    let source = raw.unwrap_or_else(|| {
+        DEFAULT_BOUND_PLATFORMS
+            .iter()
+            .map(|item| item.to_string())
+            .collect()
+    });
     let mut dedup = Vec::new();
     for item in source {
         let normalized = item.trim().to_ascii_lowercase();
         if normalized.is_empty() {
             continue;
         }
-        if !dedup.iter().any(|existing: &String| existing == &normalized) {
+        if !dedup
+            .iter()
+            .any(|existing: &String| existing == &normalized)
+        {
             dedup.push(normalized);
         }
     }
     if dedup.is_empty() {
-        return DEFAULT_BOUND_PLATFORMS.iter().map(|item| item.to_string()).collect();
+        return DEFAULT_BOUND_PLATFORMS
+            .iter()
+            .map(|item| item.to_string())
+            .collect();
     }
     dedup
 }

@@ -169,8 +169,7 @@ fn normalize_base_url(raw: &str) -> AppResult<String> {
         format!("https://{trimmed}")
     };
 
-    reqwest::Url::parse(&normalized)
-        .map_err(|_| anyhow!("中转 API 地址格式不正确"))?;
+    reqwest::Url::parse(&normalized).map_err(|_| anyhow!("中转 API 地址格式不正确"))?;
 
     Ok(normalized.trim_end_matches('/').to_string())
 }
@@ -248,15 +247,20 @@ fn extract_newapi_pricing_response(
     for item in data {
         let Some(id) = get_string_at_path(item, "model_name")
             .or_else(|| get_string_at_path(item, "name"))
-            .or_else(|| get_string_at_path(item, "id")) else {
-                continue;
-            };
+            .or_else(|| get_string_at_path(item, "id"))
+        else {
+            continue;
+        };
 
         let enable_groups = extract_string_array(
-            item.get("enable_groups").or_else(|| item.get("enable_group")),
+            item.get("enable_groups")
+                .or_else(|| item.get("enable_group")),
         );
         let vendor_id = item.get("vendor_id").and_then(Value::as_i64);
-        let quota_type = item.get("quota_type").and_then(Value::as_i64).map(|v| v as i32);
+        let quota_type = item
+            .get("quota_type")
+            .and_then(Value::as_i64)
+            .map(|v| v as i32);
         let model_ratio = item.get("model_ratio").and_then(Value::as_f64);
         let completion_ratio = item.get("completion_ratio").and_then(Value::as_f64);
         let cache_ratio = item.get("cache_ratio").and_then(Value::as_f64);
@@ -294,7 +298,8 @@ fn extract_newapi_pricing_response(
                     model_price.map(|price| price * recommended_group_ratio),
                 ),
                 _ => {
-                    let input = model_ratio.map(|ratio| ratio * recommended_group_ratio * usd_per_1m_factor);
+                    let input = model_ratio
+                        .map(|ratio| ratio * recommended_group_ratio * usd_per_1m_factor);
                     let output = match (input, completion_ratio) {
                         (Some(input), Some(completion_ratio)) => Some(input * completion_ratio),
                         _ => None,
@@ -347,23 +352,25 @@ fn extract_models_from_payload(payload: &Value) -> Vec<RemoteModelPricing> {
             continue;
         };
 
-        let entry = merged.entry(id.clone()).or_insert_with(|| RemoteModelPricing {
-            id,
-            name: extract_model_name(item),
-            description: get_string_at_path(item, "description"),
-            input_price_per_1m: None,
-            output_price_per_1m: None,
-            cache_read_price_per_1m: None,
-            fixed_price_usd: None,
-            quota_type: None,
-            model_ratio: None,
-            completion_ratio: None,
-            cache_ratio: None,
-            model_price: None,
-            enable_groups: Vec::new(),
-            vendor_id: None,
-            recommended_group: None,
-        });
+        let entry = merged
+            .entry(id.clone())
+            .or_insert_with(|| RemoteModelPricing {
+                id,
+                name: extract_model_name(item),
+                description: get_string_at_path(item, "description"),
+                input_price_per_1m: None,
+                output_price_per_1m: None,
+                cache_read_price_per_1m: None,
+                fixed_price_usd: None,
+                quota_type: None,
+                model_ratio: None,
+                completion_ratio: None,
+                cache_ratio: None,
+                model_price: None,
+                enable_groups: Vec::new(),
+                vendor_id: None,
+                recommended_group: None,
+            });
 
         if entry.name.is_none() {
             entry.name = extract_model_name(item);
@@ -407,7 +414,11 @@ fn extract_string_map(value: Option<&Value>) -> BTreeMap<String, String> {
     };
 
     for (key, value) in map {
-        if let Some(text) = value.as_str().map(str::trim).filter(|text| !text.is_empty()) {
+        if let Some(text) = value
+            .as_str()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+        {
             output.insert(key.clone(), text.to_string());
         }
     }
@@ -482,13 +493,18 @@ fn pick_recommended_group(
     }
 
     for group in auto_groups {
-        if enable_groups.iter().any(|enabled| enabled == group) && group_ratios.contains_key(group) {
+        if enable_groups.iter().any(|enabled| enabled == group) && group_ratios.contains_key(group)
+        {
             return Some(group.clone());
         }
     }
 
     for group in enable_groups {
-        if group != "admin" && group != "default" && group != "auto" && group_ratios.contains_key(group) {
+        if group != "admin"
+            && group != "default"
+            && group != "auto"
+            && group_ratios.contains_key(group)
+        {
             return Some(group.clone());
         }
     }

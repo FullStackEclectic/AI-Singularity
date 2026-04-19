@@ -34,16 +34,17 @@ impl<'a> SyncService<'a> {
             .list_mcps()
             .map_err(|e| e.to_string())?;
 
-        let provider = if let Some(provider_id) = provider_id.filter(|item| !item.trim().is_empty()) {
-            providers
-                .iter()
-                .find(|item| item.id == provider_id && item.syncs_to(&ToolTarget::Codex))
-        } else {
-            providers
-                .iter()
-                .find(|item| item.is_active && item.syncs_to(&ToolTarget::Codex))
-        }
-        .ok_or_else(|| "未找到可用于 Codex 的 Provider".to_string())?;
+        let provider =
+            if let Some(provider_id) = provider_id.filter(|item| !item.trim().is_empty()) {
+                providers
+                    .iter()
+                    .find(|item| item.id == provider_id && item.syncs_to(&ToolTarget::Codex))
+            } else {
+                providers
+                    .iter()
+                    .find(|item| item.is_active && item.syncs_to(&ToolTarget::Codex))
+            }
+            .ok_or_else(|| "未找到可用于 Codex 的 Provider".to_string())?;
 
         self.write_codex_config(codex_dir, provider, &mcps)
     }

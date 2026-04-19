@@ -1,0 +1,165 @@
+.instance-overview-card {
+  padding: 10px;
+  border: 1px solid rgba(0, 255, 170, 0.12);
+  background: rgba(0, 255, 170, 0.03);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.instance-overview-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.instance-overview-stat {
+  padding: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.instance-overview-value {
+  font-size: 16px;
+  font-weight: 700;
+  color: #d7fff4;
+}
+
+.instance-overview-label {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.instance-overview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.instance-overview-item {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  color: inherit;
+  text-align: left;
+}
+
+.instance-overview-item:hover {
+  background: rgba(0, 255, 170, 0.06);
+  border-color: rgba(0, 255, 170, 0.2);
+}
+
+.instance-overview-item-main,
+.instance-overview-item-meta,
+.instance-overview-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.instance-overview-item-meta {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.instance-overview-item-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #d7fff4;
+}
+
+.instance-overview-state {
+  font-size: 10px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.instance-overview-state.running {
+  color: #a8f5d8;
+  border-color: rgba(0, 255, 170, 0.22);
+  background: rgba(0, 255, 170, 0.06);
+}
+
+.instance-overview-state.stopped {
+  color: #ffb6c8;
+  border-color: rgba(255, 92, 135, 0.22);
+  background: rgba(255, 92, 135, 0.06);
+}
+
+.session-instance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.session-instance-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 255, 170, 0.04);
+  border: 1px solid rgba(0, 255, 170, 0.12);
+}
+
+.session-instance-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #d7fff4;
+  margin-bottom: 4px;
+}
+
+.session-instance-path {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+  word-break: break-all;
+}
+
+.session-instance-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.48);
+}
+
+.session-instance-flags {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.session-instance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.instance-flag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.instance-flag.ok {
+  color: #a8f5d8;
+  border-color: rgba(0, 255, 170, 0.22);
+  background: rgba(0, 255, 170, 0.06);
+}
+
+.instance-flag.bad {
+  color: #ffb1c4;
+  border-color: rgba(255, 92, 135, 0.22);
+  background: rgba(255, 92, 135, 0.06);
+}

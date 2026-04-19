@@ -1,5 +1,8 @@
 import { Search, X } from "lucide-react";
 import type { ChatSession } from "./sessionTypes";
+import "./SessionsFiltersPanel.css";
+import "./SessionsDialogs.css";
+import "./SessionDetailPane.css";
 
 type RelatedGeminiTranscriptsDialogProps = {
   open: boolean;

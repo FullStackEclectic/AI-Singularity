@@ -3,11 +3,11 @@ use crate::services::codex_instance_store::{CodexInstanceRecord, CodexInstanceSt
 use crate::services::codex_runtime;
 use crate::services::ide_injector::inject_codex_account_to_dir;
 use crate::services::provider_current::ProviderCurrentService;
-use crate::services::sync::SyncService;
 use crate::services::session_manager::{
     ChatMessage, ChatSession, CodexSessionRepairSummary, CodexThreadSyncSummary, SessionManager,
     SessionTrashSummary, ZombieProcess,
 };
+use crate::services::sync::SyncService;
 use std::path::Path;
 use tauri::{AppHandle, State};
 
@@ -98,7 +98,9 @@ pub fn add_codex_instance(
     name: String,
     user_data_dir: String,
 ) -> Result<CodexInstanceRecord, String> {
-    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(&user_data_dir))?;
+    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(
+        &user_data_dir,
+    ))?;
     CodexInstanceStore::add_instance(name, user_data_dir)
 }
 
@@ -166,19 +168,23 @@ pub fn start_codex_instance(
     if instance.is_default && instance.follow_local_account {
         instance.bind_account_id = ProviderCurrentService::get_current_account_id(&db, "codex")?;
     }
-    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(&instance.user_data_dir))?;
-    SyncService::new(&db)
-        .sync_codex_dir_with_provider_id(
-            &std::path::PathBuf::from(&instance.user_data_dir),
-            instance.bind_provider_id.as_deref(),
-        )?;
+    crate::services::codex_shared::ensure_instance_shared_resources(std::path::Path::new(
+        &instance.user_data_dir,
+    ))?;
+    SyncService::new(&db).sync_codex_dir_with_provider_id(
+        &std::path::PathBuf::from(&instance.user_data_dir),
+        instance.bind_provider_id.as_deref(),
+    )?;
     inject_bound_account_if_needed(
         &db,
         instance.bind_account_id.as_deref(),
         &instance.user_data_dir,
     )?;
 
-    if let Some(pid) = instance.last_pid.filter(|pid| codex_runtime::is_pid_running(*pid)) {
+    if let Some(pid) = instance
+        .last_pid
+        .filter(|pid| codex_runtime::is_pid_running(*pid))
+    {
         let _ = codex_runtime::stop_pid(pid);
     }
 
@@ -194,7 +200,10 @@ pub fn start_codex_instance(
 pub fn stop_codex_instance(id: String) -> Result<CodexInstanceRecord, String> {
     let instance = find_codex_instance(&id)?;
 
-    if let Some(pid) = instance.last_pid.filter(|pid| codex_runtime::is_pid_running(*pid)) {
+    if let Some(pid) = instance
+        .last_pid
+        .filter(|pid| codex_runtime::is_pid_running(*pid))
+    {
         codex_runtime::stop_pid(pid)?;
     }
 
@@ -228,7 +237,10 @@ pub fn close_all_codex_instances() -> Result<(), String> {
     }
 
     for instance in CodexInstanceStore::list_instances()? {
-        if let Some(pid) = instance.last_pid.filter(|pid| codex_runtime::is_pid_running(*pid)) {
+        if let Some(pid) = instance
+            .last_pid
+            .filter(|pid| codex_runtime::is_pid_running(*pid))
+        {
             let _ = codex_runtime::stop_pid(pid);
         }
     }

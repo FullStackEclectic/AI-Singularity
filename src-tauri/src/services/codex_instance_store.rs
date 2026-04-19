@@ -1,8 +1,8 @@
+use crate::services::codex_shared::inspect_instance_shared_resources;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
-use crate::services::codex_shared::inspect_instance_shared_resources;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -202,7 +202,10 @@ impl CodexInstanceStore {
         ))
     }
 
-    pub fn add_instance(name: String, user_data_dir: String) -> Result<CodexInstanceRecord, String> {
+    pub fn add_instance(
+        name: String,
+        user_data_dir: String,
+    ) -> Result<CodexInstanceRecord, String> {
         let trimmed_name = name.trim();
         let trimmed_dir = user_data_dir.trim();
         if trimmed_name.is_empty() {

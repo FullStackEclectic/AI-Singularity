@@ -63,6 +63,10 @@ export interface CodexInstanceRecord {
   shared_strategy_version?: string;
 }
 
+export type CodexInstanceCardRecord = CodexInstanceRecord & {
+  sessionCount: number;
+};
+
 export interface ProviderOption {
   id: string;
   name: string;
@@ -71,6 +75,11 @@ export interface ProviderOption {
 }
 
 export type ActionMessage = { text: string; tone?: "error" | "success" | "info" };
+
+export type SessionActionMessage = ActionMessage & {
+  id: string;
+  createdAt: number;
+};
 
 export type ConfirmDialogState = {
   title: string;

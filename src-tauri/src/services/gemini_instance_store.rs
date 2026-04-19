@@ -82,8 +82,8 @@ impl GeminiInstanceStore {
         if !path.exists() {
             return Ok(GeminiInstanceStoreFile::default());
         }
-        let content = fs::read_to_string(&path)
-            .map_err(|e| format!("读取 Gemini 实例配置失败: {}", e))?;
+        let content =
+            fs::read_to_string(&path).map_err(|e| format!("读取 Gemini 实例配置失败: {}", e))?;
         if content.trim().is_empty() {
             return Ok(GeminiInstanceStoreFile::default());
         }
@@ -99,7 +99,10 @@ impl GeminiInstanceStore {
     }
 
     fn is_initialized(user_data_dir: &str) -> bool {
-        PathBuf::from(user_data_dir).join(".gemini").join("oauth_creds.json").exists()
+        PathBuf::from(user_data_dir)
+            .join(".gemini")
+            .join("oauth_creds.json")
+            .exists()
     }
 
     fn build_runtime_record(
@@ -165,7 +168,10 @@ impl GeminiInstanceStore {
         ))
     }
 
-    pub fn add_instance(name: String, user_data_dir: String) -> Result<GeminiInstanceRecord, String> {
+    pub fn add_instance(
+        name: String,
+        user_data_dir: String,
+    ) -> Result<GeminiInstanceRecord, String> {
         let trimmed_name = name.trim();
         let trimmed_dir = user_data_dir.trim();
         if trimmed_name.is_empty() {

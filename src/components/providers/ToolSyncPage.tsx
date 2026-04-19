@@ -7,7 +7,6 @@ import { ProviderModal } from "./ProviderModal";
 import { api } from "../../lib/api";
 import { CheckCircle2, Circle, Edit2, Trash2 } from "lucide-react";
 import "./ToolSyncPage.css";
-import "./ProviderModal.css";
 
 const ALL_TOOLS: ToolTarget[] = [
   "claude_code",

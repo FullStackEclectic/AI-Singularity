@@ -128,7 +128,10 @@ impl LocalIdeRefreshService {
             return Err("账号平台与本地登录态不匹配".to_string());
         }
 
-        if let Some(access_token) = scanned.access_token.filter(|value| !value.trim().is_empty()) {
+        if let Some(access_token) = scanned
+            .access_token
+            .filter(|value| !value.trim().is_empty())
+        {
             account.token.access_token = access_token;
         }
         if let Some(refresh_token) = scanned
@@ -154,8 +157,7 @@ impl LocalIdeRefreshService {
         account.updated_at = now;
         account.last_used = now;
 
-        db.upsert_ide_account(&account)
-            .map_err(|e| e.to_string())?;
+        db.upsert_ide_account(&account).map_err(|e| e.to_string())?;
         Ok(account)
     }
 }

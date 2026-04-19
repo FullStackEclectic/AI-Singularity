@@ -37,7 +37,8 @@ pub fn create_account_group(
     db: State<'_, Database>,
     name: String,
 ) -> Result<AccountGroup, String> {
-    let group = AccountGroupStore::create_group(&app_data_dir(&app)?, &valid_account_ids(&db)?, &name)?;
+    let group =
+        AccountGroupStore::create_group(&app_data_dir(&app)?, &valid_account_ids(&db)?, &name)?;
     emit_group_changed(&app, "create");
     Ok(group)
 }
@@ -49,8 +50,12 @@ pub fn rename_account_group(
     id: String,
     name: String,
 ) -> Result<AccountGroup, String> {
-    let group =
-        AccountGroupStore::rename_group(&app_data_dir(&app)?, &valid_account_ids(&db)?, &id, &name)?;
+    let group = AccountGroupStore::rename_group(
+        &app_data_dir(&app)?,
+        &valid_account_ids(&db)?,
+        &id,
+        &name,
+    )?;
     emit_group_changed(&app, "rename");
     Ok(group)
 }
@@ -61,7 +66,8 @@ pub fn delete_account_group(
     db: State<'_, Database>,
     id: String,
 ) -> Result<bool, String> {
-    let deleted = AccountGroupStore::delete_group(&app_data_dir(&app)?, &valid_account_ids(&db)?, &id)?;
+    let deleted =
+        AccountGroupStore::delete_group(&app_data_dir(&app)?, &valid_account_ids(&db)?, &id)?;
     if deleted {
         emit_group_changed(&app, "delete");
     }

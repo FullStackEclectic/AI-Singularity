@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronRight, Folder, MessageSquare } from "lucide-react";
 import type { ChatSession, SessionGroup } from "./sessionTypes";
+import "./SessionGroupsList.css";
 
 type SessionGroupsListProps = {
   sessions: ChatSession[];

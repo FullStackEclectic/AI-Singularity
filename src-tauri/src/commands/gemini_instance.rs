@@ -26,7 +26,9 @@ fn quote_windows_arg(value: &str) -> String {
 }
 
 fn parse_extra_args(raw: &str) -> Vec<String> {
-    raw.split_whitespace().map(|item| item.to_string()).collect()
+    raw.split_whitespace()
+        .map(|item| item.to_string())
+        .collect()
 }
 
 fn resolve_launch_info(instance: &GeminiInstanceRecord) -> GeminiInstanceLaunchInfo {
@@ -35,7 +37,11 @@ fn resolve_launch_info(instance: &GeminiInstanceRecord) -> GeminiInstanceLaunchI
         let escaped_home = instance.user_data_dir.replace('"', "\"\"");
         env_prefixes.push(format!("set \"GEMINI_CLI_HOME={}\"", escaped_home));
     }
-    if let Some(project_id) = instance.project_id.as_deref().filter(|item| !item.trim().is_empty()) {
+    if let Some(project_id) = instance
+        .project_id
+        .as_deref()
+        .filter(|item| !item.trim().is_empty())
+    {
         let escaped_project = project_id.replace('"', "\"\"");
         env_prefixes.push(format!("set \"GOOGLE_CLOUD_PROJECT={}\"", escaped_project));
     }
@@ -76,11 +82,7 @@ fn inject_bound_account_if_needed(
         .find(|item| item.id == bind_account_id)
         .ok_or_else(|| format!("未找到绑定的 Gemini 账号：{}", bind_account_id))?;
 
-    inject_gemini_cli_account_to_root(
-        &account,
-        std::path::Path::new(user_data_dir),
-        project_id,
-    )
+    inject_gemini_cli_account_to_root(&account, std::path::Path::new(user_data_dir), project_id)
 }
 
 #[tauri::command]
@@ -144,10 +146,7 @@ pub fn get_gemini_instance_launch_command(id: String) -> Result<GeminiInstanceLa
 }
 
 #[tauri::command]
-pub fn launch_gemini_instance(
-    db: State<'_, Database>,
-    id: String,
-) -> Result<String, String> {
+pub fn launch_gemini_instance(db: State<'_, Database>, id: String) -> Result<String, String> {
     let mut instance = if id == "__default__" {
         GeminiInstanceStore::get_default_instance()?
     } else {

@@ -1,5 +1,6 @@
 import { Activity, ChevronDown, ChevronRight, Copy, Folder, Terminal } from "lucide-react";
 import type { ChatMessage, ChatSession } from "./sessionTypes";
+import "./SessionDetailPane.css";
 
 type SessionDetailPaneProps = {
   selectedSession: ChatSession | null;

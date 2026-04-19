@@ -1,0 +1,129 @@
+.wiz-custom-select-container {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+}
+
+.wiz-custom-select-trigger {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.wiz-custom-select-trigger:hover {
+  border-color: rgba(37, 99, 235, 0.4);
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.08);
+}
+
+.wiz-custom-select-trigger.open {
+  border-color: var(--color-accent, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.wiz-custom-select-val {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.wiz-cs-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+}
+
+.wiz-cs-desc {
+  font-size: 0.72rem;
+  color: var(--color-text-muted, #94a3b8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wiz-cs-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  max-height: 280px;
+  overflow-y: auto;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 12px 32px -4px rgba(15, 23, 42, 0.12), 0 4px 12px -2px rgba(15, 23, 42, 0.06);
+  z-index: 1010;
+  animation: cs-fade-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+  padding: 6px;
+}
+
+@keyframes cs-fade-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.wiz-cs-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1005;
+}
+
+.wiz-cs-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.wiz-cs-menu::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.1);
+  border-radius: 3px;
+}
+
+.wiz-cs-menu::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.2);
+}
+
+.wiz-cs-option {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s;
+  position: relative;
+  gap: 12px;
+}
+
+.wiz-cs-option:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.wiz-cs-option.selected {
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.wiz-cs-opt-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #0f172a);
+  width: 120px;
+  flex-shrink: 0;
+}
+
+.wiz-cs-opt-desc {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #64748b);
+  flex: 1;
+}
+
+.wiz-cs-check {
+  color: var(--color-accent, #2563eb);
+  flex-shrink: 0;
+}

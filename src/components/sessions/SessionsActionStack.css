@@ -1,0 +1,49 @@
+.session-action-bar {
+  margin: 10px 12px 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  border: 1px solid rgba(0, 255, 170, 0.2);
+}
+
+.session-action-stack {
+  margin: 10px 12px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-action-stack-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.session-action-text {
+  line-height: 1.45;
+}
+
+.session-action-time {
+  margin-top: 4px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.session-action-bar.info {
+  color: #9de9ff;
+  border-color: rgba(0, 200, 255, 0.25);
+  background: rgba(0, 140, 255, 0.08);
+}
+
+.session-action-bar.success {
+  color: #b8ffe8;
+  border-color: rgba(0, 255, 170, 0.25);
+  background: rgba(0, 255, 170, 0.08);
+}
+
+.session-action-bar.error {
+  color: #ffb6c8;
+  border-color: rgba(255, 92, 135, 0.25);
+  background: rgba(255, 92, 135, 0.08);
+}
