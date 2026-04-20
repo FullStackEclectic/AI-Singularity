@@ -33,7 +33,7 @@ pub async fn force_inject_ide(
         Ok(())
     } else {
         Err(crate::error::AppError::Other(anyhow::anyhow!(
-            "未能在兵工厂中找到该账户！"
+            "未能在账号资产库中找到该账户"
         )))
     }
 }

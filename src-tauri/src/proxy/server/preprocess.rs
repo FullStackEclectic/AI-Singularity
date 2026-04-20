@@ -27,7 +27,12 @@ pub(super) fn compress_context_if_needed(body: &mut OpenAIRequest) {
             return;
         }
 
-        let estimated_tokens: usize = body.messages.iter().map(|msg| msg.content.len()).sum::<usize>() / 3;
+        let estimated_tokens: usize = body
+            .messages
+            .iter()
+            .map(|msg| msg.content.len())
+            .sum::<usize>()
+            / 3;
         let budget = cfg.advanced_thinking.budget_limit as usize;
         let threshold = (budget as f64 * cfg.advanced_thinking.compression_threshold) as usize;
 
@@ -52,7 +57,12 @@ pub(super) fn compress_context_if_needed(body: &mut OpenAIRequest) {
             content: "[...Previous context compressed by AI Singularity Cognitive Engine...]"
                 .to_string(),
         });
-        for msg in body.messages.clone().into_iter().skip(len.saturating_sub(3)) {
+        for msg in body
+            .messages
+            .clone()
+            .into_iter()
+            .skip(len.saturating_sub(3))
+        {
             compressed_msgs.push(msg);
         }
         body.messages = compressed_msgs;

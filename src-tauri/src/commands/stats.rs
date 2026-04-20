@@ -28,10 +28,14 @@ pub async fn get_dashboard_stats(db: State<'_, Database>) -> Result<DashboardSta
     )?;
     let total_platforms: i64 =
         db.query_scalar("SELECT COUNT(DISTINCT platform) FROM api_keys", &[])?;
-    let total_cost_usd: f64 = db.query_scalar(
-        "SELECT COALESCE(SUM(cost_usd), 0.0) FROM usage_logs WHERE recorded_at >= date('now', 'start of month')",
-        &[],
-    ).unwrap_or(0.0);
+    let total_cost_usd: f64 = db
+        .query_scalar(
+            "SELECT COALESCE(SUM(total_cost_usd), 0.0)
+             FROM token_usage_records
+             WHERE date(created_at) >= date('now', 'start of month', 'localtime')",
+            &[],
+        )
+        .unwrap_or(0.0);
 
     Ok(DashboardStats {
         total_keys,

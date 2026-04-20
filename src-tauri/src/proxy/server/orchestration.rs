@@ -1,9 +1,8 @@
 use super::helpers::{get_fallback_model, get_platform_for_model, platform_base_url};
 use super::request::ProxyRequestContext;
 use super::transport::{
-    forward_to_anthropic, forward_to_gemini, forward_to_ide_bypass,
-    forward_to_openai_compatible, handle_anthropic_stream, handle_openai_compatible_stream,
-    AuditContext,
+    forward_to_anthropic, forward_to_gemini, forward_to_ide_bypass, forward_to_openai_compatible,
+    handle_anthropic_stream, handle_openai_compatible_stream, AuditContext,
 };
 use super::{ForwardTarget, ProxyState};
 use crate::models::Platform;

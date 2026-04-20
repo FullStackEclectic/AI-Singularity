@@ -1,4 +1,5 @@
-use super::{ScannedIdeAccount, dedup_scanned_accounts, parse_email_from_jwt};
+use super::{dedup_scanned_accounts, parse_email_from_jwt, ScannedIdeAccount};
+use crate::services::ide_injector::read_github_auth_sessions_by_db_path;
 use std::path::Path;
 
 pub(super) fn extract_accounts_from_import_file(
@@ -368,6 +369,36 @@ pub(super) fn extract_accounts_from_vscdb(
     path: &Path,
     platform: &str,
 ) -> Result<Vec<ScannedIdeAccount>, String> {
+    let mut accounts: Vec<ScannedIdeAccount> = Vec::new();
+
+    if platform.eq_ignore_ascii_case("vscode") {
+        let github_sessions = read_github_auth_sessions_by_db_path(path)?;
+        accounts.extend(github_sessions.into_iter().filter_map(|session| {
+            let access_token = session
+                .access_token
+                .filter(|value| !value.trim().is_empty());
+            if access_token.is_none() {
+                return None;
+            }
+
+            Some(ScannedIdeAccount {
+                email: session.label.unwrap_or_default(),
+                refresh_token: None,
+                access_token,
+                origin_platform: "vscode".to_string(),
+                source_path: path.to_string_lossy().to_string(),
+                meta_json: serde_json::json!({
+                    "user_id": session.account_id,
+                    "auth_mode": "oauth",
+                    "source": "vscode.github-authentication",
+                })
+                .to_string()
+                .into(),
+                label: None,
+            })
+        }));
+    }
+
     let conn = rusqlite::Connection::open_with_flags(
         path,
         rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY
@@ -379,8 +410,6 @@ pub(super) fn extract_accounts_from_vscdb(
     let mut stmt = conn
         .prepare("SELECT key, value FROM ItemTable WHERE key LIKE '%token%' OR key LIKE '%auth%' OR key LIKE '%session%' OR key LIKE '%secret%'")
         .map_err(|e| format!("查询失败: {}", e))?;
-
-    let mut accounts: Vec<ScannedIdeAccount> = Vec::new();
 
     let rows = stmt
         .query_map([], |row| {
@@ -421,9 +450,8 @@ pub(super) fn extract_accounts_from_vscdb(
             .cmp(&b.refresh_token)
             .then_with(|| a.access_token.cmp(&b.access_token))
     });
-    accounts.dedup_by(|a, b| {
-        a.refresh_token == b.refresh_token && a.access_token == b.access_token
-    });
+    accounts
+        .dedup_by(|a, b| a.refresh_token == b.refresh_token && a.access_token == b.access_token);
 
     Ok(accounts)
 }
@@ -481,6 +509,8 @@ fn parse_auth_json(
             let access_token = obj
                 .get("accessToken")
                 .or_else(|| obj.get("access_token"))
+                .or_else(|| obj.get("apiKey"))
+                .or_else(|| obj.get("api_key"))
                 .or_else(|| obj.get("token"))
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
@@ -501,6 +531,8 @@ fn parse_auth_json(
                     meta_json: None,
                     label: obj
                         .get("label")
+                        .or_else(|| obj.get("name"))
+                        .or_else(|| obj.get("displayName"))
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string()),
                 });

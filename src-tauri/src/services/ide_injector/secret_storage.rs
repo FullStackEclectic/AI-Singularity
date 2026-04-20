@@ -25,9 +25,9 @@ use rusqlite::Connection;
 use sha1::Sha1;
 
 #[cfg(target_os = "windows")]
-use windows::Win32::Foundation::{HLOCAL, LocalFree};
+use windows::Win32::Foundation::{LocalFree, HLOCAL};
 #[cfg(target_os = "windows")]
-use windows::Win32::Security::Cryptography::{CRYPT_INTEGER_BLOB, CryptUnprotectData};
+use windows::Win32::Security::Cryptography::{CryptUnprotectData, CRYPT_INTEGER_BLOB};
 
 #[cfg(not(target_os = "windows"))]
 type Aes128CbcEnc = cbc::Encryptor<Aes128>;
@@ -69,6 +69,40 @@ fn resolve_vscode_data_root(user_data_dir: Option<&str>) -> Result<PathBuf, Stri
             err
         }
     })
+}
+
+fn resolve_antigravity_data_root(user_data_dir: Option<&str>) -> Result<PathBuf, String> {
+    if let Some(raw) = user_data_dir {
+        let trimmed = raw.trim();
+        if !trimmed.is_empty() {
+            return Ok(PathBuf::from(trimmed));
+        }
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let appdata =
+            std::env::var("APPDATA").map_err(|_| "无法获取 APPDATA 环境变量".to_string())?;
+        return Ok(PathBuf::from(appdata).join("Antigravity"));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        let home = dirs::home_dir().ok_or("无法获取用户主目录".to_string())?;
+        return Ok(home
+            .join("Library")
+            .join("Application Support")
+            .join("Antigravity"));
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        let home = dirs::home_dir().ok_or("无法获取用户主目录".to_string())?;
+        return Ok(home.join(".config").join("Antigravity"));
+    }
+
+    #[allow(unreachable_code)]
+    Err("Unsupported platform".to_string())
 }
 
 fn get_vscode_db_path_from_data_root(data_root: &Path) -> Result<PathBuf, String> {
@@ -830,7 +864,7 @@ pub fn read_antigravity_secret_storage_value(
     key: &str,
     user_data_dir: Option<&str>,
 ) -> Result<Option<String>, String> {
-    let data_root = resolve_vscode_data_root(user_data_dir)?;
+    let data_root = resolve_antigravity_data_root(user_data_dir)?;
     read_secret_storage_value_with_data_root_and_mode(
         &data_root,
         extension_id,
@@ -970,6 +1004,122 @@ fn load_existing_sessions(
     Ok((sessions, prefix))
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct GithubAuthSessionSnapshot {
+    pub label: Option<String>,
+    pub account_id: Option<String>,
+    pub access_token: Option<String>,
+    pub scopes: Vec<String>,
+}
+
+fn parse_github_auth_session_snapshots(
+    sessions: Vec<serde_json::Value>,
+) -> Vec<GithubAuthSessionSnapshot> {
+    sessions
+        .into_iter()
+        .filter_map(|session| {
+            let access_token = session
+                .get("accessToken")
+                .or_else(|| session.get("access_token"))
+                .and_then(|value| value.as_str())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty());
+            let label = session
+                .get("account")
+                .and_then(|value| value.get("label"))
+                .and_then(|value| value.as_str())
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .or_else(|| {
+                    session
+                        .get("account")
+                        .and_then(|value| value.get("email"))
+                        .and_then(|value| value.as_str())
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty())
+                });
+            let account_id = session
+                .get("account")
+                .and_then(|value| value.get("id"))
+                .and_then(|value| {
+                    value
+                        .as_str()
+                        .map(|raw| raw.trim().to_string())
+                        .filter(|raw| !raw.is_empty())
+                        .or_else(|| value.as_i64().map(|raw| raw.to_string()))
+                        .or_else(|| value.as_u64().map(|raw| raw.to_string()))
+                });
+            let scopes = session
+                .get("scopes")
+                .and_then(|value| value.as_array())
+                .map(|items| {
+                    items
+                        .iter()
+                        .filter_map(|item| item.as_str().map(str::trim))
+                        .filter(|item| !item.is_empty())
+                        .map(|item| item.to_string())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            if access_token.is_none() && label.is_none() && account_id.is_none() {
+                return None;
+            }
+
+            Some(GithubAuthSessionSnapshot {
+                label,
+                account_id,
+                access_token,
+                scopes,
+            })
+        })
+        .collect()
+}
+
+pub fn read_github_auth_sessions_by_db_path(
+    db_path: &Path,
+) -> Result<Vec<GithubAuthSessionSnapshot>, String> {
+    if !db_path.exists() {
+        return Ok(Vec::new());
+    }
+
+    let conn = Connection::open(db_path).map_err(|e| {
+        format!(
+            "Failed to open VS Code database {}: {}",
+            db_path.display(),
+            e
+        )
+    })?;
+    let secret_key =
+        r#"secret://{"extensionId":"vscode.github-authentication","key":"github.auth"}"#;
+    let raw_value: Option<String> = match conn.query_row(
+        "SELECT value FROM ItemTable WHERE key = ?1",
+        [secret_key],
+        |row| row.get(0),
+    ) {
+        Ok(value) => Some(value),
+        Err(rusqlite::Error::QueryReturnedNoRows) => None,
+        Err(err) => {
+            return Err(format!(
+                "Failed to query VS Code secret key '{}': {}",
+                secret_key, err
+            ));
+        }
+    };
+
+    let data_root = resolve_data_root_from_state_db_path(db_path)?;
+    let (sessions, _) = load_existing_sessions(raw_value.as_deref(), Some(data_root))?;
+    Ok(parse_github_auth_session_snapshots(sessions))
+}
+
+pub fn read_github_auth_sessions(
+    user_data_dir: Option<&str>,
+) -> Result<Vec<GithubAuthSessionSnapshot>, String> {
+    let data_root = resolve_vscode_data_root(user_data_dir)?;
+    let db_path = get_vscode_db_path_from_data_root(&data_root)?;
+    read_github_auth_sessions_by_db_path(&db_path)
+}
+
 fn build_github_auth_sessions(
     existing_encrypted_value: Option<&str>,
     data_root: Option<&Path>,
@@ -994,7 +1144,9 @@ fn build_github_auth_sessions(
     let mut replaced = false;
     for session in &mut sessions {
         if let Some(scopes) = session["scopes"].as_array() {
-            let has_user_email = scopes.iter().any(|scope| scope.as_str() == Some("user:email"));
+            let has_user_email = scopes
+                .iter()
+                .any(|scope| scope.as_str() == Some("user:email"));
             if has_user_email {
                 *session = new_session.clone();
                 replaced = true;
@@ -1029,6 +1181,19 @@ pub(super) fn inject_secret_to_state_db_for_codebuddy(
         db_key,
         plaintext,
         SafeStorageReadMode::CodeBuddyOnly,
+    )
+}
+
+pub(super) fn inject_secret_to_state_db_for_antigravity(
+    db_path: &Path,
+    db_key: &str,
+    plaintext: &str,
+) -> Result<(), String> {
+    inject_secret_to_state_db_with_mode(
+        db_path,
+        db_key,
+        plaintext,
+        SafeStorageReadMode::AntigravityOnly,
     )
 }
 
@@ -1088,8 +1253,8 @@ fn inject_secret_to_state_db_with_mode(
             .map_err(|e| format!("Failed to create state.vscdb parent dir: {}", e))?;
     }
 
-    let conn =
-        rusqlite::Connection::open(db_path).map_err(|e| format!("Failed to open state.vscdb: {}", e))?;
+    let conn = rusqlite::Connection::open(db_path)
+        .map_err(|e| format!("Failed to open state.vscdb: {}", e))?;
     conn.execute(
         "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value TEXT)",
         [],

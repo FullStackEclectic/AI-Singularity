@@ -3,10 +3,13 @@ import { PLATFORM_LABELS } from "../../types";
 import type { AccountGroup, ApiKey, Balance, IdeAccount } from "../../types";
 import {
   type AttentionReasonFilter,
+  IDE_REFRESHABLE_PLATFORMS,
   getAttentionReasonLabel,
   isCurrentIdeAccount,
   isIdeMatchingAttentionReason,
   isIdeNeedsAttention,
+  isIdeSetCurrentSupported,
+  parseIdeMeta,
 } from "./unifiedAccountsUtils";
 import { supportsDailyCheckin } from "./platformStatusActionUtils";
 import {
@@ -43,6 +46,38 @@ type ChannelsSummary = {
 };
 
 type IdeUnifiedItem = Extract<UnifiedAccountItem, { type: "ide" }>;
+
+function matchesApiKeySearch(key: ApiKey, query: string) {
+  return (
+    key.name.toLowerCase().includes(query) ||
+    key.platform.toLowerCase().includes(query) ||
+    key.key_preview.toLowerCase().includes(query) ||
+    (key.tags || []).some((tag) => tag.toLowerCase().includes(query))
+  );
+}
+
+function matchesIdeAccountSearch(account: IdeAccount, query: string) {
+  const meta = parseIdeMeta(account.meta_json);
+  const searchable = [
+    account.email,
+    account.origin_platform,
+    account.label || "",
+    meta.user_id || "",
+    meta.login || "",
+    meta.nickname || "",
+    meta.uid || "",
+    meta.auth_id || "",
+    meta.membership_type || "",
+    meta.subscription_status || "",
+    meta.plan || "",
+    meta.account_name || "",
+    meta.plan_type || "",
+    meta.oauth_provider || "",
+    ...(account.tags || []),
+  ];
+
+  return searchable.some((value) => value.toLowerCase().includes(query));
+}
 
 export function useUnifiedAccountsDerivedState({
   accountGroupFilter,
@@ -132,9 +167,9 @@ export function useUnifiedAccountsDerivedState({
       const query = searchQuery.toLowerCase();
       rawItems = rawItems.filter((item) => {
         if (item.type === "api") {
-          return item.data.name.toLowerCase().includes(query) || item.data.platform.toLowerCase().includes(query);
+          return matchesApiKeySearch(item.data, query);
         }
-        return item.data.email.toLowerCase().includes(query) || item.data.origin_platform.toLowerCase().includes(query);
+        return matchesIdeAccountSearch(item.data, query);
       });
     }
 
@@ -242,16 +277,22 @@ export function useUnifiedAccountsDerivedState({
   const canExportIdeAccounts = filteredIdeItems.length > 0 && (activeChannelId === "all" || activeChannelId.startsWith("ide_"));
   const canBatchEditIdeTags = filteredIdeItems.length > 0;
   const canBatchDailyCheckin = filteredDailyCheckinIds.length > 0;
-  const batchRefreshablePlatforms = ["gemini", "codex", "cursor", "windsurf", "kiro", "qoder", "trae", "codebuddy", "codebuddy_cn", "workbuddy", "zed"];
   const activeIdePlatform = activeChannelId.startsWith("ide_") ? activeChannelId.replace("ide_", "") : null;
-  const canBatchRefreshActiveIde = !!activeIdePlatform && batchRefreshablePlatforms.includes(activeIdePlatform);
+  const canBatchRefreshActiveIde =
+    !!activeIdePlatform && IDE_REFRESHABLE_PLATFORMS.includes(activeIdePlatform);
   const selectedIdeCount = selectedVisibleIdeIds.length;
   const canBatchGroupIde = filteredIdeItems.length > 0;
   const selectedIdePlatforms = [...new Set(selectedVisibleIdeItems.map((item) => item.data.origin_platform))];
   const filteredIdePlatforms = [...new Set(filteredIdeItems.map((item) => item.data.origin_platform))];
-  const canBatchSetCurrent = selectedIdeCount > 0 && selectedIdePlatforms.length === 1;
+  const canBatchSetCurrent =
+    selectedIdeCount > 0 &&
+    selectedIdePlatforms.length === 1 &&
+    selectedVisibleIdeItems.every((item) => isIdeSetCurrentSupported(item.data));
   const canBatchSetCurrentForGroupView =
-    accountGroupFilter !== "all" && filteredIdeIds.length > 0 && filteredIdePlatforms.length === 1;
+    accountGroupFilter !== "all" &&
+    filteredIdeIds.length > 0 &&
+    filteredIdePlatforms.length === 1 &&
+    filteredIdeItems.every((item) => isIdeSetCurrentSupported(item.data));
   const selectedCurrentCount = selectedVisibleIdeItems.filter((item) => isCurrentIdeAccount(item.data, currentIdeAccountIds)).length;
   const attentionReasonLabel = attentionReasonFilter ? getAttentionReasonLabel(attentionReasonFilter) : null;
   const currentGroupFilterLabel = accountGroupFilter === "__ungrouped__"
@@ -346,11 +387,7 @@ export function useUnifiedAccountsDerivedState({
     }
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      items = items.filter((item) =>
-        item.email.toLowerCase().includes(query) ||
-        item.origin_platform.toLowerCase().includes(query) ||
-        (item.label || "").toLowerCase().includes(query)
-      );
+      items = items.filter((item) => matchesIdeAccountSearch(item, query));
     }
     return items;
   }, [activeChannelId, ideAccs, searchQuery]);

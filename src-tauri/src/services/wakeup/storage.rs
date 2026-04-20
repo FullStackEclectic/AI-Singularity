@@ -1,6 +1,5 @@
 use super::{
-    normalize_client_version_mode, WakeupHistoryItem, WakeupService, WakeupState,
-    MAX_HISTORY_ITEMS,
+    normalize_client_version_mode, WakeupHistoryItem, WakeupService, WakeupState, MAX_HISTORY_ITEMS,
 };
 use chrono::Utc;
 use std::fs;

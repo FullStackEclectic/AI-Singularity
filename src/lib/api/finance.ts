@@ -38,6 +38,23 @@ export const models = {
   list: (): Promise<Model[]> => invoke("list_models"),
   byPlatform: (platform: string): Promise<Model[]> =>
     invoke("get_platform_models", { platform }),
+  savePricing: (request: {
+    platform: Platform;
+    modelId: string;
+    fixedPrice?: number;
+    requestPrice?: number;
+    inputPricePer1m?: number;
+    outputPricePer1m?: number;
+    pricingCurrency?: string;
+    pricingUnit?: string;
+    note?: string;
+  }): Promise<Model> =>
+    invoke("save_model_pricing", { request }),
+  resetPricing: (request: {
+    platform: Platform;
+    modelId: string;
+  }): Promise<Model> =>
+    invoke("reset_model_pricing", { request }),
 };
 
 export const tokenCalculator = {

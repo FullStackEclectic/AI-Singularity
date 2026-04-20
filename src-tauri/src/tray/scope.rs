@@ -1,4 +1,4 @@
-use super::types::{TRAY_SCOPE_FILE, TrayScopeState};
+use super::types::{TrayScopeState, TRAY_SCOPE_FILE};
 use chrono::Utc;
 use std::fs;
 use std::path::PathBuf;

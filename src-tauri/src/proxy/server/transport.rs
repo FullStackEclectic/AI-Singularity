@@ -1,7 +1,7 @@
 use crate::db::Database;
 use crate::proxy::converter::{
-    anthropic_to_openai_response, gemini_to_openai_response, openai_to_anthropic,
-    openai_to_gemini, OpenAIRequest,
+    anthropic_to_openai_response, gemini_to_openai_response, openai_to_anthropic, openai_to_gemini,
+    OpenAIRequest,
 };
 use axum::response::{
     sse::{Event, Sse},
@@ -40,8 +40,15 @@ impl AuditContext {
         }
     }
 
-    pub(super) fn write_usage(&self, prompt_tokens: u64, completion_tokens: u64, total_tokens: u64) {
+    pub(super) fn write_usage(
+        &self,
+        prompt_tokens: u64,
+        completion_tokens: u64,
+        total_tokens: u64,
+    ) {
         let cost = crate::services::pricing::PricingEngine::calculate_cost(
+            &self.db,
+            &self.platform,
             &self.model,
             prompt_tokens,
             completion_tokens,

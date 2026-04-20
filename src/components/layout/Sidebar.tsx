@@ -60,7 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
       { id: "providers", icon: "🔌", label: "终端配置" },
       { id: "mcp", icon: "🔌", label: "MCP 扩展" },
       { id: "skills", icon: "🛠️", label: "技能包" },
-      { id: "tools", icon: "⏬", label: "本地兵工厂" },
+      { id: "tools", icon: "🧪", label: "环境配置" },
       { id: "tokenCalculator", icon: "🧮", label: "TOKEN 计算器" },
       { id: "mfa", icon: "🔐", label: "2FA / MFA 管理" },
       { id: "wakeup", icon: "⏰", label: "Wakeup / Verification" },

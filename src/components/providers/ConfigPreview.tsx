@@ -8,7 +8,7 @@
  */
 
 import { useMemo, useState } from "react";
-import type { ToolTarget, ToolSpecificConfigs } from "../../types";
+import type { ProviderConfig, ToolTarget, ToolSpecificConfigs } from "../../types";
 import { TOOL_TARGET_LABELS, TOOL_TARGET_CONFIG_PATH } from "../../types";
 import "./ConfigPreview.css";
 
@@ -16,24 +16,73 @@ import "./ConfigPreview.css";
 // 配置内容生成函数
 // ─────────────────────────────────────────────────────────────────────────────
 
+type ProviderExtraConfig = {
+  apiKeyField?: string;
+  envInjection?: string;
+  projectId?: string;
+};
+
+function parseProviderExtraConfig(provider?: ProviderConfig): ProviderExtraConfig {
+  try {
+    if (!provider?.extra_config) return {};
+    const parsed = JSON.parse(provider.extra_config);
+    return parsed && typeof parsed === "object" ? parsed as ProviderExtraConfig : {};
+  } catch {
+    return {};
+  }
+}
+
+function resolveToolModel(
+  cfg: { model?: string; model_name?: string } | undefined,
+  provider?: ProviderConfig,
+): string {
+  const model = cfg?.model || cfg?.model_name || provider?.model_name;
+  return model?.trim() ? model : "(使用 Provider 默认模型)";
+}
+
+function normalizeCodexBaseUrl(baseUrl: string): string {
+  if (!baseUrl) return "https://api.example.com/v1";
+  return baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl.replace(/\/+$/, "")}/v1`;
+}
+
+function escapeEnvValue(value: string): string {
+  if (!value) return "\"\"";
+  return /[\s#"\\]/.test(value)
+    ? `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`
+    : value;
+}
+
+function resolveGeminiEnvMode(provider?: ProviderConfig): "standard" | "legacy" {
+  const mode = parseProviderExtraConfig(provider).envInjection;
+  return mode === "legacy" ? "legacy" : "standard";
+}
+
+function resolvePreviewPath(tool: ToolTarget): string {
+  if (tool === "codex") return "~/.codex/config.toml + ~/.codex/auth.json";
+  if (tool === "gemini_cli") return "~/.gemini/settings.json + ~/.gemini/.env";
+  return TOOL_TARGET_CONFIG_PATH[tool];
+}
+
 function buildClaudePreview(
   baseUrl: string,
   apiKey: string,
   cfg: ToolSpecificConfigs["claude_code"],
+  provider?: ProviderConfig,
 ): string {
-  const model = cfg?.model || "(使用 Provider 默认模型)";
-  const haiku  = cfg?.haikuModel  || undefined;
-  const sonnet = cfg?.sonnetModel || undefined;
-  const opus   = cfg?.opusModel   || undefined;
+  const extra = parseProviderExtraConfig(provider);
+  const authField = extra.apiKeyField === "ANTHROPIC_AUTH_TOKEN"
+    ? "ANTHROPIC_AUTH_TOKEN"
+    : "ANTHROPIC_API_KEY";
+  const model = resolveToolModel(cfg, provider);
+  const env: Record<string, string> = {};
 
-  const env: Record<string, string> = {
-    ANTHROPIC_AUTH_TOKEN: apiKey || "sk-...",
-  };
-  if (baseUrl) env["ANTHROPIC_BASE_URL"] = baseUrl;
-  env["ANTHROPIC_MODEL"] = model;
-  if (haiku)  env["ANTHROPIC_DEFAULT_HAIKU_MODEL"]  = haiku;
-  if (sonnet) env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = sonnet;
-  if (opus)   env["ANTHROPIC_DEFAULT_OPUS_MODEL"]   = opus;
+  if (apiKey) env[authField] = apiKey;
+  if (baseUrl) env.ANTHROPIC_BASE_URL = baseUrl;
+  env.ANTHROPIC_MODEL = model;
+  if (cfg?.reasoningModel) env.ANTHROPIC_REASONING_MODEL = cfg.reasoningModel;
+  if (cfg?.haikuModel) env.ANTHROPIC_DEFAULT_HAIKU_MODEL = cfg.haikuModel;
+  if (cfg?.sonnetModel) env.ANTHROPIC_DEFAULT_SONNET_MODEL = cfg.sonnetModel;
+  if (cfg?.opusModel) env.ANTHROPIC_DEFAULT_OPUS_MODEL = cfg.opusModel;
 
   return JSON.stringify({ env }, null, 2);
 }
@@ -42,25 +91,25 @@ function buildCodexPreview(
   baseUrl: string,
   apiKey: string,
   cfg: ToolSpecificConfigs["codex"],
+  provider?: ProviderConfig,
 ): string {
-  const model = cfg?.model || "(使用 Provider 默认模型)";
+  const model = resolveToolModel(cfg, provider);
   const effort = cfg?.reasoningEffort || "high";
-  const codexUrl = baseUrl
-    ? (baseUrl.endsWith("/v1") ? baseUrl : `${baseUrl.replace(/\/+$/, "")}/v1`)
-    : "https://api.example.com/v1";
+  const codexUrl = normalizeCodexBaseUrl(baseUrl);
+  const providerName = provider?.name || "Custom Provider";
 
-  return `model_provider = "custom"
+  return `model_provider = "ai_singularity"
 model = "${model}"
 model_reasoning_effort = "${effort}"
 disable_response_storage = true
 
-[model_providers.custom]
-name = "Custom Provider"
+[model_providers.ai_singularity]
+name = "${providerName}"
 base_url = "${codexUrl}"
 wire_api = "responses"
 requires_openai_auth = true
 
-# auth (配置环境变量)
+# ~/.codex/auth.json
 # OPENAI_API_KEY = "${apiKey ? apiKey.slice(0, 8) + "..." : "your-api-key"}"`;
 }
 
@@ -68,59 +117,94 @@ function buildGeminiPreview(
   baseUrl: string,
   apiKey: string,
   cfg: ToolSpecificConfigs["gemini_cli"],
+  provider?: ProviderConfig,
 ): string {
-  const model = cfg?.model || "(使用 Provider 默认模型)";
-  const env: Record<string, string> = {
-    GEMINI_API_KEY: apiKey || "your-api-key",
+  const extra = parseProviderExtraConfig(provider);
+  const settings: Record<string, unknown> = {
+    security: {
+      auth: {
+        selectedType: "gemini-api-key",
+      },
+    },
   };
-  if (baseUrl) env["GOOGLE_GEMINI_BASE_URL"] = baseUrl;
-  env["GEMINI_MODEL"] = model;
+  const model = resolveToolModel(cfg, provider);
+  const envLines: string[] = [];
+  const envMode = resolveGeminiEnvMode(provider);
 
-  return JSON.stringify({ env }, null, 2);
+  if (baseUrl) settings.GOOGLE_GEMINI_BASE_URL = baseUrl;
+  settings.model = model;
+  if (extra.projectId?.trim()) settings.projectId = extra.projectId.trim();
+  if (apiKey) {
+    envLines.push(`GEMINI_API_KEY=${escapeEnvValue(apiKey)}`);
+    if (envMode === "legacy") {
+      envLines.push(`GOOGLE_API_KEY=${escapeEnvValue(apiKey)}`);
+    }
+  }
+  if (baseUrl) envLines.push(`GOOGLE_GEMINI_BASE_URL=${escapeEnvValue(baseUrl)}`);
+  if (extra.projectId?.trim()) {
+    envLines.push(`GOOGLE_CLOUD_PROJECT=${escapeEnvValue(extra.projectId.trim())}`);
+  }
+  envLines.push(`GEMINI_MODEL=${escapeEnvValue(model)}`);
+
+  return [
+    "# ~/.gemini/settings.json",
+    JSON.stringify(settings, null, 2),
+    "",
+    "# ~/.gemini/.env",
+    ...(envLines.length > 0 ? envLines : ["# (当前不会写入额外环境变量)"]),
+  ].join("\n");
 }
 
 function buildOpenCodePreview(
   baseUrl: string,
   apiKey: string,
   cfg: ToolSpecificConfigs["open_code"],
+  provider?: ProviderConfig,
 ): string {
-  const model = cfg?.model || "(使用 Provider 默认模型)";
+  const model = resolveToolModel(cfg, provider);
+  const providerKey = provider?.id?.replace(/-/g, "_") || "custom";
   return JSON.stringify({
     providers: {
-      custom: {
-        api_key:  apiKey || "your-api-key",
-        base_url: baseUrl || "https://api.example.com",
-        model,
+      [providerKey]: {
+        npm: "@ai-sdk/openai-compatible",
+        options: {
+          baseURL: baseUrl || "https://api.example.com/v1",
+          apiKey: apiKey || "{env:OPENAI_API_KEY}",
+        },
+        models: {
+          [model]: {
+            name: model,
+          },
+        },
       },
     },
+    mcpServers: {},
   }, null, 2);
 }
 
 function buildOpenClawPreview(
   baseUrl: string,
-  apiKey: string,
+  _apiKey: string,
   cfg: ToolSpecificConfigs["open_claw"],
+  provider?: ProviderConfig,
 ): string {
-  const model = cfg?.model || "(使用 Provider 默认模型)";
+  const model = resolveToolModel(cfg, provider);
   return JSON.stringify({
-    provider: {
-      base_url: baseUrl || "https://api.example.com",
-      api_key:  apiKey || "your-api-key",
-      model,
-    },
+    openai_base_url: baseUrl || "https://api.example.com/v1",
+    model,
   }, null, 2);
 }
 
 function buildAiderPreview(
   baseUrl: string,
-  apiKey: string,
+  _apiKey: string,
   cfg: ToolSpecificConfigs["aider"],
+  provider?: ProviderConfig,
 ): string {
-  const model = cfg?.model || "(使用 Provider 默认模型)";
+  const model = resolveToolModel(cfg, provider);
   const lines: string[] = ["# ~/.aider.conf.yml"];
-  lines.push(`model: anthropic/${model}`);
-  if (baseUrl) lines.push(`anthropic-api-base: ${baseUrl}`);
-  lines.push(`# 环境变量: ANTHROPIC_API_KEY=${apiKey ? apiKey.slice(0, 8) + "..." : "your-api-key"}`);
+  lines.push(`model: ${model}`);
+  if (baseUrl) lines.push(`openai-api-base: ${baseUrl}`);
   return lines.join("\n");
 }
 
@@ -151,7 +235,7 @@ function PreviewBlock({
       <div className="cfg-preview-header">
         <div className="cfg-preview-meta">
           <span className="cfg-preview-tool">{TOOL_TARGET_LABELS[tool]}</span>
-          <span className="cfg-preview-path">{TOOL_TARGET_CONFIG_PATH[tool]}</span>
+          <span className="cfg-preview-path">{resolvePreviewPath(tool)}</span>
           <span className="cfg-preview-lang-badge">{LANG_LABELS[lang]}</span>
         </div>
         <button className="cfg-copy-btn" onClick={handleCopy}>
@@ -171,6 +255,7 @@ interface ConfigPreviewProps {
   apiKey: string;
   toolTargets: ToolTarget[];
   toolConfigs: ToolSpecificConfigs;
+  provider?: ProviderConfig;
 }
 
 export default function ConfigPreview({
@@ -178,6 +263,7 @@ export default function ConfigPreview({
   apiKey,
   toolTargets,
   toolConfigs,
+  provider,
 }: ConfigPreviewProps) {
   const previews = useMemo(() => {
     const result: Array<{ tool: ToolTarget; content: string; lang: "json" | "toml" | "yaml" }> = [];
@@ -185,48 +271,48 @@ export default function ConfigPreview({
     if (toolTargets.includes("claude_code")) {
       result.push({
         tool: "claude_code",
-        content: buildClaudePreview(baseUrl, apiKey, toolConfigs.claude_code),
+        content: buildClaudePreview(baseUrl, apiKey, toolConfigs.claude_code, provider),
         lang: "json",
       });
     }
     if (toolTargets.includes("codex")) {
       result.push({
         tool: "codex",
-        content: buildCodexPreview(baseUrl, apiKey, toolConfigs.codex),
+        content: buildCodexPreview(baseUrl, apiKey, toolConfigs.codex, provider),
         lang: "toml",
       });
     }
     if (toolTargets.includes("gemini_cli")) {
       result.push({
         tool: "gemini_cli",
-        content: buildGeminiPreview(baseUrl, apiKey, toolConfigs.gemini_cli),
-        lang: "json",
+        content: buildGeminiPreview(baseUrl, apiKey, toolConfigs.gemini_cli, provider),
+        lang: "yaml",
       });
     }
     if (toolTargets.includes("open_code")) {
       result.push({
         tool: "open_code",
-        content: buildOpenCodePreview(baseUrl, apiKey, toolConfigs.open_code),
+        content: buildOpenCodePreview(baseUrl, apiKey, toolConfigs.open_code, provider),
         lang: "json",
       });
     }
     if (toolTargets.includes("open_claw")) {
       result.push({
         tool: "open_claw",
-        content: buildOpenClawPreview(baseUrl, apiKey, toolConfigs.open_claw),
+        content: buildOpenClawPreview(baseUrl, apiKey, toolConfigs.open_claw, provider),
         lang: "json",
       });
     }
     if (toolTargets.includes("aider")) {
       result.push({
         tool: "aider",
-        content: buildAiderPreview(baseUrl, apiKey, toolConfigs.aider),
+        content: buildAiderPreview(baseUrl, apiKey, toolConfigs.aider, provider),
         lang: "yaml",
       });
     }
 
     return result;
-  }, [baseUrl, apiKey, toolTargets, toolConfigs]);
+  }, [baseUrl, apiKey, provider, toolTargets, toolConfigs]);
 
   if (previews.length === 0) return null;
 

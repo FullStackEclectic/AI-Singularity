@@ -101,9 +101,7 @@ pub(super) fn should_force_refresh_token(message: &str) -> bool {
         || lower.contains("错误 401")
 }
 
-pub(super) fn extract_chatgpt_account_id_from_access_token(
-    access_token: &str,
-) -> Option<String> {
+pub(super) fn extract_chatgpt_account_id_from_access_token(access_token: &str) -> Option<String> {
     decode_any_claim(
         access_token,
         &["chatgpt_account_id", "account_id", "workspace_id"],

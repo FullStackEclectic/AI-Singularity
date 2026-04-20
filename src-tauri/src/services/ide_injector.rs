@@ -19,13 +19,12 @@ mod secret_storage;
 
 use crate::models::IdeAccount;
 
-pub use self::platforms::{
-    inject_codex_account_to_dir, inject_gemini_cli_account_to_root,
-};
+pub use self::platforms::{inject_codex_account_to_dir, inject_gemini_cli_account_to_root};
 #[allow(unused_imports)]
 pub use self::secret_storage::{
     inject_copilot_token_for_user_data_dir, read_antigravity_secret_storage_value,
     read_codebuddy_cn_secret_storage_value, read_codebuddy_secret_storage_value,
+    read_github_auth_sessions, read_github_auth_sessions_by_db_path,
     read_qoder_secret_storage_value_by_db_path, read_workbuddy_secret_storage_value,
 };
 

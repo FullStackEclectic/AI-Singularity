@@ -6,6 +6,7 @@ import {
   IDE_ORIGINS,
   LOCAL_IMPORT_OPTIONS,
   isImportOnly,
+  supportsOAuth,
 } from "./addAccountWizardConfig";
 import { useAddAccountWizardApiKey } from "./useAddAccountWizardApiKey";
 import { useAddAccountWizardSandbox } from "./useAddAccountWizardSandbox";
@@ -120,7 +121,7 @@ export default function AddAccountWizard({ onClose, onSuccess }: Props) {
   const currentLocalImportOption = LOCAL_IMPORT_OPTIONS[ideOrigin];
   const channelOptions: readonly ChannelOption[] =
     sandboxTab === "oauth"
-      ? IDE_ORIGINS.filter((option) => !isImportOnly(option.value))
+      ? IDE_ORIGINS.filter((option) => supportsOAuth(option.value))
       : IDE_ORIGINS;
 
   return (

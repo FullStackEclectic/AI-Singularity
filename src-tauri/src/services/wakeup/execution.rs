@@ -339,14 +339,8 @@ fn render_command_template(
         .replace("{account_id}", &task.account_id)
         .replace("{email}", email)
         .replace("{client_version_mode}", &profile.effective_mode)
-        .replace(
-            "{client_version_mode_requested}",
-            &profile.requested_mode,
-        )
-        .replace(
-            "{client_version_fallback_mode}",
-            &profile.fallback_mode,
-        )
+        .replace("{client_version_mode_requested}", &profile.requested_mode)
+        .replace("{client_version_fallback_mode}", &profile.fallback_mode)
         .replace("{client_runtime_args}", &profile.runtime_args)
         .replace("{gateway_mode}", &profile.gateway_mode)
         .replace("{gateway_transport}", &profile.gateway_transport)

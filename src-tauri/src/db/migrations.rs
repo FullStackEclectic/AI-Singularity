@@ -308,6 +308,51 @@ impl Database {
             )?;
         }
 
+        if current_version < 15 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS model_pricing_overrides (
+                    platform                TEXT NOT NULL,
+                    model_id                TEXT NOT NULL,
+                    input_price_per_1m      REAL,
+                    output_price_per_1m     REAL,
+                    note                    TEXT,
+                    updated_at              TEXT NOT NULL,
+                    PRIMARY KEY (platform, model_id)
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (15, datetime('now'));",
+            )?;
+        }
+
+        if current_version < 16 {
+            let _ = conn.execute_batch(
+                "ALTER TABLE model_pricing_overrides ADD COLUMN pricing_currency TEXT;
+                 ALTER TABLE model_pricing_overrides ADD COLUMN pricing_unit TEXT;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (16, datetime('now'));",
+            )?;
+        }
+
+        if current_version < 17 {
+            let _ = conn.execute_batch(
+                "ALTER TABLE model_pricing_overrides ADD COLUMN fixed_price REAL;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (17, datetime('now'));",
+            )?;
+        }
+
+        if current_version < 18 {
+            let _ = conn.execute_batch(
+                "ALTER TABLE model_pricing_overrides ADD COLUMN request_price REAL;",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (18, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 }

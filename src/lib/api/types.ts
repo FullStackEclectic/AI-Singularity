@@ -23,6 +23,15 @@ export interface OAuthEnvStatusItem {
   configured: boolean;
 }
 
+export interface RuntimeEnvStatusItem {
+  tool: string;
+  label: string;
+  env_name: string;
+  configured: boolean;
+  sources: string[];
+  note?: string | null;
+}
+
 export interface GeminiCloudProject {
   project_id: string;
   project_name?: string | null;

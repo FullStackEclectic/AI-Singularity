@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { api, type CurrentAccountSnapshot, type FloatingAccountCard } from "../../lib/api";
 import type { IdeAccount } from "../../types";
+import { formatIdePlatformKeyLabel } from "../accounts/unifiedAccountsUtils";
 import {
   isFloatingCardConflictError,
   mergeFloatingCardByUpdatedAt,
@@ -345,7 +346,9 @@ export default function FloatingAccountCardsLayer() {
                   return (
                     <div key={`${card.id}-${normalizedPlatform}`} className="floating-card-platform-row">
                       <div className="floating-card-platform-meta">
-                        <div className="floating-card-platform-name">{normalizedPlatform || "unknown"}</div>
+                        <div className="floating-card-platform-name">
+                          {normalizedPlatform ? formatIdePlatformKeyLabel(normalizedPlatform) : "unknown"}
+                        </div>
                         <div className="floating-card-platform-account">
                           {snapshot?.label || snapshot?.email || "未解析到当前账号"}
                         </div>

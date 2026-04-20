@@ -1,22 +1,28 @@
 use super::*;
 
+#[derive(Clone)]
+struct GithubUserProfile {
+    account_id: Option<String>,
+    login: Option<String>,
+    email: Option<String>,
+}
+
 impl OauthManager {
     pub async fn poll_oauth_login(login_id: String) -> Result<Option<OAuthResult>, String> {
-        let (provider, device_code, code_verifier, uuid, expired, pending) =
-            with_sessions(|map| {
-                if let Some(s) = map.get(&login_id) {
-                    (
-                        s.provider.clone(),
-                        s.device_code.clone(),
-                        s.code_verifier.clone(),
-                        s.state_token.clone(),
-                        s.expires_at < Instant::now(),
-                        s.pending_result.clone(),
-                    )
-                } else {
-                    ("".to_string(), None, None, None, true, None)
-                }
-            });
+        let (provider, device_code, code_verifier, uuid, expired, pending) = with_sessions(|map| {
+            if let Some(s) = map.get(&login_id) {
+                (
+                    s.provider.clone(),
+                    s.device_code.clone(),
+                    s.code_verifier.clone(),
+                    s.state_token.clone(),
+                    s.expires_at < Instant::now(),
+                    s.pending_result.clone(),
+                )
+            } else {
+                ("".to_string(), None, None, None, true, None)
+            }
+        });
 
         if expired {
             with_sessions(|map| {
@@ -122,10 +128,7 @@ impl OauthManager {
         Ok(None)
     }
 
-    async fn poll_github(
-        login_id: &str,
-        device_code: &str,
-    ) -> Result<Option<OAuthResult>, String> {
+    async fn poll_github(login_id: &str, device_code: &str) -> Result<Option<OAuthResult>, String> {
         #[derive(Deserialize)]
         struct GhTokenResp {
             access_token: Option<String>,
@@ -157,7 +160,20 @@ impl OauthManager {
 
         if let Some(token) = body.access_token {
             if !token.is_empty() {
-                let email = Self::fetch_github_user_email(&token).await;
+                let profile = Self::fetch_github_user_profile(&token).await;
+                let email = profile
+                    .as_ref()
+                    .and_then(|item| item.email.clone().or(item.login.clone()));
+                let name = profile.as_ref().and_then(|item| item.login.clone());
+                let meta_json = profile.as_ref().map(|item| {
+                    serde_json::json!({
+                        "user_id": item.account_id,
+                        "login": item.login,
+                        "email": item.email,
+                        "auth_mode": "oauth",
+                    })
+                    .to_string()
+                });
                 with_sessions(|map| {
                     map.remove(login_id);
                 });
@@ -165,9 +181,9 @@ impl OauthManager {
                     token,
                     access_token: None,
                     refresh_token: None,
-                    meta_json: None,
+                    meta_json,
                     email,
-                    name: None,
+                    name,
                     provider: "github_copilot".to_string(),
                     error: None,
                 }));
@@ -197,9 +213,10 @@ impl OauthManager {
         }
     }
 
-    async fn fetch_github_user_email(access_token: &str) -> Option<String> {
+    async fn fetch_github_user_profile(access_token: &str) -> Option<GithubUserProfile> {
         #[derive(Deserialize)]
         struct GhUser {
+            id: Option<u64>,
             login: Option<String>,
             email: Option<String>,
         }
@@ -219,7 +236,11 @@ impl OauthManager {
             .ok()?;
 
         let user: GhUser = resp.json().await.ok()?;
-        user.email.or(user.login)
+        Some(GithubUserProfile {
+            account_id: user.id.map(|value| value.to_string()),
+            login: user.login,
+            email: user.email,
+        })
     }
 
     pub fn cancel_oauth_flow(login_id: Option<String>) -> Result<(), String> {

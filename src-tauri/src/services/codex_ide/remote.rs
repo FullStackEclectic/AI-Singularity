@@ -3,9 +3,7 @@ use super::profile::{
     normalize_remaining_percentage, normalize_reset_time, normalize_window_minutes,
     parse_remote_profile,
 };
-use super::{
-    CodexIdeService, CodexProfile, CodexTokenRefreshResponse, UsageResponse,
-};
+use super::{CodexIdeService, CodexProfile, CodexTokenRefreshResponse, UsageResponse};
 use crate::models::IdeAccount;
 use chrono::Utc;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION};

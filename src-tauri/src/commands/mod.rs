@@ -27,7 +27,6 @@ pub mod speedtest;
 pub mod stats;
 pub mod stream_check;
 pub mod token_calculator;
-pub mod tools;
 pub mod tray;
 pub mod update;
 pub mod user_token;

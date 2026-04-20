@@ -7,6 +7,28 @@ export type AttentionReasonFilter =
   | "proxy_disabled"
   | "manually_disabled";
 
+const IDE_PLATFORM_LABELS: Record<string, string> = {
+  antigravity: "Antigravity",
+  github_copilot: "GitHub Copilot",
+  vscode: "VS Code",
+  codex: "OpenAI Codex",
+  gemini: "Gemini CLI",
+  cursor: "Cursor",
+  windsurf: "Windsurf",
+  kiro: "Kiro",
+  qoder: "Qoder",
+  trae: "Trae",
+  codebuddy: "CodeBuddy",
+  codebuddy_cn: "CodeBuddy CN",
+  workbuddy: "WorkBuddy",
+  zed: "Zed",
+};
+
+export function formatIdePlatformKeyLabel(platform: string) {
+  const key = platform.trim().toLowerCase();
+  return IDE_PLATFORM_LABELS[key] || platform;
+}
+
 export function formatGeminiQuotaSummary(quotaJson?: string) {
   if (!quotaJson) return "—";
   try {
@@ -34,6 +56,21 @@ export function formatGeminiQuotaSummary(quotaJson?: string) {
 }
 
 export function formatIdePlatformLabel(account: IdeAccount) {
+  if (account.origin_platform === "antigravity") {
+    const meta = parseIdeMeta(account.meta_json);
+    const extra = account.label || meta.user_id || account.email;
+    return extra ? `antigravity · ${extra}` : "antigravity";
+  }
+  if (account.origin_platform === "github_copilot") {
+    const meta = parseIdeMeta(account.meta_json);
+    const extra = account.label || meta.login || meta.user_id;
+    return extra ? `github_copilot · ${extra}` : "github_copilot";
+  }
+  if (account.origin_platform === "vscode") {
+    const meta = parseIdeMeta(account.meta_json);
+    const extra = account.label || meta.login || meta.user_id;
+    return extra ? `vscode · ${extra}` : "vscode";
+  }
   if (account.origin_platform === "gemini") {
     return account.project_id ? `gemini · ${account.project_id}` : "gemini";
   }
@@ -153,6 +190,12 @@ export function getAttentionReasonSuggestedTag(reason: AttentionReasonFilter) {
 
 export function getCurrentActionLabel(account: IdeAccount) {
   switch (account.origin_platform) {
+    case "antigravity":
+      return "设为当前 Antigravity 账号";
+    case "github_copilot":
+      return "设为当前 GitHub Copilot 账号";
+    case "vscode":
+      return "设为当前 VS Code 账号";
     case "codex":
       return "设为当前 Codex 账号";
     case "gemini":
@@ -180,9 +223,33 @@ export function getCurrentActionLabel(account: IdeAccount) {
   }
 }
 
+export const IDE_SET_CURRENT_SUPPORTED_PLATFORMS = [
+  "antigravity",
+  "github_copilot",
+  "vscode",
+  "codex",
+  "gemini",
+  "cursor",
+  "windsurf",
+  "kiro",
+  "qoder",
+  "trae",
+  "codebuddy",
+  "codebuddy_cn",
+  "workbuddy",
+  "zed",
+];
+
+export function isIdeSetCurrentSupported(account: IdeAccount) {
+  return IDE_SET_CURRENT_SUPPORTED_PLATFORMS.includes(account.origin_platform.toLowerCase());
+}
+
 const IDE_REFRESH_TITLE_LABELS: Record<string, string> = {
+  antigravity: "刷新 Antigravity OAuth 状态",
   codex: "刷新 Codex 配额与资料",
   gemini: "刷新 Gemini 状态与配额",
+  github_copilot: "刷新 GitHub Copilot 本地登录态",
+  vscode: "刷新 VS Code 本地登录态",
   cursor: "刷新 Cursor 本地登录态",
   windsurf: "刷新 Windsurf 本地登录态",
   kiro: "刷新 Kiro 本地登录态",
@@ -194,9 +261,14 @@ const IDE_REFRESH_TITLE_LABELS: Record<string, string> = {
   zed: "刷新 Zed 本地登录态",
 };
 
+export const IDE_REFRESHABLE_PLATFORMS = Object.keys(IDE_REFRESH_TITLE_LABELS);
+
 const IDE_REFRESH_SUCCESS_LABELS: Record<string, string> = {
+  antigravity: "Antigravity OAuth 状态已刷新",
   codex: "Codex 状态与配额已刷新",
   gemini: "Gemini 状态与配额已刷新",
+  github_copilot: "GitHub Copilot 本地登录态已刷新",
+  vscode: "VS Code 本地登录态已刷新",
   cursor: "Cursor 本地登录态已刷新",
   windsurf: "Windsurf 本地登录态已刷新",
   kiro: "Kiro 本地登录态已刷新",
@@ -213,7 +285,7 @@ export function isIdeRefreshSupported(account: IdeAccount) {
   if (platform === "codex" && isCodexApiKeyAccount(account)) {
     return false;
   }
-  return platform in IDE_REFRESH_TITLE_LABELS;
+  return IDE_REFRESHABLE_PLATFORMS.includes(platform);
 }
 
 export function getIdeRefreshActionLabel(platform: string) {
@@ -354,6 +426,42 @@ export function formatCodebuddyTooltip(account: IdeAccount) {
     typeof meta.nickname === "string" ? `Nickname: ${meta.nickname}` : null,
     account.label ? `Profile: ${account.label}` : null,
     quotaTooltip,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function formatGithubAuthSummary(account: IdeAccount) {
+  const meta = parseIdeMeta(account.meta_json);
+  return account.label || meta.login || meta.user_id || account.email || "已同步";
+}
+
+export function formatGithubAuthTooltip(account: IdeAccount) {
+  const meta = parseIdeMeta(account.meta_json);
+  return [
+    typeof meta.user_id === "string" ? `User ID: ${meta.user_id}` : null,
+    typeof meta.login === "string" ? `Login: ${meta.login}` : null,
+    account.email ? `Email: ${account.email}` : null,
+    typeof meta.auth_mode === "string" ? `Auth: ${meta.auth_mode}` : null,
+    typeof meta.source === "string" ? `Source: ${meta.source}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export function formatAntigravitySummary(account: IdeAccount) {
+  const meta = parseIdeMeta(account.meta_json);
+  return account.label || account.email || meta.user_id || "已同步";
+}
+
+export function formatAntigravityTooltip(account: IdeAccount) {
+  const meta = parseIdeMeta(account.meta_json);
+  return [
+    account.label ? `Profile: ${account.label}` : null,
+    account.email ? `Email: ${account.email}` : null,
+    typeof meta.user_id === "string" ? `User ID: ${meta.user_id}` : null,
+    typeof meta.auth_mode === "string" ? `Auth: ${meta.auth_mode}` : null,
+    typeof meta.oauth_provider === "string" ? `Provider: ${meta.oauth_provider}` : null,
   ]
     .filter(Boolean)
     .join("\n");

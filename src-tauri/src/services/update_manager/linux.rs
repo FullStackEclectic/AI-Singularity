@@ -1,11 +1,10 @@
+use super::types::CURRENT_VERSION;
 use super::{
     LinuxInstallResult, LinuxReleaseAssetInfo, LinuxReleaseInfo, UpdateManager, UpdateRuntimeInfo,
 };
-use super::types::CURRENT_VERSION;
 #[cfg(target_os = "linux")]
 use std::fs;
 use std::path::Path;
-#[cfg(target_os = "linux")]
 use url::Url;
 
 impl UpdateManager {
@@ -22,7 +21,8 @@ impl UpdateManager {
         let updater_pubkey_configured =
             !pubkey.trim().is_empty() && pubkey.trim() != "YOUR_UPDATER_PUBLIC_KEY";
         let platform = std::env::consts::OS.to_string();
-        let can_auto_install = platform != "linux";
+        let can_auto_install =
+            platform != "linux" && !endpoints.is_empty() && updater_pubkey_configured;
         let linux_install_kind = linux_install_kind();
         let linux_manual_hint = linux_manual_hint(linux_install_kind.as_deref());
         let warning = if endpoints.is_empty() {
@@ -53,76 +53,30 @@ impl UpdateManager {
     pub async fn fetch_linux_release_info() -> Result<LinuxReleaseInfo, String> {
         let config =
             read_tauri_updater_config().ok_or_else(|| "未找到 updater 配置".to_string())?;
-        let endpoint = config
-            .endpoints
-            .first()
-            .cloned()
-            .ok_or_else(|| "未配置 updater endpoint".to_string())?;
-
-        if !endpoint.contains("api.github.com") || !endpoint.contains("/releases/latest") {
-            return Err("当前 updater endpoint 不是 GitHub latest release API，暂不支持自动解析 Linux 安装包资产。".to_string());
-        }
-
         let preferred_kind = linux_install_kind();
         let client = reqwest::Client::builder()
             .user_agent("AI-Singularity")
             .build()
             .map_err(|e| format!("创建更新 HTTP 客户端失败: {}", e))?;
-        let value = client
-            .get(&endpoint)
-            .send()
+        let mut errors = Vec::new();
+
+        for endpoint in &config.endpoints {
+            match fetch_linux_release_info_from_endpoint(
+                &client,
+                endpoint,
+                preferred_kind.as_deref(),
+            )
             .await
-            .map_err(|e| format!("请求 GitHub Release 失败: {}", e))?
-            .error_for_status()
-            .map_err(|e| format!("GitHub Release 返回异常状态: {}", e))?
-            .json::<serde_json::Value>()
-            .await
-            .map_err(|e| format!("解析 GitHub Release 响应失败: {}", e))?;
+            {
+                Ok(info) => return Ok(info),
+                Err(err) => errors.push(format!("{} => {}", endpoint, err)),
+            }
+        }
 
-        let version = value
-            .get("tag_name")
-            .and_then(|v| v.as_str())
-            .or_else(|| value.get("name").and_then(|v| v.as_str()))
-            .unwrap_or("unknown")
-            .to_string();
-        let published_at = value
-            .get("published_at")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-        let body = value
-            .get("body")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-
-        let assets = value
-            .get("assets")
-            .and_then(|v| v.as_array())
-            .into_iter()
-            .flatten()
-            .filter_map(|asset| {
-                let name = asset.get("name")?.as_str()?.to_string();
-                let url = asset.get("browser_download_url")?.as_str()?.to_string();
-                let kind = classify_linux_asset_kind(&name)?;
-                Some(LinuxReleaseAssetInfo {
-                    preferred: preferred_kind.as_deref() == Some(kind.as_str()),
-                    name,
-                    kind,
-                    url,
-                    size: asset.get("size").and_then(|v| v.as_u64()),
-                    content_type: asset
-                        .get("content_type")
-                        .and_then(|v| v.as_str())
-                        .map(|s| s.to_string()),
-                })
-            })
-            .collect::<Vec<_>>();
-
-        Ok(LinuxReleaseInfo {
-            version,
-            published_at,
-            body,
-            assets,
-        })
+        Err(format!(
+            "当前 updater endpoint 仍无法解析可用的 Linux 安装包资产。已检测：{}",
+            errors.join(" | ")
+        ))
     }
 
     pub async fn install_linux_release_asset(
@@ -301,17 +255,263 @@ fn read_tauri_updater_config() -> Option<TauriUpdaterConfig> {
         .and_then(|cfg| cfg.plugins.and_then(|plugins| plugins.updater))
 }
 
+fn github_release_api_url_from_endpoint(endpoint: &str) -> Option<String> {
+    let parsed = Url::parse(endpoint).ok()?;
+    let host = parsed.host_str()?.to_ascii_lowercase();
+    let segments = parsed.path_segments()?.collect::<Vec<_>>();
+
+    if host == "api.github.com" {
+        if segments.len() >= 3 && segments.first() == Some(&"repos") {
+            let owner = segments.get(1)?.trim();
+            let repo = segments.get(2)?.trim();
+            if !owner.is_empty() && !repo.is_empty() {
+                return Some(format!(
+                    "https://api.github.com/repos/{}/{}/releases/latest",
+                    owner, repo
+                ));
+            }
+        }
+        return None;
+    }
+
+    if host == "github.com" || host == "www.github.com" {
+        if segments.len() >= 2 {
+            let owner = segments.first()?.trim();
+            let repo = segments.get(1)?.trim();
+            if !owner.is_empty() && !repo.is_empty() {
+                return Some(format!(
+                    "https://api.github.com/repos/{}/{}/releases/latest",
+                    owner, repo
+                ));
+            }
+        }
+    }
+
+    None
+}
+
+async fn fetch_linux_release_info_from_endpoint(
+    client: &reqwest::Client,
+    endpoint: &str,
+    preferred_kind: Option<&str>,
+) -> Result<LinuxReleaseInfo, String> {
+    let request_url = github_release_api_url_from_endpoint(endpoint)
+        .unwrap_or_else(|| endpoint.trim().to_string());
+    let value = client
+        .get(&request_url)
+        .send()
+        .await
+        .map_err(|e| format!("请求更新清单失败: {}", e))?
+        .error_for_status()
+        .map_err(|e| format!("更新清单返回异常状态: {}", e))?
+        .json::<serde_json::Value>()
+        .await
+        .map_err(|e| format!("解析更新清单响应失败: {}", e))?;
+
+    if request_url.contains("api.github.com/repos/") {
+        parse_github_release_info(&value, preferred_kind)
+    } else {
+        parse_generic_linux_release_info(endpoint, &value, preferred_kind)
+    }
+}
+
+fn parse_github_release_info(
+    value: &serde_json::Value,
+    preferred_kind: Option<&str>,
+) -> Result<LinuxReleaseInfo, String> {
+    let version = value
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .or_else(|| value.get("name").and_then(|v| v.as_str()))
+        .unwrap_or("unknown")
+        .to_string();
+    let published_at = value
+        .get("published_at")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+    let body = value
+        .get("body")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let assets = value
+        .get("assets")
+        .and_then(|v| v.as_array())
+        .into_iter()
+        .flatten()
+        .filter_map(|asset| {
+            let url = asset
+                .get("browser_download_url")
+                .or_else(|| asset.get("url"))
+                .and_then(|v| v.as_str())?
+                .to_string();
+            let name = asset
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| asset_name_from_url(&url))?;
+            let kind = classify_linux_asset_kind(&name)?;
+            Some(LinuxReleaseAssetInfo {
+                preferred: preferred_kind == Some(kind.as_str()),
+                name,
+                kind,
+                url,
+                size: asset.get("size").and_then(|v| v.as_u64()),
+                content_type: asset
+                    .get("content_type")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string()),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    if assets.is_empty() {
+        return Err("已解析 GitHub Release，但未找到可识别的 Linux 安装包资产。".to_string());
+    }
+
+    Ok(LinuxReleaseInfo {
+        version,
+        published_at,
+        body,
+        assets,
+    })
+}
+
+fn parse_generic_linux_release_info(
+    endpoint: &str,
+    value: &serde_json::Value,
+    preferred_kind: Option<&str>,
+) -> Result<LinuxReleaseInfo, String> {
+    let version = value
+        .get("version")
+        .and_then(|v| v.as_str())
+        .or_else(|| value.get("name").and_then(|v| v.as_str()))
+        .or_else(|| value.get("tag_name").and_then(|v| v.as_str()))
+        .unwrap_or("unknown")
+        .to_string();
+    let published_at = value
+        .get("pub_date")
+        .and_then(|v| v.as_str())
+        .or_else(|| value.get("published_at").and_then(|v| v.as_str()))
+        .map(|s| s.to_string());
+    let body = value
+        .get("notes")
+        .and_then(|v| v.as_str())
+        .or_else(|| value.get("body").and_then(|v| v.as_str()))
+        .map(|s| s.to_string());
+
+    let mut assets = Vec::new();
+    if let Some(platforms) = value.get("platforms").and_then(|v| v.as_object()) {
+        let current_arch = std::env::consts::ARCH.to_ascii_lowercase();
+        for (platform_key, item) in platforms {
+            let lower_platform = platform_key.to_ascii_lowercase();
+            if !lower_platform.contains("linux") {
+                continue;
+            }
+            let Some(item_obj) = item.as_object() else {
+                continue;
+            };
+            let Some(url) = item_obj
+                .get("url")
+                .or_else(|| item_obj.get("browser_download_url"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+            else {
+                continue;
+            };
+            let name = item_obj
+                .get("name")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+                .or_else(|| asset_name_from_url(&url))
+                .unwrap_or_else(|| format!("linux-asset-{}", platform_key));
+            let Some(kind) =
+                classify_linux_asset_kind(&name).or_else(|| classify_linux_asset_kind(&url))
+            else {
+                continue;
+            };
+            assets.push(LinuxReleaseAssetInfo {
+                preferred: preferred_kind == Some(kind.as_str())
+                    || lower_platform.contains(&current_arch),
+                name,
+                kind,
+                url,
+                size: item_obj.get("size").and_then(|v| v.as_u64()),
+                content_type: None,
+            });
+        }
+    }
+
+    if assets.is_empty() {
+        assets = value
+            .get("assets")
+            .and_then(|v| v.as_array())
+            .into_iter()
+            .flatten()
+            .filter_map(|asset| {
+                let url = asset
+                    .get("browser_download_url")
+                    .or_else(|| asset.get("url"))
+                    .and_then(|v| v.as_str())?
+                    .to_string();
+                let name = asset
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.to_string())
+                    .or_else(|| asset_name_from_url(&url))?;
+                let kind =
+                    classify_linux_asset_kind(&name).or_else(|| classify_linux_asset_kind(&url))?;
+                let lower_platform = asset
+                    .get("platform")
+                    .or_else(|| asset.get("target"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_ascii_lowercase();
+                if !lower_platform.is_empty() && !lower_platform.contains("linux") {
+                    return None;
+                }
+                Some(LinuxReleaseAssetInfo {
+                    preferred: preferred_kind == Some(kind.as_str()),
+                    name,
+                    kind,
+                    url,
+                    size: asset.get("size").and_then(|v| v.as_u64()),
+                    content_type: asset
+                        .get("content_type")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.to_string()),
+                })
+            })
+            .collect();
+    }
+
+    if assets.is_empty() {
+        return Err(format!(
+            "已解析 updater manifest，但未在 {} 中找到可识别的 Linux 安装包资产。",
+            endpoint
+        ));
+    }
+
+    Ok(LinuxReleaseInfo {
+        version,
+        published_at,
+        body,
+        assets,
+    })
+}
+
+fn asset_name_from_url(url: &str) -> Option<String> {
+    Url::parse(url).ok().and_then(|parsed| {
+        parsed
+            .path_segments()
+            .and_then(|mut segments| segments.next_back().map(str::to_string))
+            .filter(|name| !name.trim().is_empty())
+    })
+}
+
 #[cfg(target_os = "linux")]
 fn asset_file_name(url: &str) -> Result<String, String> {
-    Url::parse(url)
-        .ok()
-        .and_then(|parsed| {
-            parsed
-                .path_segments()
-                .and_then(|mut segments| segments.next_back().map(str::to_string))
-        })
-        .filter(|name| !name.trim().is_empty())
-        .ok_or_else(|| "无法从下载链接解析文件名".to_string())
+    asset_name_from_url(url).ok_or_else(|| "无法从下载链接解析文件名".to_string())
 }
 
 #[cfg(target_os = "linux")]
@@ -423,4 +623,85 @@ fn linux_manual_hint(kind: Option<&str>) -> Option<String> {
 #[cfg(not(target_os = "linux"))]
 fn linux_manual_hint(_: Option<&str>) -> Option<String> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{github_release_api_url_from_endpoint, parse_generic_linux_release_info};
+    use serde_json::json;
+
+    #[test]
+    fn resolves_github_web_release_endpoint_to_api_latest() {
+        let resolved = github_release_api_url_from_endpoint(
+            "https://github.com/tarui/AI-Singularity/releases/latest",
+        )
+        .expect("should resolve github web latest url");
+        assert_eq!(
+            resolved,
+            "https://api.github.com/repos/tarui/AI-Singularity/releases/latest"
+        );
+    }
+
+    #[test]
+    fn resolves_github_api_release_endpoint_to_api_latest() {
+        let resolved = github_release_api_url_from_endpoint(
+            "https://api.github.com/repos/tarui/AI-Singularity/releases/latest",
+        )
+        .expect("should resolve github api latest url");
+        assert_eq!(
+            resolved,
+            "https://api.github.com/repos/tarui/AI-Singularity/releases/latest"
+        );
+    }
+
+    #[test]
+    fn resolves_github_download_manifest_endpoint_to_api_latest() {
+        let resolved = github_release_api_url_from_endpoint(
+            "https://github.com/tarui/AI-Singularity/releases/latest/download/latest.json",
+        )
+        .expect("should resolve github release asset url");
+        assert_eq!(
+            resolved,
+            "https://api.github.com/repos/tarui/AI-Singularity/releases/latest"
+        );
+    }
+
+    #[test]
+    fn rejects_non_github_endpoint() {
+        let resolved =
+            github_release_api_url_from_endpoint("https://updates.example.com/latest.json");
+        assert!(resolved.is_none());
+    }
+
+    #[test]
+    fn parses_generic_latest_json_linux_assets() {
+        let manifest = json!({
+            "version": "v0.1.1",
+            "notes": "release notes",
+            "pub_date": "2026-04-20T00:00:00Z",
+            "platforms": {
+                "linux-x86_64": {
+                    "signature": "sig",
+                    "url": "https://updates.example.com/downloads/AI-Singularity_0.1.1_amd64.deb"
+                },
+                "windows-x86_64": {
+                    "signature": "sig",
+                    "url": "https://updates.example.com/downloads/AI-Singularity_0.1.1_x64-setup.exe"
+                }
+            }
+        });
+
+        let parsed = parse_generic_linux_release_info(
+            "https://updates.example.com/latest.json",
+            &manifest,
+            Some("deb"),
+        )
+        .expect("should parse generic updater manifest");
+
+        assert_eq!(parsed.version, "v0.1.1");
+        assert_eq!(parsed.assets.len(), 1);
+        assert_eq!(parsed.assets[0].kind, "deb");
+        assert!(parsed.assets[0].preferred);
+        assert_eq!(parsed.assets[0].name, "AI-Singularity_0.1.1_amd64.deb");
+    }
 }

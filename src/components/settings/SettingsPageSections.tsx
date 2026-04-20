@@ -59,6 +59,7 @@ export function SettingsPageSections({
           runtimeLoading={runtimeData.runtimeLoading}
           skillStorage={runtimeData.skillStorage}
           oauthEnvStatus={runtimeData.oauthEnvStatus}
+          runtimeEnvStatuses={runtimeData.runtimeEnvStatuses}
           websocketStatus={runtimeData.websocketStatus}
           webReportStatus={runtimeData.webReportStatus}
           currentSnapshots={runtimeData.currentSnapshots}

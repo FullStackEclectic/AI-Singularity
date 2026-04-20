@@ -10,6 +10,7 @@ import {
   getIdeRefreshActionLabel,
   isCurrentIdeAccount,
   isIdeRefreshSupported,
+  isIdeSetCurrentSupported,
 } from "./unifiedAccountsUtils";
 import type { UnifiedAccountItem } from "./unifiedAccountsTypes";
 
@@ -59,6 +60,7 @@ export function UnifiedAccountsGridCard({
   const isCurrent = item.type === "ide" ? isCurrentIdeAccount(item.data, currentIdeAccountIds) : false;
   const groupName = item.type === "ide" ? accountGroupByAccountId.get(item.data.id)?.name : null;
   const isIdeRefreshable = item.type === "ide" && isIdeRefreshSupported(item.data);
+  const isSetCurrentSupported = item.type === "ide" && isIdeSetCurrentSupported(item.data);
 
   return (
     <article key={itemKey} className="account-grid-card">
@@ -113,7 +115,12 @@ export function UnifiedAccountsGridCard({
             ) : (
               <button
                 className="btn-row-action"
-                title={getCurrentActionLabel(item.data)}
+                title={
+                  isSetCurrentSupported
+                    ? getCurrentActionLabel(item.data)
+                    : `${item.data.origin_platform} 当前暂不支持设为本地当前账号`
+                }
+                disabled={!isSetCurrentSupported}
                 onClick={() => onSetCurrentIdeAccount(item.data)}
               >
                 <MonitorPlay size={14} />

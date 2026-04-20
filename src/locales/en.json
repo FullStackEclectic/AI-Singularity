@@ -5,6 +5,7 @@
     "providers": "Provider",
     "mcp": "MCP Server",
     "skills": "Skills",
+    "tools": "Environment",
     "prompts": "System Prompts",
     "tokenCalculator": "Token Calculator",
     "proxy": "Local Proxy",

@@ -72,7 +72,10 @@ pub async fn exchange_pkce_code(
     if !resp.status().is_success() {
         let status = resp.status();
         let body = resp.text().await.unwrap_or_default();
-        return Err(format!("PKCE token exchange 失败: HTTP {} — {}", status, body));
+        return Err(format!(
+            "PKCE token exchange 失败: HTTP {} — {}",
+            status, body
+        ));
     }
 
     resp.json::<serde_json::Value>()

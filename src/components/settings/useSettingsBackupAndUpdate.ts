@@ -87,6 +87,14 @@ export function useSettingsBackupAndUpdate({
 
   const handleInstallUpdate = async (update = availableUpdate) => {
     if (!update) return;
+    if (updateRuntimeInfo?.can_auto_install === false) {
+      setUpdateMsg(
+        updateRuntimeInfo?.updater_pubkey_configured === false
+          ? "当前未配置有效 Updater 公钥，已禁用自动安装。请先替换正式 pubkey。"
+          : "当前运行环境不支持自动安装更新，请按界面提示手动处理。"
+      );
+      return;
+    }
     try {
       let downloaded = 0;
       let total = 0;

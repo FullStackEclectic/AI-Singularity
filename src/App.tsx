@@ -1,27 +1,8 @@
-import { useEffect, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import Sidebar from "./components/layout/Sidebar";
 import DashboardPage from "./components/dashboard/DashboardPage";
-import ModelsPage from "./components/models/ModelsPage";
-import ProxyPage from "./components/proxy/ProxyPage";
-import SettingsPage from "./components/settings/SettingsPage";
-import ToolSyncPage from "./components/providers/ToolSyncPage";
-import McpPage from "./components/mcp/McpPage";
-import SkillsPage from "./components/skills/SkillsPage";
-import PromptsPage from "./components/prompts/PromptsPage";
-import SpeedTestPage from "./components/speedtest/SpeedTestPage";
-import AnalyticsPage from "./components/analytics/AnalyticsPage";
-import LogsPage from "./components/logs/LogsPage";
-import SessionsPage from "./components/sessions/SessionsPage";
-import UnifiedAccountsList from "./components/accounts/UnifiedAccountsList";
-import SharingPage from "./components/accounts/SharingPage";
-import ToolDepotPage from "./components/tools/ToolDepotPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
-import SecurityPage from "./components/security/SecurityPage";
-import MfaVaultPage from "./components/mfa/MfaVaultPage";
-import WebReportPage from "./components/report/WebReportPage";
-import WakeupPage from "./components/wakeup/WakeupPage";
-import TokenCalculatorPage from "./components/tokenCalculator/TokenCalculatorPage";
 import FloatingAccountCardsLayer from "./components/floating/FloatingAccountCardsLayer";
 import { message } from "@tauri-apps/plugin-dialog";
 import { api } from "./lib/api";
@@ -32,6 +13,26 @@ export type NavPage = "dashboard" | "accounts" | "sharing" | "models" | "proxy" 
 import { listen } from "@tauri-apps/api/event";
 import { useProviderStore } from "./stores/providerStore";
 
+const UnifiedAccountsList = lazy(() => import("./components/accounts/UnifiedAccountsList"));
+const SharingPage = lazy(() => import("./components/accounts/SharingPage"));
+const ModelsPage = lazy(() => import("./components/models/ModelsPage"));
+const ProxyPage = lazy(() => import("./components/proxy/ProxyPage"));
+const ToolSyncPage = lazy(() => import("./components/providers/ToolSyncPage"));
+const McpPage = lazy(() => import("./components/mcp/McpPage"));
+const SkillsPage = lazy(() => import("./components/skills/SkillsPage"));
+const PromptsPage = lazy(() => import("./components/prompts/PromptsPage"));
+const ToolDepotPage = lazy(() => import("./components/tools/ToolDepotPage"));
+const TokenCalculatorPage = lazy(() => import("./components/tokenCalculator/TokenCalculatorPage"));
+const MfaVaultPage = lazy(() => import("./components/mfa/MfaVaultPage"));
+const WakeupPage = lazy(() => import("./components/wakeup/WakeupPage"));
+const SpeedTestPage = lazy(() => import("./components/speedtest/SpeedTestPage"));
+const AnalyticsPage = lazy(() => import("./components/analytics/AnalyticsPage"));
+const WebReportPage = lazy(() => import("./components/report/WebReportPage"));
+const LogsPage = lazy(() => import("./components/logs/LogsPage"));
+const SessionsPage = lazy(() => import("./components/sessions/SessionsPage"));
+const SettingsPage = lazy(() => import("./components/settings/SettingsPage"));
+const SecurityPage = lazy(() => import("./components/security/SecurityPage"));
+
 export default function App() {
   const [activePage, setActivePage] = useState<NavPage>("dashboard");
   const queryClient = useQueryClient();
@@ -41,33 +42,20 @@ export default function App() {
       useProviderStore.getState().fetch();
     });
     const unlistenNavigate = listen<string>("navigate_to_page", (event) => {
-      const target = String(event.payload || "").trim() as NavPage;
-      const allowed: NavPage[] = [
-        "dashboard",
-        "accounts",
-        "sharing",
-        "models",
-        "proxy",
-        "providers",
-        "mcp",
-        "skills",
-        "prompts",
-        "tools",
-        "tokenCalculator",
-        "mfa",
-        "wakeup",
-        "speedtest",
-        "analytics",
-        "report",
-        "logs",
-        "sessions",
-        "settings",
-        "security",
-      ];
-      if (allowed.includes(target)) {
+      const target = normalizeNavPageTarget(event.payload);
+      if (target) {
         setActivePage(target);
       }
     });
+
+    const handleWindowNavigate = (event: Event) => {
+      const detail = (event as CustomEvent<string>).detail;
+      const target = normalizeNavPageTarget(detail);
+      if (target) {
+        setActivePage(target);
+      }
+    };
+    window.addEventListener("ais:navigate", handleWindowNavigate as EventListener);
 
     const unlistenRefresh = listen("force_refresh_analytics", () => {
       // 触发全局事件通知 AnalyticsPage 刷新
@@ -118,6 +106,7 @@ export default function App() {
       unlistenRefresh.then((unlisten: () => void) => unlisten());
       unlistenWatcher.then((unlisten: () => void) => unlisten());
       unlistenDataChanged.then((unlisten: () => void) => unlisten());
+      window.removeEventListener("ais:navigate", handleWindowNavigate as EventListener);
     };
   }, [queryClient]);
 
@@ -143,7 +132,7 @@ export default function App() {
       case "sessions":   return <SessionsPage />;
       case "settings":   return <SettingsPage />;
       case "security":   return <SecurityPage />;
-      default:           return <ComingSoonPage name={activePage} />;
+      default:           return <DashboardPage />;
     }
   };
 
@@ -151,7 +140,9 @@ export default function App() {
     <div className="app-layout">
       <Sidebar activePage={activePage} onNavigate={setActivePage} />
       <main className="main-content animate-fade-in">
-        {renderPage()}
+        <Suspense fallback={<PageLoadingState activePage={activePage} />}>
+          {renderPage()}
+        </Suspense>
       </main>
       <FloatingAccountCardsLayer />
       <DeepLinkHandler />
@@ -159,14 +150,74 @@ export default function App() {
   );
 }
 
-function ComingSoonPage({ name }: { name: string }) {
+const ALLOWED_NAV_PAGES: NavPage[] = [
+  "dashboard",
+  "accounts",
+  "sharing",
+  "models",
+  "proxy",
+  "providers",
+  "mcp",
+  "skills",
+  "prompts",
+  "tools",
+  "tokenCalculator",
+  "mfa",
+  "wakeup",
+  "speedtest",
+  "analytics",
+  "report",
+  "logs",
+  "sessions",
+  "settings",
+  "security",
+];
+
+const NAV_PAGE_LABELS: Record<NavPage, string> = {
+  dashboard: "仪表盘",
+  accounts: "账号管理",
+  sharing: "账号共享",
+  models: "大模型目录",
+  proxy: "代理与转发",
+  providers: "环境配置",
+  mcp: "MCP",
+  skills: "Skills",
+  prompts: "提示词",
+  tools: "工具池",
+  tokenCalculator: "TOKEN 计算器",
+  mfa: "MFA 保险库",
+  wakeup: "唤醒任务",
+  speedtest: "测速",
+  analytics: "数据分析",
+  report: "网页报告",
+  logs: "日志",
+  sessions: "会话",
+  settings: "设置",
+  security: "安全",
+};
+
+function normalizeNavPageTarget(raw: unknown): NavPage | null {
+  if (typeof raw !== "string") return null;
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+
+  const normalized = trimmed
+    .replace(/^#/, "")
+    .replace(/^\//, "")
+    .replace(/\?.*$/, "")
+    .replace(/\/.*$/, "") as NavPage;
+
+  if (ALLOWED_NAV_PAGES.includes(normalized)) {
+    return normalized;
+  }
+  return null;
+}
+
+function PageLoadingState({ activePage }: { activePage: NavPage }) {
   return (
-    <div className="empty-state" style={{ height: "100%" }}>
-      <div className="empty-state-icon">🚧</div>
-      <h3 style={{ fontSize: 18, color: "var(--color-text-secondary)" }}>
-        {name} — 开发中
-      </h3>
-      <p>此功能正在紧锣密鼓开发，敬请期待</p>
+    <div className="page-loading-state">
+      <div className="page-loading-spinner">⟳</div>
+      <div className="page-loading-text">正在加载 {NAV_PAGE_LABELS[activePage] || activePage} 页面...</div>
     </div>
   );
 }

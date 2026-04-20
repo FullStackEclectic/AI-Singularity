@@ -38,11 +38,8 @@ fn reminder_policy_respects_skipped_version() {
         skip_version: Some("0.1.12".to_string()),
         ..UpdateSettings::default()
     };
-    let decision = settings::evaluate_update_reminder_policy_with_now(
-        &settings,
-        "0.1.12",
-        Utc::now(),
-    );
+    let decision =
+        settings::evaluate_update_reminder_policy_with_now(&settings, "0.1.12", Utc::now());
     assert!(!decision.should_notify);
     assert_eq!(decision.reason, "skipped_version");
 }
@@ -56,11 +53,7 @@ fn reminder_policy_blocks_daily_window_for_same_version() {
         last_reminded_at: Some((now - chrono::Duration::hours(6)).to_rfc3339()),
         ..UpdateSettings::default()
     };
-    let decision = settings::evaluate_update_reminder_policy_with_now(
-        &settings,
-        "0.1.13",
-        now,
-    );
+    let decision = settings::evaluate_update_reminder_policy_with_now(&settings, "0.1.13", now);
     assert!(!decision.should_notify);
     assert_eq!(decision.reason, "silent_window_active");
 }
@@ -74,11 +67,7 @@ fn reminder_policy_allows_newer_version_even_in_silent_window() {
         last_reminded_at: Some((now - chrono::Duration::hours(6)).to_rfc3339()),
         ..UpdateSettings::default()
     };
-    let decision = settings::evaluate_update_reminder_policy_with_now(
-        &settings,
-        "0.1.14",
-        now,
-    );
+    let decision = settings::evaluate_update_reminder_policy_with_now(&settings, "0.1.14", now);
     assert!(decision.should_notify);
     assert_eq!(decision.reason, "allow_new_version");
 }

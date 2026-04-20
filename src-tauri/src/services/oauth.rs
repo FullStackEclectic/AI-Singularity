@@ -1,6 +1,6 @@
 mod config;
-mod google;
 mod flows;
+mod google;
 mod polling;
 mod shared;
 mod trae;
@@ -8,17 +8,14 @@ mod windsurf;
 
 use self::config::*;
 use self::google::{
-    build_google_auth_url, exchange_google_code, fetch_google_userinfo,
-    get_google_client_secret,
+    build_google_auth_url, exchange_google_code, fetch_google_userinfo, get_google_client_secret,
 };
 use self::shared::{
     decode_any_jwt_claim, decode_jwt_claim, exchange_pkce_code, generate_token, sha256_b64,
     wait_for_callback,
 };
 use self::trae::{trae_get_login_url, trae_get_user_info};
-use self::windsurf::{
-    build_windsurf_auth_url, wait_for_windsurf_callback, windsurf_register_user,
-};
+use self::windsurf::{build_windsurf_auth_url, wait_for_windsurf_callback, windsurf_register_user};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -106,5 +103,4 @@ impl OauthManager {
 
         Err(format!("未知的 provider: {}", provider))
     }
-
 }

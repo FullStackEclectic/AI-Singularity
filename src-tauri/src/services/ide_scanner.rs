@@ -134,6 +134,10 @@ impl IdeScanner {
         Ok(vec![local::extract_gemini_local_account()?])
     }
 
+    pub fn import_antigravity_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
+        Ok(vec![local::extract_antigravity_local_account()?])
+    }
+
     pub fn import_codex_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
         Ok(vec![local::extract_codex_local_account()?])
     }
@@ -144,6 +148,22 @@ impl IdeScanner {
 
     pub fn import_cursor_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
         Ok(vec![local::extract_cursor_local_account()?])
+    }
+
+    pub fn import_vscode_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
+        let root = crate::services::vscode_paths::resolve_vscode_data_root_for_state_db()?;
+        let path = crate::services::vscode_paths::vscode_state_db_path(&root);
+        importers::extract_accounts_from_vscdb(&path, "vscode")
+    }
+
+    pub fn import_github_copilot_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
+        Ok(Self::import_vscode_from_local()?
+            .into_iter()
+            .map(|mut item| {
+                item.origin_platform = "github_copilot".to_string();
+                item
+            })
+            .collect())
     }
 
     pub fn import_windsurf_from_local() -> Result<Vec<ScannedIdeAccount>, String> {

@@ -201,11 +201,13 @@ pub(super) async fn handle_image_intercept(
         }
     }
 
-    Some((
-        StatusCode::OK,
-        Json(construct_pollinations_response(&img_prompt)),
+    Some(
+        (
+            StatusCode::OK,
+            Json(construct_pollinations_response(&img_prompt)),
+        )
+            .into_response(),
     )
-        .into_response())
 }
 
 fn default_token_scope() -> crate::models::TokenScope {

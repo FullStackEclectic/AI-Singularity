@@ -6,6 +6,7 @@ import {
   type GeminiInstanceRecord,
   type LinuxReleaseInfo,
   type OAuthEnvStatusItem,
+  type RuntimeEnvStatusItem,
   type SkillStorageInfo,
   type UpdateRuntimeInfo,
   type UpdateSettings,
@@ -18,6 +19,7 @@ export function useSettingsRuntimeData() {
   const [runtimeLoading, setRuntimeLoading] = useState(true);
   const [skillStorage, setSkillStorage] = useState<SkillStorageInfo | null>(null);
   const [oauthEnvStatus, setOauthEnvStatus] = useState<OAuthEnvStatusItem[]>([]);
+  const [runtimeEnvStatuses, setRuntimeEnvStatuses] = useState<RuntimeEnvStatusItem[]>([]);
   const [ideAccounts, setIdeAccounts] = useState<IdeAccount[]>([]);
   const [currentSnapshots, setCurrentSnapshots] = useState<CurrentAccountSnapshot[]>([]);
   const [floatingCards, setFloatingCards] = useState<FloatingAccountCard[]>([]);
@@ -39,6 +41,7 @@ export function useSettingsRuntimeData() {
         const [
           storageInfo,
           oauthInfo,
+          runtimeEnvInfo,
           ideAccountsList,
           snapshots,
           floatingCardList,
@@ -47,6 +50,7 @@ export function useSettingsRuntimeData() {
         ] = await Promise.all([
           api.skills.getStorageInfo(),
           api.oauth.getEnvStatus(),
+          api.env.getStatuses(),
           api.ideAccounts.list(),
           api.providerCurrent.listSnapshots(),
           api.floatingCards.list().catch(() => []),
@@ -66,6 +70,7 @@ export function useSettingsRuntimeData() {
 
         setSkillStorage(storageInfo);
         setOauthEnvStatus(oauthInfo);
+        setRuntimeEnvStatuses(runtimeEnvInfo);
         setIdeAccounts(ideAccountsList);
         setCurrentSnapshots(snapshots);
         setFloatingCards(floatingCardList);
@@ -110,6 +115,7 @@ export function useSettingsRuntimeData() {
     runtimeLoading,
     skillStorage,
     oauthEnvStatus,
+    runtimeEnvStatuses,
     ideAccounts,
     currentSnapshots,
     floatingCards,

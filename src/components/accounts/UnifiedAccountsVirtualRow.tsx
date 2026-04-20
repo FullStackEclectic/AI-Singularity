@@ -11,6 +11,7 @@ import {
   getIdeRefreshActionLabel,
   isCurrentIdeAccount,
   isIdeRefreshSupported,
+  isIdeSetCurrentSupported,
 } from "./unifiedAccountsUtils";
 import type { UnifiedAccountItem } from "./unifiedAccountsTypes";
 
@@ -69,6 +70,7 @@ export function UnifiedAccountsVirtualRow({
 }) {
   const isCurrent = item.type === "ide" ? isCurrentIdeAccount(item.data, currentIdeAccountIds) : false;
   const groupName = item.type === "ide" ? accountGroupByAccountId.get(item.data.id)?.name : null;
+  const isSetCurrentSupported = item.type === "ide" ? isIdeSetCurrentSupported(item.data) : false;
 
   return (
     <div
@@ -145,9 +147,15 @@ export function UnifiedAccountsVirtualRow({
           <>
             <button
               className="btn-row-action"
-              disabled={isCurrent}
+              disabled={isCurrent || !isSetCurrentSupported}
               onClick={() => onSetCurrentIdeAccount(item.data)}
-              title={isCurrent ? "当前账号" : getCurrentActionLabel(item.data)}
+              title={
+                isCurrent
+                  ? "当前账号"
+                  : isSetCurrentSupported
+                    ? getCurrentActionLabel(item.data)
+                    : `${item.data.origin_platform} 当前暂不支持设为本地当前账号`
+              }
             >
               <MonitorPlay size={14} />
             </button>

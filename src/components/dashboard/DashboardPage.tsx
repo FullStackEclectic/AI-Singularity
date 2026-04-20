@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "../../lib/api";
-import type { CurrentAccountSnapshot } from "../../lib/api";
+import type { AnnouncementAction, CurrentAccountSnapshot } from "../../lib/api";
+import { formatIdePlatformKeyLabel } from "../accounts/unifiedAccountsUtils";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend,
@@ -32,7 +33,7 @@ export default function DashboardPage() {
     staleTime: 60_000,
   });
   const { data: currentSnapshots = [] } = useQuery<CurrentAccountSnapshot[]>({
-    queryKey: ["provider-current-snapshots"],
+    queryKey: ["providerCurrentSnapshots"],
     queryFn: () => api.providerCurrent.listSnapshots(),
     refetchInterval: 15_000,
   });
@@ -43,6 +44,29 @@ export default function DashboardPage() {
     { label: "今日消耗 (Tokens)", value: isLoading ? "—" : String(metrics?.today_total_tokens ?? 0), icon: "⚡", color: "var(--color-warning)" },
     { label: "风控阵亡率 (403/429)", value: isLoading ? "—" : `${((metrics?.forbidden_accounts_ratio ?? 0) * 100).toFixed(1)}%`, icon: "⚠️", color: "var(--color-danger)" },
   ];
+
+  const executeAnnouncementAction = (action?: AnnouncementAction | null) => {
+    if (!action?.target) return;
+    const actionType = action.type?.trim().toLowerCase();
+    const target = action.target.trim();
+
+    if (actionType === "url") {
+      window.open(target, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (["page", "route", "navigate", "nav"].includes(actionType)) {
+      window.dispatchEvent(new CustomEvent("ais:navigate", { detail: target }));
+      return;
+    }
+
+    if (/^https?:\/\//i.test(target)) {
+      window.open(target, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent("ais:navigate", { detail: target }));
+  };
 
   return (
     <div className="dashboard">
@@ -104,15 +128,13 @@ export default function DashboardPage() {
                     {item.content && <div className="announcement-item-content">{item.content}</div>}
                     <div className="announcement-item-actions">
                       {item.action?.target && (
-                        item.action.type === "url" ? (
-                          <a className="btn btn-secondary btn-sm" href={item.action.target} target="_blank" rel="noreferrer">
-                            {item.action.label || "打开链接"}
-                          </a>
-                        ) : (
-                          <button className="btn btn-secondary btn-sm" disabled title={`暂未接入动作类型：${item.action.type}`}>
-                            {item.action.label || "执行动作"}
-                          </button>
-                        )
+                        <button
+                          className="btn btn-secondary btn-sm"
+                          onClick={() => executeAnnouncementAction(item.action)}
+                          title={item.action.type ? `动作类型：${item.action.type}` : undefined}
+                        >
+                          {item.action.label || "执行动作"}
+                        </button>
                       )}
                       {unread && (
                         <button
@@ -158,7 +180,7 @@ export default function DashboardPage() {
           <div className="current-account-list">
             {currentSnapshots.map((item) => (
               <div key={item.platform} className="current-account-item">
-                <div className="current-account-platform">{item.platform}</div>
+                <div className="current-account-platform">{formatIdePlatformKeyLabel(item.platform)}</div>
                 <div className="current-account-main">
                   <div className="current-account-label">{item.label || "未解析到当前账号"}</div>
                   <div className="current-account-meta">

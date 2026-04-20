@@ -3,9 +3,7 @@ mod execution;
 mod scheduler;
 mod storage;
 
-use self::execution::{
-    normalize_client_version_mode,
-};
+use self::execution::normalize_client_version_mode;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
@@ -147,5 +145,4 @@ fn default_client_version_fallback_mode() -> String {
     "auto".to_string()
 }
 
-impl WakeupService {
-}
+impl WakeupService {}

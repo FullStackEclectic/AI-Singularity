@@ -166,6 +166,8 @@ pub fn run() {
             // 模型目录
             commands::models::list_models,
             commands::models::get_platform_models,
+            commands::models::save_model_pricing,
+            commands::models::reset_model_pricing,
             // 代理
             commands::proxy::start_proxy,
             commands::proxy::get_proxy_status,
@@ -249,6 +251,7 @@ pub fn run() {
             commands::gemini_instance::launch_gemini_instance,
             // 系统检测
             commands::env::check_system_env_conflicts,
+            commands::env::get_runtime_env_statuses,
             // 降维指纹核心库 (Ide Account Pool)
             commands::ide_account::get_all_ide_accounts,
             commands::ide_account::import_ide_accounts,
@@ -272,9 +275,12 @@ pub fn run() {
             commands::ide_scanner::import_v1_accounts,
             commands::ide_scanner::import_from_files,
             commands::ide_scanner::import_gemini_from_local,
+            commands::ide_scanner::import_antigravity_from_local,
             commands::ide_scanner::import_codex_from_local,
             commands::ide_scanner::import_kiro_from_local,
             commands::ide_scanner::import_cursor_from_local,
+            commands::ide_scanner::import_vscode_from_local,
+            commands::ide_scanner::import_github_copilot_from_local,
             commands::ide_scanner::import_windsurf_from_local,
             commands::ide_scanner::import_codebuddy_from_local,
             commands::ide_scanner::import_codebuddy_cn_from_local,
@@ -284,9 +290,6 @@ pub fn run() {
             commands::ide_scanner::import_trae_from_local,
             // 重装沙盒启动器
             commands::sandbox::launch_tool_sandboxed,
-            // 局域网兵工厂分发
-            commands::tools::check_tool_status,
-            commands::tools::deploy_tool,
             commands::tray::tray_get_platform_scope,
             commands::tray::tray_set_platform_scope,
             commands::update::get_update_settings,

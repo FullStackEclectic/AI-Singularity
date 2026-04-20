@@ -18,6 +18,9 @@ pub struct ProviderCurrentService;
 impl ProviderCurrentService {
     pub fn get_current_account_id(db: &Database, platform: &str) -> Result<Option<String>, String> {
         match platform.trim().to_ascii_lowercase().as_str() {
+            "antigravity" => Self::get_current_antigravity_account_id(db),
+            "github_copilot" => Self::get_current_github_copilot_account_id(db),
+            "vscode" => Self::get_current_vscode_account_id(db),
             "codex" => Self::get_current_codex_account_id(db),
             "gemini" => Self::get_current_gemini_account_id(db),
             "cursor" => Self::get_current_cursor_account_id(db),
@@ -40,6 +43,9 @@ impl ProviderCurrentService {
             .get_all_ide_accounts()
             .map_err(|e| format!("读取 IDE 账号失败: {}", e))?;
         let platforms = [
+            "antigravity",
+            "github_copilot",
+            "vscode",
             "codex",
             "gemini",
             "cursor",

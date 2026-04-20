@@ -219,7 +219,13 @@ impl AnalyticsService {
         let id = uuid::Uuid::new_v4().to_string();
         let created_at = chrono::Utc::now().to_rfc3339();
 
-        let total_cost_usd = 0.0; // Needs pricing formula, using 0 for now
+        let total_cost_usd = crate::services::pricing::PricingEngine::calculate_cost(
+            db,
+            platform,
+            model_name,
+            prompt_tokens as u64,
+            completion_tokens as u64,
+        );
 
         db.execute(
             "INSERT INTO token_usage_records (

@@ -1,8 +1,8 @@
-use super::{
-    WakeupCategoryCount, WakeupHistoryItem, WakeupService, WakeupTask,
-    WakeupVerificationBatchItem, WakeupVerificationBatchResult,
-};
 use super::execution::execute_wakeup_task_with_retry;
+use super::{
+    WakeupCategoryCount, WakeupHistoryItem, WakeupService, WakeupTask, WakeupVerificationBatchItem,
+    WakeupVerificationBatchResult,
+};
 use crate::services::event_bus::EventBus;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};

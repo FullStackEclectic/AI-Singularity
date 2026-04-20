@@ -23,6 +23,30 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import "./ProviderModal.css";
 
+function getToolModelOverride(localConfig: any): string {
+  if (!localConfig || typeof localConfig !== "object") return "";
+  if (typeof localConfig.model === "string") return localConfig.model;
+  if (typeof localConfig.model_name === "string") return localConfig.model_name;
+  return "";
+}
+
+function getToolDefaultBaseUrl(tool: ToolTarget): string {
+  switch (tool) {
+    case "claude_code":
+      return "https://api.anthropic.com";
+    case "gemini_cli":
+      return "https://generativelanguage.googleapis.com";
+    case "codex":
+    case "open_code":
+    case "open_claw":
+      return "https://api.openai.com/v1";
+    case "aider":
+      return "";
+    default:
+      return "";
+  }
+}
+
 // --- 可拖拽的备选源条目 ---
 function SortableProviderRow({ 
   provider, 
@@ -81,7 +105,7 @@ function SortableProviderRow({
               className="form-input"
               style={{ padding: "4px 8px", fontSize: 12 }}
               placeholder={provider.model_name || "自定义模型..."}
-              value={localConfig?.model_name || ""}
+              value={getToolModelOverride(localConfig)}
               onChange={(e) => onChangeModel(e.target.value)}
               onClick={e => e.stopPropagation()}
             />
@@ -145,7 +169,14 @@ export default function ToolConfigModal({
       if (p.id === providerId) {
         const configs = parseToolSpecificConfigs(p);
         if (!configs[tool]) configs[tool] = {} as any;
-        (configs[tool] as any).model_name = overrideModel;
+        if (overrideModel.trim()) {
+          (configs[tool] as any).model = overrideModel;
+        } else if ((configs[tool] as any)?.model) {
+          delete (configs[tool] as any).model;
+        }
+        if ((configs[tool] as any)?.model_name) {
+          delete (configs[tool] as any).model_name;
+        }
         p.extra_config = serializeToolSpecificConfigs(p.extra_config, configs);
       }
       return p;
@@ -234,13 +265,13 @@ export default function ToolConfigModal({
             <div style={{ marginTop: 24 }}>
               <div className="form-section-title">底层配置文件实时预览</div>
               <ConfigPreview
-                baseUrl={proxyTakeover ? "http://127.0.0.1:23333/v1" : (activeProviders[0].base_url || "https://api.anthropic.com")}
+                baseUrl={proxyTakeover ? "http://127.0.0.1:23333/v1" : (activeProviders[0].base_url || getToolDefaultBaseUrl(tool))}
                 apiKey={activeProviders[0].api_key_id ? "sk-ais-xxxxx" : ""}
+                provider={activeProviders[0]}
                 toolTargets={[tool]}
-                toolConfigs={activeProviders.reduce((acc, p) => {
-                   acc[tool] = parseToolSpecificConfigs(p)[tool];
-                   return acc;
-                }, {} as any)}
+                toolConfigs={{
+                  [tool]: parseToolSpecificConfigs(activeProviders[0])[tool],
+                }}
               />
             </div>
           )}

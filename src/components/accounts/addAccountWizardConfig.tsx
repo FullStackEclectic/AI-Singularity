@@ -22,6 +22,21 @@ export const IDE_ORIGINS = [
 ] as const;
 
 export const LOCAL_IMPORT_OPTIONS: Partial<Record<string, LocalImportOption>> = {
+  antigravity: {
+    title: "方案 B — 导入本地 Antigravity 登录",
+    description: (
+      <>
+        直接读取当前用户目录下的 <code>Antigravity/User/globalStorage/state.vscdb</code>{" "}
+        与本地 <code>storage.json</code> 登录信息。
+      </>
+    ),
+    buttonLabel: "导入本地 Antigravity 登录",
+    loadingMessage: "正在读取本地 Antigravity 登录信息...",
+    command: "import_antigravity_from_local",
+    fallbackOrigin: "antigravity",
+    successMessage: "本地 Antigravity 账号导入完成",
+    emptyMessage: "未读取到可导入的本地 Antigravity 账号",
+  },
   gemini: {
     title: "方案 B — 导入本地 Gemini 登录",
     description: (
@@ -80,6 +95,36 @@ export const LOCAL_IMPORT_OPTIONS: Partial<Record<string, LocalImportOption>> = 
     fallbackOrigin: "cursor",
     successMessage: "本地 Cursor 账号导入完成",
     emptyMessage: "未读取到可导入的本地 Cursor 账号",
+  },
+  vscode: {
+    title: "方案 B — 导入本地 VS Code 登录",
+    description: (
+      <>
+        直接读取当前系统中的 <code>VS Code/User/globalStorage/state.vscdb</code>，
+        解出 <code>github.auth</code> 登录态。
+      </>
+    ),
+    buttonLabel: "导入本地 VS Code 登录",
+    loadingMessage: "正在读取本地 VS Code 登录...",
+    command: "import_vscode_from_local",
+    fallbackOrigin: "vscode",
+    successMessage: "本地 VS Code 账号导入完成",
+    emptyMessage: "未读取到可导入的本地 VS Code 账号",
+  },
+  github_copilot: {
+    title: "方案 B — 导入本地 GitHub Copilot 登录",
+    description: (
+      <>
+        直接读取当前系统中的 <code>VS Code/User/globalStorage/state.vscdb</code>，
+        解出 <code>github.auth</code> 当前会话并按 Copilot 渠道导入。
+      </>
+    ),
+    buttonLabel: "导入本地 GitHub Copilot 登录",
+    loadingMessage: "正在读取本地 GitHub Copilot 登录...",
+    command: "import_github_copilot_from_local",
+    fallbackOrigin: "github_copilot",
+    successMessage: "本地 GitHub Copilot 账号导入完成",
+    emptyMessage: "未读取到可导入的本地 GitHub Copilot 账号",
   },
   windsurf: {
     title: "方案 B — 导入本地 Windsurf 登录",
@@ -187,16 +232,33 @@ export const LOCAL_IMPORT_OPTIONS: Partial<Record<string, LocalImportOption>> = 
   },
 };
 
-const DEVICE_FLOW_PROVIDERS: readonly string[] = ["github_copilot"];
-const IMPORT_ONLY_PROVIDERS: readonly string[] = [
-  "claude_code",
-  "claude_desktop",
-  "vscode",
-  "opencode",
-  "generic_ide",
-];
+type OAuthCapability = "browser" | "device" | "import_only";
 
-export const isDeviceFlow = (provider: string) => DEVICE_FLOW_PROVIDERS.includes(provider);
-export const isImportOnly = (provider: string) => IMPORT_ONLY_PROVIDERS.includes(provider);
-export const isBrowserOAuth = (provider: string) =>
-  !isDeviceFlow(provider) && !isImportOnly(provider);
+const OAUTH_CAPABILITIES: Record<string, OAuthCapability> = {
+  antigravity: "browser",
+  claude_code: "import_only",
+  cursor: "browser",
+  windsurf: "browser",
+  github_copilot: "device",
+  claude_desktop: "import_only",
+  zed: "browser",
+  vscode: "import_only",
+  opencode: "import_only",
+  codex: "browser",
+  kiro: "browser",
+  gemini: "browser",
+  codebuddy: "browser",
+  codebuddy_cn: "import_only",
+  workbuddy: "import_only",
+  trae: "browser",
+  qoder: "browser",
+  generic_ide: "import_only",
+};
+
+const getOAuthCapability = (provider: string): OAuthCapability | null =>
+  OAUTH_CAPABILITIES[provider] ?? null;
+
+export const supportsOAuth = (provider: string) => getOAuthCapability(provider) !== "import_only";
+export const isDeviceFlow = (provider: string) => getOAuthCapability(provider) === "device";
+export const isImportOnly = (provider: string) => getOAuthCapability(provider) === "import_only";
+export const isBrowserOAuth = (provider: string) => getOAuthCapability(provider) === "browser";

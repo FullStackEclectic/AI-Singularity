@@ -15,7 +15,7 @@
 
 .models-stats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--space-4);
 }
 
@@ -40,8 +40,14 @@
 
 .models-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: var(--space-4);
+  align-items: center;
+}
+
+.models-toolbar-actions {
+  display: flex;
+  gap: var(--space-3);
   align-items: center;
 }
 
@@ -55,6 +61,27 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.models-banner {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.models-banner-info {
+  border-color: rgba(59, 130, 246, 0.22);
+  background: rgba(59, 130, 246, 0.08);
+  color: var(--color-text-primary);
+}
+
+.models-banner-success {
+  border-color: rgba(16, 185, 129, 0.25);
+  color: var(--color-success);
+}
+
+.models-banner-error {
+  border-color: rgba(239, 68, 68, 0.25);
+  color: var(--color-danger);
 }
 
 .model-card-header {
@@ -86,6 +113,88 @@
   color: var(--color-accent);
   font-size: 12px;
   font-weight: 600;
+}
+
+.model-meta-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.model-meta-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.model-source-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+}
+
+.model-source-chip.manual {
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.24);
+}
+
+.model-source-chip.builtin {
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+  border-color: rgba(59, 130, 246, 0.24);
+}
+
+.model-source-chip.special {
+  background: rgba(168, 85, 247, 0.14);
+  color: #d8b4fe;
+  border-color: rgba(168, 85, 247, 0.24);
+}
+
+.model-source-chip.unset {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
+}
+
+.model-billing-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+}
+
+.model-billing-chip.token {
+  background: rgba(14, 165, 233, 0.12);
+  color: #7dd3fc;
+  border-color: rgba(14, 165, 233, 0.24);
+}
+
+.model-billing-chip.hybrid {
+  background: rgba(249, 115, 22, 0.12);
+  color: #fdba74;
+  border-color: rgba(249, 115, 22, 0.24);
+}
+
+.model-billing-chip.fixed {
+  background: rgba(16, 185, 129, 0.12);
+  color: #86efac;
+  border-color: rgba(16, 185, 129, 0.24);
+}
+
+.model-billing-chip.unknown {
+  background: var(--color-bg-secondary);
+  color: var(--color-text-secondary);
 }
 
 .model-capabilities {
@@ -125,6 +234,47 @@
   font-size: 13px;
 }
 
+.model-pricing-panel,
+.model-editor {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.model-pricing-panel-title,
+.model-editor-title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: var(--space-3);
+}
+
+.model-pricing-grid,
+.model-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.model-pricing-note {
+  margin-top: var(--space-3);
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--color-text-secondary);
+}
+
+.model-editor-textarea {
+  min-height: 84px;
+  resize: vertical;
+}
+
+.model-editor-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-top: var(--space-4);
+}
+
 @media (max-width: 1100px) {
   .models-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -132,12 +282,13 @@
 }
 
 @media (max-width: 900px) {
-  .models-stats {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .models-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .models-toolbar-actions {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 
@@ -146,7 +297,14 @@
     grid-template-columns: 1fr;
   }
 
-  .model-metrics {
+  .model-metrics,
+  .model-pricing-grid,
+  .model-editor-grid {
     grid-template-columns: 1fr;
+  }
+
+  .model-meta-row {
+    flex-direction: column;
+    align-items: stretch;
   }
 }

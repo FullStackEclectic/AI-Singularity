@@ -1,6 +1,7 @@
 use crate::db::Database;
 use crate::error::AppResult;
 use crate::models::IdeAccount;
+use crate::services::antigravity_ide::AntigravityIdeService;
 use crate::services::codex_ide::CodexIdeService;
 use crate::services::event_bus::EventBus;
 use crate::services::gemini_ide::{GeminiCloudProject, GeminiIdeService};
@@ -171,8 +172,13 @@ pub async fn refresh_ide_account(
         .ok_or_else(|| "IDE 账号不存在".to_string())?;
 
     let refreshed = match account.origin_platform.to_ascii_lowercase().as_str() {
+        "antigravity" => AntigravityIdeService::refresh_account(&*db, &account.id).await,
         "gemini" => GeminiIdeService::refresh_account(&*db, &account.id).await,
         "codex" => CodexIdeService::refresh_account(&*db, &account.id).await,
+        "github_copilot" => {
+            LocalIdeRefreshService::refresh_github_copilot_account(&*db, &account.id)
+        }
+        "vscode" => LocalIdeRefreshService::refresh_vscode_account(&*db, &account.id),
         "cursor" => LocalIdeRefreshService::refresh_cursor_account(&*db, &account.id),
         "windsurf" => LocalIdeRefreshService::refresh_windsurf_account(&*db, &account.id),
         "kiro" => LocalIdeRefreshService::refresh_kiro_account(&*db, &account.id),
@@ -196,8 +202,11 @@ pub async fn refresh_all_ide_accounts_by_platform(
     platform: String,
 ) -> Result<usize, String> {
     let count = match platform.to_ascii_lowercase().as_str() {
+        "antigravity" => AntigravityIdeService::refresh_all_accounts(&*db).await,
         "gemini" => GeminiIdeService::refresh_all_accounts(&*db).await,
         "codex" => CodexIdeService::refresh_all_accounts(&*db).await,
+        "github_copilot" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "github_copilot"),
+        "vscode" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "vscode"),
         "cursor" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "cursor"),
         "windsurf" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "windsurf"),
         "kiro" => LocalIdeRefreshService::refresh_all_by_platform(&*db, "kiro"),
@@ -236,12 +245,22 @@ pub async fn batch_refresh_ide_accounts(
         };
 
         let result = match account.origin_platform.to_ascii_lowercase().as_str() {
+            "antigravity" => AntigravityIdeService::refresh_account(&*db, &account.id)
+                .await
+                .map(|_| ()),
             "gemini" => GeminiIdeService::refresh_account(&*db, &account.id)
                 .await
                 .map(|_| ()),
             "codex" => CodexIdeService::refresh_account(&*db, &account.id)
                 .await
                 .map(|_| ()),
+            "github_copilot" => {
+                LocalIdeRefreshService::refresh_github_copilot_account(&*db, &account.id)
+                    .map(|_| ())
+            }
+            "vscode" => {
+                LocalIdeRefreshService::refresh_vscode_account(&*db, &account.id).map(|_| ())
+            }
             "cursor" => {
                 LocalIdeRefreshService::refresh_cursor_account(&*db, &account.id).map(|_| ())
             }

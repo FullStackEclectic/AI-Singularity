@@ -1,5 +1,7 @@
 import type { ApiKey, Balance, IdeAccount } from "../../types";
 import {
+  formatAntigravitySummary,
+  formatAntigravityTooltip,
   formatCodebuddySummary,
   formatCodebuddyTooltip,
   formatCodexQuotaSummary,
@@ -8,6 +10,8 @@ import {
   formatCursorTooltip,
   formatGeminiQuotaSummary,
   formatGeminiQuotaTooltip,
+  formatGithubAuthSummary,
+  formatGithubAuthTooltip,
   formatKiroSummary,
   formatKiroTooltip,
   formatQoderSummary,
@@ -43,6 +47,18 @@ export default function UnifiedAccountBalanceCell({
 
   if (item.type !== "ide") {
     return <span className="text-muted">—</span>;
+  }
+
+  if (item.data.origin_platform === "antigravity") {
+    return (
+      <span
+        className="text-success"
+        style={{ fontWeight: 600 }}
+        title={privacy ? undefined : formatAntigravityTooltip(item.data)}
+      >
+        {privacy ? "***" : formatAntigravitySummary(item.data)}
+      </span>
+    );
   }
 
   if (item.data.origin_platform === "gemini" && item.data.quota_json) {
@@ -89,6 +105,21 @@ export default function UnifiedAccountBalanceCell({
         title={privacy ? undefined : formatWindsurfTooltip(item.data)}
       >
         {privacy ? "***" : formatWindsurfSummary(item.data)}
+      </span>
+    );
+  }
+
+  if (
+    item.data.origin_platform === "github_copilot" ||
+    item.data.origin_platform === "vscode"
+  ) {
+    return (
+      <span
+        className="text-success"
+        style={{ fontWeight: 600 }}
+        title={privacy ? undefined : formatGithubAuthTooltip(item.data)}
+      >
+        {privacy ? "***" : formatGithubAuthSummary(item.data)}
       </span>
     );
   }

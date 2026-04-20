@@ -1,7 +1,8 @@
-use super::{ScannedIdeAccount, parse_email_from_jwt};
+use super::{parse_email_from_jwt, ScannedIdeAccount};
 use crate::services::ide_injector::{
-    read_codebuddy_cn_secret_storage_value, read_codebuddy_secret_storage_value,
-    read_qoder_secret_storage_value_by_db_path, read_workbuddy_secret_storage_value,
+    read_antigravity_secret_storage_value, read_codebuddy_cn_secret_storage_value,
+    read_codebuddy_secret_storage_value, read_qoder_secret_storage_value_by_db_path,
+    read_workbuddy_secret_storage_value,
 };
 use rusqlite::OptionalExtension;
 use std::path::{Path, PathBuf};
@@ -15,6 +16,7 @@ pub(super) fn collect_all_ide_state_db_candidates() -> Vec<(PathBuf, String)> {
         ("Code", "vscode"),
         ("Code - Insiders", "vscode"),
         ("VSCodium", "vscode"),
+        ("Antigravity", "antigravity"),
         ("Cursor", "cursor"),
         ("Cursor - Nightly", "cursor"),
         ("Windsurf", "windsurf"),
@@ -132,6 +134,125 @@ pub(super) fn extract_gemini_local_account() -> Result<ScannedIdeAccount, String
         source_path: oauth_path.to_string_lossy().to_string(),
         meta_json: None,
         label: None,
+    })
+}
+
+pub(super) fn extract_antigravity_local_account() -> Result<ScannedIdeAccount, String> {
+    let data_root = app_data_root("Antigravity")?;
+    let db_path = data_root
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    if !db_path.exists() {
+        return Err(format!(
+            "未找到本地 Antigravity 登录数据库: {}",
+            db_path.display()
+        ));
+    }
+
+    let auth_status_raw = read_state_db_string(&db_path, "antigravityAuthStatus")
+        .ok_or_else(|| "未读取到本地 Antigravity 登录信息".to_string())?;
+    let auth_status_json: serde_json::Value = serde_json::from_str(&auth_status_raw)
+        .map_err(|e| format!("解析 Antigravity 登录信息失败: {}", e))?;
+
+    let storage_path = data_root
+        .join("User")
+        .join("globalStorage")
+        .join("storage.json");
+    let storage_json = if storage_path.exists() {
+        std::fs::read_to_string(&storage_path)
+            .ok()
+            .and_then(|raw| serde_json::from_str::<serde_json::Value>(&raw).ok())
+    } else {
+        None
+    };
+
+    let secret_credential_raw = read_antigravity_secret_storage_value(
+        "jlcodes.antigravity-cockpit",
+        "antigravity.autoTrigger.credential",
+        Some(data_root.to_string_lossy().as_ref()),
+    )
+    .ok()
+    .flatten();
+    let secret_credentials_raw = read_antigravity_secret_storage_value(
+        "jlcodes.antigravity-cockpit",
+        "antigravity.autoTrigger.credentials",
+        Some(data_root.to_string_lossy().as_ref()),
+    )
+    .ok()
+    .flatten();
+    let secret_payloads = [
+        secret_credential_raw.clone(),
+        secret_credentials_raw.clone(),
+    ];
+
+    let mut secret_access_token = None;
+    let mut secret_refresh_token = None;
+    let mut secret_email = None;
+    let mut secret_name = None;
+    for payload in secret_payloads.into_iter().flatten() {
+        let parsed = parse_antigravity_secret_payload(&payload);
+        if secret_access_token.is_none() {
+            secret_access_token = parsed.access_token;
+        }
+        if secret_refresh_token.is_none() {
+            secret_refresh_token = parsed.refresh_token;
+        }
+        if secret_email.is_none() {
+            secret_email = parsed.email;
+        }
+        if secret_name.is_none() {
+            secret_name = parsed.name;
+        }
+    }
+
+    let access_token = secret_access_token.or_else(|| {
+        pick_string_recursive(
+            &auth_status_json,
+            &["apiKey", "api_key", "accessToken", "access_token", "token"],
+        )
+    });
+    let refresh_token = secret_refresh_token
+        .or_else(|| pick_string_recursive(&auth_status_json, &["refreshToken", "refresh_token"]));
+    let email = pick_string_recursive(&auth_status_json, &["email", "userEmail"])
+        .or(secret_email)
+        .unwrap_or_else(|| "unknown@antigravity.local".to_string());
+    let name = pick_string_recursive(&auth_status_json, &["name", "displayName", "nickname"])
+        .or(secret_name);
+    let user_id = storage_json
+        .as_ref()
+        .and_then(|value| pick_string_recursive(value, &["machineId"]))
+        .or_else(|| pick_string_recursive(&auth_status_json, &["userId", "user_id", "uid"]));
+    let project_id = secret_credential_raw
+        .as_deref()
+        .map(parse_jsonish_value)
+        .as_ref()
+        .and_then(|value| pick_string_recursive(value, &["projectId", "project_id"]));
+
+    if access_token.is_none() && refresh_token.is_none() {
+        return Err("本地 Antigravity 登录信息缺少 apiKey / refreshToken".to_string());
+    }
+
+    let meta_json = serde_json::json!({
+        "auth_mode": "oauth",
+        "oauth_provider": "antigravity",
+        "user_id": user_id,
+        "antigravity_project_id": project_id,
+        "antigravity_auth_status_raw": auth_status_json,
+        "antigravity_storage_raw": storage_json,
+        "antigravity_secret_credential_raw": secret_credential_raw.as_deref().map(parse_jsonish_value),
+        "antigravity_secret_credentials_raw": secret_credentials_raw.as_deref().map(parse_jsonish_value),
+    })
+    .to_string();
+
+    Ok(ScannedIdeAccount {
+        email,
+        refresh_token,
+        access_token,
+        origin_platform: "antigravity".to_string(),
+        source_path: db_path.to_string_lossy().to_string(),
+        meta_json: Some(meta_json),
+        label: name,
     })
 }
 
@@ -277,8 +398,7 @@ pub(super) fn extract_cursor_local_account() -> Result<ScannedIdeAccount, String
         .unwrap_or_else(|| "unknown@cursor.local".to_string());
     let auth_id = read_state_db_string(&db_path, "cursorAuth/authId");
     let membership_type = read_state_db_string(&db_path, "cursorAuth/stripeMembershipType");
-    let subscription_status =
-        read_state_db_string(&db_path, "cursorAuth/stripeSubscriptionStatus");
+    let subscription_status = read_state_db_string(&db_path, "cursorAuth/stripeSubscriptionStatus");
 
     if access_token.is_none() && refresh_token.is_none() {
         return Err("本地 Cursor 登录数据库缺少 accessToken / refreshToken".to_string());
@@ -603,6 +723,76 @@ fn json_object_string_field(
     None
 }
 
+#[derive(Default)]
+struct AntigravitySecretPayload {
+    access_token: Option<String>,
+    refresh_token: Option<String>,
+    email: Option<String>,
+    name: Option<String>,
+}
+
+fn parse_jsonish_value(raw: &str) -> serde_json::Value {
+    serde_json::from_str::<serde_json::Value>(raw)
+        .unwrap_or_else(|_| serde_json::Value::String(raw.to_string()))
+}
+
+fn parse_antigravity_secret_payload(secret: &str) -> AntigravitySecretPayload {
+    let parsed = serde_json::from_str::<serde_json::Value>(secret).ok();
+    let access_token = parsed
+        .as_ref()
+        .and_then(|value| {
+            pick_string_recursive(
+                value,
+                &["apiKey", "api_key", "accessToken", "access_token", "token"],
+            )
+        })
+        .or_else(|| extract_token_like(secret, &["ya29."]));
+    let refresh_token = parsed
+        .as_ref()
+        .and_then(|value| {
+            pick_string_recursive(
+                value,
+                &["refreshToken", "refresh_token", "oauthRefreshToken"],
+            )
+        })
+        .or_else(|| extract_token_like(secret, &["1//"]));
+    let email = parsed
+        .as_ref()
+        .and_then(|value| pick_string_recursive(value, &["email", "userEmail"]));
+    let name = parsed
+        .as_ref()
+        .and_then(|value| pick_string_recursive(value, &["name", "displayName", "nickname"]));
+
+    AntigravitySecretPayload {
+        access_token,
+        refresh_token,
+        email,
+        name,
+    }
+}
+
+fn extract_token_like(raw: &str, prefixes: &[&str]) -> Option<String> {
+    let text = raw.trim();
+    if text.is_empty() {
+        return None;
+    }
+
+    for prefix in prefixes {
+        if let Some(start) = text.find(prefix) {
+            let suffix = &text[start..];
+            let token: String = suffix
+                .chars()
+                .take_while(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-' | '/'))
+                .collect();
+            if !token.is_empty() {
+                return Some(token);
+            }
+        }
+    }
+
+    None
+}
+
 pub(super) fn extract_codebuddy_local_account() -> Result<ScannedIdeAccount, String> {
     let data_root = app_data_root("CodeBuddy")?;
     let source_path = data_root
@@ -801,11 +991,12 @@ fn find_string_recursive(value: &serde_json::Value, key: &str) -> Option<String>
                     return Some(trimmed.to_string());
                 }
             }
-            map.values().find_map(|item| find_string_recursive(item, key))
+            map.values()
+                .find_map(|item| find_string_recursive(item, key))
         }
-        serde_json::Value::Array(items) => {
-            items.iter().find_map(|item| find_string_recursive(item, key))
-        }
+        serde_json::Value::Array(items) => items
+            .iter()
+            .find_map(|item| find_string_recursive(item, key)),
         _ => None,
     }
 }
@@ -829,10 +1020,7 @@ pub(super) fn get_v1_migration_paths() -> Vec<PathBuf> {
     paths
 }
 
-pub(super) fn parse_v1_json(
-    content: &str,
-    path: &Path,
-) -> Result<Vec<ScannedIdeAccount>, String> {
+pub(super) fn parse_v1_json(content: &str, path: &Path) -> Result<Vec<ScannedIdeAccount>, String> {
     let json: serde_json::Value =
         serde_json::from_str(content).map_err(|e| format!("JSON 解析失败: {}", e))?;
 

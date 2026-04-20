@@ -258,9 +258,22 @@ export interface Model {
   context_length?: number;
   supports_vision: boolean;
   supports_tools: boolean;
+  fixed_price?: number;
+  request_price?: number;
   input_price_per_1m?: number;
   output_price_per_1m?: number;
   is_available: boolean;
+  base_fixed_price?: number;
+  base_request_price?: number;
+  base_input_price_per_1m?: number;
+  base_output_price_per_1m?: number;
+  pricing_currency?: string;
+  pricing_unit?: string;
+  base_pricing_currency?: string;
+  base_pricing_unit?: string;
+  pricing_source?: string;
+  pricing_note?: string;
+  pricing_updated_at?: string;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -275,7 +288,7 @@ export interface EnvConflict {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// IDE 账号兵工厂 (降维池化指纹)
+// IDE 账号资产库 (降维池化指纹)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export interface DeviceProfile {

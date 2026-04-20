@@ -29,6 +29,11 @@ pub fn import_gemini_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
 }
 
 #[tauri::command]
+pub fn import_antigravity_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
+    IdeScanner::import_antigravity_from_local()
+}
+
+#[tauri::command]
 pub fn import_codex_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
     IdeScanner::import_codex_from_local()
 }
@@ -41,6 +46,16 @@ pub fn import_kiro_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
 #[tauri::command]
 pub fn import_cursor_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
     IdeScanner::import_cursor_from_local()
+}
+
+#[tauri::command]
+pub fn import_vscode_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
+    IdeScanner::import_vscode_from_local()
+}
+
+#[tauri::command]
+pub fn import_github_copilot_from_local() -> Result<Vec<ScannedIdeAccount>, String> {
+    IdeScanner::import_github_copilot_from_local()
 }
 
 #[tauri::command]

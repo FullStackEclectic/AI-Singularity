@@ -3,10 +3,12 @@ import type {
   CurrentAccountSnapshot,
   FloatingAccountCard,
   OAuthEnvStatusItem,
+  RuntimeEnvStatusItem,
   SkillStorageInfo,
   WebReportStatus,
   WebSocketStatus,
 } from "../../lib/api";
+import { formatIdePlatformKeyLabel } from "../accounts/unifiedAccountsUtils";
 
 type SettingsRuntimeSectionProps = {
   languageTitle: string;
@@ -16,6 +18,7 @@ type SettingsRuntimeSectionProps = {
   runtimeLoading: boolean;
   skillStorage: SkillStorageInfo | null;
   oauthEnvStatus: OAuthEnvStatusItem[];
+  runtimeEnvStatuses: RuntimeEnvStatusItem[];
   websocketStatus: WebSocketStatus | null;
   webReportStatus: WebReportStatus | null;
   currentSnapshots: CurrentAccountSnapshot[];
@@ -35,6 +38,7 @@ export function SettingsRuntimeSection({
   runtimeLoading,
   skillStorage,
   oauthEnvStatus,
+  runtimeEnvStatuses,
   websocketStatus,
   webReportStatus,
   currentSnapshots,
@@ -65,7 +69,7 @@ export function SettingsRuntimeSection({
 
       <h3 style={{ marginBottom: "var(--space-2)" }}>运行时状态</h3>
       <p className="text-muted" style={{ fontSize: "12px", marginBottom: "var(--space-4)" }}>
-        把当前应用真正依赖的本地路径和 OAuth 环境配置显式展示出来，方便排查问题。
+        把当前应用真正依赖的本地路径、CLI 环境来源和 OAuth 环境配置显式展示出来，方便排查问题。
       </p>
       <div
         style={{
@@ -132,7 +136,7 @@ export function SettingsRuntimeSection({
             borderRadius: "var(--radius-md)",
           }}
         >
-          <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>OAuth 环境配置</div>
+          <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>OAuth Client Secret 环境项</div>
           {runtimeLoading ? (
             <div className="text-muted" style={{ fontSize: 13 }}>
               加载中...
@@ -174,6 +178,93 @@ export function SettingsRuntimeSection({
           ) : (
             <div className="text-muted" style={{ fontSize: 13 }}>
               当前没有需要展示的 OAuth 环境项
+            </div>
+          )}
+        </div>
+
+        <div
+          style={{
+            background: "var(--surface-sunken)",
+            padding: "var(--space-4)",
+            borderRadius: "var(--radius-md)",
+          }}
+        >
+          <div style={{ fontWeight: 600, marginBottom: "var(--space-2)" }}>主流 CLI 环境变量</div>
+          {runtimeLoading ? (
+            <div className="text-muted" style={{ fontSize: 13 }}>
+              加载中...
+            </div>
+          ) : runtimeEnvStatuses.length > 0 ? (
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+              {runtimeEnvStatuses.map((item) => (
+                <div
+                  key={`${item.tool}-${item.env_name}`}
+                  style={{
+                    paddingBottom: "var(--space-2)",
+                    borderBottom: "1px solid var(--color-border)",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span style={{ fontWeight: 500, fontSize: 13 }}>{item.label}</span>
+                    <span
+                      style={{
+                        fontSize: 12,
+                        color: item.configured
+                          ? "var(--color-success)"
+                          : "var(--color-text-tertiary)",
+                      }}
+                    >
+                      {item.configured ? "已发现" : "未配置"}
+                    </span>
+                  </div>
+                  <code style={{ fontSize: 12, wordBreak: "break-all" }}>{item.env_name}</code>
+                  {item.sources.length > 0 ? (
+                    <div
+                      style={{
+                        display: "flex",
+                        flexWrap: "wrap",
+                        gap: 6,
+                        marginTop: 8,
+                      }}
+                    >
+                      {item.sources.map((source) => (
+                        <span
+                          key={`${item.env_name}-${source}`}
+                          style={{
+                            fontSize: 11,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            border: "1px solid var(--color-border)",
+                            background: "rgba(255,255,255,0.04)",
+                          }}
+                        >
+                          {source}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-muted" style={{ fontSize: 12, marginTop: 8 }}>
+                      当前未在系统环境或工具配置文件中检测到。
+                    </div>
+                  )}
+                  {item.note ? (
+                    <div className="text-muted" style={{ fontSize: 12, marginTop: 8 }}>
+                      {item.note}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-muted" style={{ fontSize: 13 }}>
+              当前没有可展示的主流 CLI 环境变量
             </div>
           )}
         </div>
@@ -288,7 +379,7 @@ export function SettingsRuntimeSection({
                   }}
                 >
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
-                    {item.platform}
+                    {formatIdePlatformKeyLabel(item.platform)}
                   </div>
                   <div style={{ fontSize: 13 }}>{item.label || "未解析到当前账号"}</div>
                   <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>

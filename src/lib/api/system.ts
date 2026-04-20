@@ -5,18 +5,25 @@ import type {
   TokenUsageStat,
 } from "../../types";
 import type {
+  RuntimeEnvStatusItem,
   SkillStorageInfo,
 } from "./types";
 
 export const stats = {
   getDashboard: (): Promise<DashboardStats> => invoke("get_dashboard_stats"),
-  getTokenUsage: (): Promise<{ by_app: TokenUsageStat[]; by_model: TokenUsageStat[] }> =>
+  getTokenUsage: (): Promise<{
+    by_app: TokenUsageStat[];
+    by_model: TokenUsageStat[];
+    by_platform: TokenUsageStat[];
+  }> =>
     invoke("get_token_usage_stats"),
 };
 
 export const env = {
   checkConflicts: (appName: string): Promise<EnvConflict[]> =>
     invoke("check_system_env_conflicts", { appName }),
+  getStatuses: (): Promise<RuntimeEnvStatusItem[]> =>
+    invoke("get_runtime_env_statuses"),
 };
 
 export const proxy = {
@@ -42,13 +49,6 @@ export const alerts = {
 
 export const speedtest = {
   run: (): Promise<any[]> => invoke("run_speedtest"),
-};
-
-export const tools = {
-  checkStatus: (toolId: string): Promise<any> =>
-    invoke("check_tool_status", { toolId }),
-  deploy: (toolId: string): Promise<void> =>
-    invoke("deploy_tool", { toolId }),
 };
 
 export const skills = {

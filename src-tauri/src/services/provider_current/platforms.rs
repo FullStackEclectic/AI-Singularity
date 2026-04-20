@@ -7,15 +7,114 @@ use super::helpers::{
 use super::ProviderCurrentService;
 use crate::db::Database;
 use crate::services::ide_injector::{
-    read_codebuddy_cn_secret_storage_value, read_codebuddy_secret_storage_value,
+    read_antigravity_secret_storage_value, read_codebuddy_cn_secret_storage_value,
+    read_codebuddy_secret_storage_value, read_github_auth_sessions,
     read_qoder_secret_storage_value_by_db_path, read_workbuddy_secret_storage_value,
 };
 use serde_json::Value;
 
 impl ProviderCurrentService {
-    pub(super) fn get_current_codex_account_id(
+    pub(super) fn get_current_antigravity_account_id(
         db: &Database,
     ) -> Result<Option<String>, String> {
+        let db_path = ide_state_db_path("Antigravity")?;
+        if !db_path.exists() {
+            return Ok(None);
+        }
+        let conn = rusqlite::Connection::open(&db_path)
+            .map_err(|e| format!("打开 Antigravity 本地数据库失败: {}", e))?;
+        let data_root = app_data_root("Antigravity")?;
+        let secret_credential = read_antigravity_secret_storage_value(
+            "jlcodes.antigravity-cockpit",
+            "antigravity.autoTrigger.credential",
+            Some(data_root.to_string_lossy().as_ref()),
+        )?
+        .and_then(|raw| serde_json::from_str::<Value>(&raw).ok());
+        let auth_status = read_db_string(&conn, "antigravityAuthStatus")
+            .and_then(|raw| serde_json::from_str::<Value>(&raw).ok());
+        let access_token = secret_credential
+            .as_ref()
+            .and_then(|value| {
+                pick_string(
+                    value,
+                    &["accessToken", "access_token", "apiKey", "api_key", "token"],
+                )
+            })
+            .or_else(|| {
+                auth_status.as_ref().and_then(|value| {
+                    pick_string(
+                        value,
+                        &["apiKey", "api_key", "accessToken", "access_token", "token"],
+                    )
+                })
+            });
+        let refresh_token = secret_credential
+            .as_ref()
+            .and_then(|value| pick_string(value, &["refreshToken", "refresh_token"]));
+        let email = secret_credential
+            .as_ref()
+            .and_then(|value| pick_string(value, &["email", "userEmail"]))
+            .or_else(|| {
+                auth_status
+                    .as_ref()
+                    .and_then(|value| pick_string(value, &["email", "userEmail"]))
+            });
+
+        let accounts = db
+            .get_all_ide_accounts()
+            .map_err(|e| format!("读取 IDE 账号失败: {}", e))?;
+
+        Ok(find_matching_ide_account_id(
+            accounts
+                .into_iter()
+                .filter(|item| item.origin_platform.eq_ignore_ascii_case("antigravity")),
+            email.as_deref(),
+            access_token.as_deref(),
+            refresh_token.as_deref(),
+            None,
+        ))
+    }
+
+    pub(super) fn get_current_github_copilot_account_id(
+        db: &Database,
+    ) -> Result<Option<String>, String> {
+        Self::get_current_vscode_github_auth_account_id(db, "github_copilot")
+    }
+
+    pub(super) fn get_current_vscode_account_id(db: &Database) -> Result<Option<String>, String> {
+        Self::get_current_vscode_github_auth_account_id(db, "vscode")
+    }
+
+    fn get_current_vscode_github_auth_account_id(
+        db: &Database,
+        platform: &str,
+    ) -> Result<Option<String>, String> {
+        let sessions = read_github_auth_sessions(None)?;
+        let current = sessions
+            .iter()
+            .find(|item| item.scopes.iter().any(|scope| scope == "user:email"))
+            .cloned()
+            .or_else(|| sessions.into_iter().next());
+
+        let Some(current) = current else {
+            return Ok(None);
+        };
+
+        let accounts = db
+            .get_all_ide_accounts()
+            .map_err(|e| format!("读取 IDE 账号失败: {}", e))?;
+        Ok(find_matching_ide_account_id(
+            accounts
+                .into_iter()
+                .filter(|item| item.origin_platform.eq_ignore_ascii_case(platform)),
+            current.label.as_deref(),
+            current.access_token.as_deref(),
+            None,
+            current.account_id.as_deref(),
+        ))
+    }
+
+    pub(super) fn get_current_codex_account_id(db: &Database) -> Result<Option<String>, String> {
         let home = dirs::home_dir().ok_or("无法获取用户主目录".to_string())?;
         let auth_path = home.join(".codex").join("auth.json");
         if !auth_path.exists() {
@@ -139,9 +238,7 @@ impl ProviderCurrentService {
         Ok(None)
     }
 
-    pub(super) fn get_current_gemini_account_id(
-        db: &Database,
-    ) -> Result<Option<String>, String> {
+    pub(super) fn get_current_gemini_account_id(db: &Database) -> Result<Option<String>, String> {
         let home = dirs::home_dir().ok_or("无法获取用户主目录".to_string())?;
         let gemini_dir = home.join(".gemini");
         let oauth_path = gemini_dir.join("oauth_creds.json");
@@ -210,9 +307,7 @@ impl ProviderCurrentService {
         Ok(None)
     }
 
-    pub(super) fn get_current_cursor_account_id(
-        db: &Database,
-    ) -> Result<Option<String>, String> {
+    pub(super) fn get_current_cursor_account_id(db: &Database) -> Result<Option<String>, String> {
         let db_path = ide_state_db_path("Cursor")?;
         if !db_path.exists() {
             return Ok(None);
@@ -237,9 +332,7 @@ impl ProviderCurrentService {
         ))
     }
 
-    pub(super) fn get_current_windsurf_account_id(
-        db: &Database,
-    ) -> Result<Option<String>, String> {
+    pub(super) fn get_current_windsurf_account_id(db: &Database) -> Result<Option<String>, String> {
         let db_path = ide_state_db_path("Windsurf")?;
         if !db_path.exists() {
             return Ok(None);

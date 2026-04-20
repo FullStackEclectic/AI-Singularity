@@ -4,12 +4,7 @@ use crate::db::Database;
 use crate::models::Platform;
 use crate::proxy::converter::OpenAIRequest;
 use crate::proxy::router::Router;
-use axum::{
-    extract::State,
-    response::IntoResponse,
-    routing::post,
-    Json, Router as AxumRouter,
-};
+use axum::{extract::State, response::IntoResponse, routing::post, Json, Router as AxumRouter};
 use serde_json::json;
 use std::sync::Arc;
 use tokio::net::TcpListener;

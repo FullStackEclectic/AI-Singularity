@@ -60,7 +60,9 @@ impl SessionManager {
                 .map(|item| item.id.clone())
                 .collect::<HashSet<_>>();
             for snapshot in snapshots {
-                thread_universe.entry(snapshot.id.clone()).or_insert(snapshot);
+                thread_universe
+                    .entry(snapshot.id.clone())
+                    .or_insert(snapshot);
             }
             existing_ids_by_instance.insert(instance.id.clone(), ids);
         }
@@ -227,9 +229,11 @@ impl SessionManager {
         {
             let mut values = Vec::with_capacity(columns.len());
             for index in 0..columns.len() {
-                values.push(row.get::<usize, Value>(index).map_err(|e| {
-                    format!("解析 Codex 线程记录失败 ({}): {}", instance.name, e)
-                })?);
+                values.push(
+                    row.get::<usize, Value>(index).map_err(|e| {
+                        format!("解析 Codex 线程记录失败 ({}): {}", instance.name, e)
+                    })?,
+                );
             }
 
             let row_data = ThreadRowData {
@@ -384,7 +388,10 @@ impl SessionManager {
             return Ok(());
         }
 
-        let removed_ids = session_ids.iter().map(|id| id.as_str()).collect::<HashSet<_>>();
+        let removed_ids = session_ids
+            .iter()
+            .map(|id| id.as_str())
+            .collect::<HashSet<_>>();
         let content = fs::read_to_string(&path).map_err(|e| {
             format!(
                 "读取 Codex session_index.jsonl 失败 ({}): {}",

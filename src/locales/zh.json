@@ -6,7 +6,7 @@
     "providers": "终端配置",
     "mcp": "上下文扩展 (MCP)",
     "skills": "技能中心",
-    "tools": "局域工具池",
+    "tools": "环境配置",
     "tokenCalculator": "TOKEN 计算器",
     "prompts": "系统配置",
     "proxy": "本地代理",

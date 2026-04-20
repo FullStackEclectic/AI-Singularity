@@ -2,10 +2,31 @@ use crate::db::Database;
 use crate::models::{AccountStatus, IdeAccount};
 use crate::services::ide_scanner::IdeScanner;
 use chrono::Utc;
+use serde_json::Value;
 
 pub struct LocalIdeRefreshService;
 
 impl LocalIdeRefreshService {
+    pub fn refresh_vscode_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        let account = Self::load_account(db, id)?;
+        let scanned = Self::select_scanned_account(
+            IdeScanner::import_vscode_from_local()?,
+            &account,
+            "VS Code",
+        )?;
+        Self::merge_scanned_account(db, id, scanned)
+    }
+
+    pub fn refresh_github_copilot_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        let account = Self::load_account(db, id)?;
+        let scanned = Self::select_scanned_account(
+            IdeScanner::import_github_copilot_from_local()?,
+            &account,
+            "GitHub Copilot",
+        )?;
+        Self::merge_scanned_account(db, id, scanned)
+    }
+
     pub fn refresh_cursor_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
         let scanned = IdeScanner::import_cursor_from_local()?
             .into_iter()
@@ -91,6 +112,8 @@ impl LocalIdeRefreshService {
         let mut count = 0usize;
         for id in target_ids {
             let result = match platform_lower.as_str() {
+                "vscode" => Self::refresh_vscode_account(db, &id),
+                "github_copilot" => Self::refresh_github_copilot_account(db, &id),
                 "cursor" => Self::refresh_cursor_account(db, &id),
                 "windsurf" => Self::refresh_windsurf_account(db, &id),
                 "kiro" => Self::refresh_kiro_account(db, &id),
@@ -107,6 +130,100 @@ impl LocalIdeRefreshService {
             }
         }
         Ok(count)
+    }
+
+    fn load_account(db: &Database, id: &str) -> Result<IdeAccount, String> {
+        db.get_all_ide_accounts()
+            .map_err(|e| e.to_string())?
+            .into_iter()
+            .find(|item| item.id == id)
+            .ok_or_else(|| "IDE 账号不存在".to_string())
+    }
+
+    fn select_scanned_account(
+        scanned_accounts: Vec<crate::services::ide_scanner::ScannedIdeAccount>,
+        account: &IdeAccount,
+        platform_label: &str,
+    ) -> Result<crate::services::ide_scanner::ScannedIdeAccount, String> {
+        if scanned_accounts.is_empty() {
+            return Err(format!("未读取到可用的 {} 本地登录态", platform_label));
+        }
+
+        let expected_user_id = Self::extract_meta_string(account.meta_json.as_deref(), "user_id");
+        let expected_login = Self::extract_meta_string(account.meta_json.as_deref(), "login");
+        let expected_email = Self::normalize_optional_string(Some(account.email.as_str()));
+        let expected_label = Self::normalize_optional_string(account.label.as_deref());
+        let expected_access_token =
+            Self::normalize_optional_string(Some(account.token.access_token.as_str()));
+        let expected_refresh_token =
+            Self::normalize_optional_string(Some(account.token.refresh_token.as_str()));
+
+        for scanned in &scanned_accounts {
+            if expected_user_id.as_ref().is_some_and(|expected| {
+                Self::extract_meta_string(scanned.meta_json.as_deref(), "user_id").as_deref()
+                    == Some(expected.as_str())
+            }) {
+                return Ok(scanned.clone());
+            }
+            if expected_login.as_ref().is_some_and(|expected| {
+                Self::extract_meta_string(scanned.meta_json.as_deref(), "login").as_deref()
+                    == Some(expected.as_str())
+            }) {
+                return Ok(scanned.clone());
+            }
+            if expected_access_token.as_ref().is_some_and(|expected| {
+                Self::normalize_optional_string(scanned.access_token.as_deref()).as_deref()
+                    == Some(expected.as_str())
+            }) {
+                return Ok(scanned.clone());
+            }
+            if expected_refresh_token.as_ref().is_some_and(|expected| {
+                Self::normalize_optional_string(scanned.refresh_token.as_deref()).as_deref()
+                    == Some(expected.as_str())
+            }) {
+                return Ok(scanned.clone());
+            }
+            if expected_email.as_ref().is_some_and(|expected| {
+                Self::normalize_optional_string(Some(scanned.email.as_str())).as_deref()
+                    == Some(expected.as_str())
+            }) {
+                return Ok(scanned.clone());
+            }
+            if expected_label.as_ref().is_some_and(|expected| {
+                Self::normalize_optional_string(scanned.label.as_deref()).as_deref()
+                    == Some(expected.as_str())
+            }) {
+                return Ok(scanned.clone());
+            }
+        }
+
+        if scanned_accounts.len() == 1 {
+            return scanned_accounts
+                .into_iter()
+                .next()
+                .ok_or_else(|| format!("未读取到可用的 {} 本地登录态", platform_label));
+        }
+
+        Err(format!(
+            "检测到多个 {} 本地登录态，但无法匹配当前账号，请重新导入对应账号后再试",
+            platform_label
+        ))
+    }
+
+    fn normalize_optional_string(raw: Option<&str>) -> Option<String> {
+        raw.map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+    }
+
+    fn extract_meta_string(raw: Option<&str>, key: &str) -> Option<String> {
+        raw.and_then(|value| serde_json::from_str::<Value>(value).ok())
+            .and_then(|value| {
+                value
+                    .get(key)
+                    .and_then(|item| item.as_str())
+                    .map(str::to_string)
+            })
+            .and_then(|value| Self::normalize_optional_string(Some(value.as_str())))
     }
 
     fn merge_scanned_account(

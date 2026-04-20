@@ -1,13 +1,26 @@
 use super::secret_storage::{
-    inject_copilot_token_for_user_data_dir, inject_secret_to_state_db_for_codebuddy,
-    inject_secret_to_state_db_for_codebuddy_cn, inject_secret_to_state_db_for_qoder,
-    inject_secret_to_state_db_for_workbuddy,
+    inject_copilot_token_for_user_data_dir, inject_secret_to_state_db_for_antigravity,
+    inject_secret_to_state_db_for_codebuddy, inject_secret_to_state_db_for_codebuddy_cn,
+    inject_secret_to_state_db_for_qoder, inject_secret_to_state_db_for_workbuddy,
+    read_antigravity_secret_storage_value,
 };
 use crate::models::IdeAccount;
+use chrono::SecondsFormat;
+use serde_json::{Map, Value};
 use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "macos")]
 use std::process::Command;
+
+const ANTIGRAVITY_AUTH_STATUS_KEY: &str = "antigravityAuthStatus";
+const ANTIGRAVITY_CLIENT_ID: &str =
+    "1071006060591-tmhssin2h21lcre235vtolojh4g403ep.apps.googleusercontent.com";
+const ANTIGRAVITY_CLIENT_SECRET_ENV: &str = "AIS_ANTIGRAVITY_CLIENT_SECRET";
+const ANTIGRAVITY_SECRET_EXTENSION_ID: &str = "jlcodes.antigravity-cockpit";
+const ANTIGRAVITY_SECRET_CREDENTIAL_NAME: &str = "antigravity.autoTrigger.credential";
+const ANTIGRAVITY_SECRET_CREDENTIALS_NAME: &str = "antigravity.autoTrigger.credentials";
+const ANTIGRAVITY_SECRET_CREDENTIAL_DB_KEY: &str = r#"secret://{"extensionId":"jlcodes.antigravity-cockpit","key":"antigravity.autoTrigger.credential"}"#;
+const ANTIGRAVITY_SECRET_CREDENTIALS_DB_KEY: &str = r#"secret://{"extensionId":"jlcodes.antigravity-cockpit","key":"antigravity.autoTrigger.credentials"}"#;
 
 pub(super) fn inject_platform_account(acc: &IdeAccount) -> Result<(), String> {
     let platform = acc.origin_platform.to_lowercase();
@@ -15,6 +28,8 @@ pub(super) fn inject_platform_account(acc: &IdeAccount) -> Result<(), String> {
 
     if platform.contains("codex") {
         inject_codex_account(acc)
+    } else if platform.contains("antigravity") {
+        inject_antigravity_account(acc)
     } else if platform.contains("gemini") {
         inject_gemini_cli_account(acc)
     } else if platform.contains("cursor") {
@@ -37,8 +52,13 @@ pub(super) fn inject_platform_account(acc: &IdeAccount) -> Result<(), String> {
         inject_trae_account(acc)
     } else if platform.contains("copilot") {
         inject_copilot_token_for_user_data_dir("", &acc.email, &access_token, None).map(|_| ())
-    } else {
+    } else if platform == "vscode" {
         inject_copilot_token_for_user_data_dir("", &acc.email, &access_token, None).map(|_| ())
+    } else {
+        Err(format!(
+            "{} 当前暂不支持设为本地当前账号",
+            acc.origin_platform
+        ))
     }
 }
 
@@ -81,7 +101,9 @@ pub fn inject_gemini_cli_account_to_root(
         .and_then(|value| value.as_array())
         .cloned()
         .unwrap_or_default();
-    if let Some(previous_active) = existing_accounts.get("active").and_then(|value| value.as_str())
+    if let Some(previous_active) = existing_accounts
+        .get("active")
+        .and_then(|value| value.as_str())
     {
         if !previous_active.eq_ignore_ascii_case(&acc.email)
             && !old_accounts
@@ -246,12 +268,242 @@ fn app_data_root(app_name: &str) -> Result<PathBuf, String> {
     Err(format!("当前平台暂不支持读取 {} 数据目录", app_name))
 }
 
-fn parse_meta_object(acc: &IdeAccount) -> serde_json::Map<String, serde_json::Value> {
+fn parse_meta_object(acc: &IdeAccount) -> Map<String, Value> {
     acc.meta_json
         .as_deref()
-        .and_then(|raw| serde_json::from_str::<serde_json::Value>(raw).ok())
+        .and_then(|raw| serde_json::from_str::<Value>(raw).ok())
         .and_then(|value| value.as_object().cloned())
         .unwrap_or_default()
+}
+
+fn parse_json_value(raw: &str) -> Option<Value> {
+    serde_json::from_str::<Value>(raw).ok()
+}
+
+fn meta_string(meta: &Map<String, Value>, key: &str) -> Option<String> {
+    meta.get(key)
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+}
+
+fn value_into_object(value: Value) -> Map<String, Value> {
+    value.as_object().cloned().unwrap_or_default()
+}
+
+fn current_antigravity_secret_payload(data_root: &Path, key: &str) -> Option<Value> {
+    read_antigravity_secret_storage_value(
+        ANTIGRAVITY_SECRET_EXTENSION_ID,
+        key,
+        Some(data_root.to_string_lossy().as_ref()),
+    )
+    .ok()
+    .flatten()
+    .and_then(|raw| parse_json_value(&raw))
+}
+
+fn read_itemtable_string(conn: &rusqlite::Connection, key: &str) -> Option<String> {
+    match conn.query_row(
+        "SELECT value FROM ItemTable WHERE key = ?1 LIMIT 1",
+        [key],
+        |row| row.get::<_, String>(0),
+    ) {
+        Ok(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Err(_) => None,
+    }
+}
+
+fn antigravity_expires_at(acc: &IdeAccount) -> String {
+    let expires_at = acc.token.updated_at
+        + chrono::Duration::seconds(acc.token.expires_in.min(i64::MAX as u64) as i64);
+    expires_at.to_rfc3339_opts(SecondsFormat::Millis, true)
+}
+
+fn build_antigravity_auth_status(
+    acc: &IdeAccount,
+    meta: &Map<String, Value>,
+    base: Value,
+) -> Value {
+    let mut root = value_into_object(base);
+    root.insert(
+        "apiKey".to_string(),
+        Value::String(acc.token.access_token.clone()),
+    );
+    root.insert("email".to_string(), Value::String(acc.email.clone()));
+
+    if let Some(name) = acc
+        .label
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        root.insert("name".to_string(), Value::String(name.to_string()));
+    }
+    if !acc.token.refresh_token.trim().is_empty() && acc.token.refresh_token != "missing" {
+        root.insert(
+            "refreshToken".to_string(),
+            Value::String(acc.token.refresh_token.clone()),
+        );
+    }
+    if let Some(user_id) = meta_string(meta, "user_id") {
+        root.entry("userId".to_string())
+            .or_insert_with(|| Value::String(user_id));
+    }
+
+    Value::Object(root)
+}
+
+fn build_antigravity_secret_credential(
+    acc: &IdeAccount,
+    meta: &Map<String, Value>,
+    base: Value,
+) -> Value {
+    let mut root = value_into_object(base);
+    root.insert(
+        "clientId".to_string(),
+        Value::String(
+            root.get("clientId")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or(ANTIGRAVITY_CLIENT_ID)
+                .to_string(),
+        ),
+    );
+    if let Some(client_secret) = root
+        .get("clientSecret")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+        .or_else(|| std::env::var(ANTIGRAVITY_CLIENT_SECRET_ENV).ok())
+    {
+        root.insert("clientSecret".to_string(), Value::String(client_secret));
+    }
+    root.insert(
+        "accessToken".to_string(),
+        Value::String(acc.token.access_token.clone()),
+    );
+    root.insert("email".to_string(), Value::String(acc.email.clone()));
+    root.insert(
+        "expiresAt".to_string(),
+        Value::String(antigravity_expires_at(acc)),
+    );
+    root.insert("isInvalid".to_string(), Value::Bool(false));
+
+    if !acc.token.refresh_token.trim().is_empty() && acc.token.refresh_token != "missing" {
+        root.insert(
+            "refreshToken".to_string(),
+            Value::String(acc.token.refresh_token.clone()),
+        );
+    }
+    if let Some(project_id) = acc
+        .project_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string())
+        .or_else(|| meta_string(meta, "antigravity_project_id"))
+    {
+        root.insert("projectId".to_string(), Value::String(project_id));
+    }
+
+    Value::Object(root)
+}
+
+fn build_antigravity_credentials_payload(
+    acc: &IdeAccount,
+    base: Value,
+    credential: Value,
+) -> Value {
+    let mut root = value_into_object(base);
+    let accounts_value = root
+        .remove("accounts")
+        .unwrap_or_else(|| serde_json::json!({}));
+    let mut accounts = value_into_object(accounts_value);
+    accounts.insert(acc.email.clone(), credential);
+    root.insert("accounts".to_string(), Value::Object(accounts));
+    Value::Object(root)
+}
+
+fn inject_antigravity_account(acc: &IdeAccount) -> Result<(), String> {
+    let db_path = app_data_root("Antigravity")?
+        .join("User")
+        .join("globalStorage")
+        .join("state.vscdb");
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建 Antigravity 目录失败: {}", e))?;
+    }
+
+    let conn = rusqlite::Connection::open(&db_path)
+        .map_err(|e| format!("打开 Antigravity state.vscdb 失败: {}", e))?;
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS ItemTable (key TEXT PRIMARY KEY, value TEXT)",
+        [],
+    )
+    .map_err(|e| format!("初始化 Antigravity ItemTable 失败: {}", e))?;
+
+    let meta = parse_meta_object(acc);
+    let data_root = app_data_root("Antigravity")?;
+
+    let auth_status_base = meta
+        .get("antigravity_auth_status_raw")
+        .cloned()
+        .or_else(|| {
+            read_itemtable_string(&conn, ANTIGRAVITY_AUTH_STATUS_KEY)
+                .and_then(|raw| parse_json_value(&raw))
+        })
+        .unwrap_or_else(|| serde_json::json!({}));
+    let auth_status = build_antigravity_auth_status(acc, &meta, auth_status_base);
+    let auth_status_raw = serde_json::to_string(&auth_status)
+        .map_err(|e| format!("序列化 Antigravity authStatus 失败: {}", e))?;
+    conn.execute(
+        "INSERT OR REPLACE INTO ItemTable (key, value) VALUES (?1, ?2)",
+        rusqlite::params![ANTIGRAVITY_AUTH_STATUS_KEY, auth_status_raw],
+    )
+    .map_err(|e| format!("写入 Antigravity authStatus 失败: {}", e))?;
+
+    let credential_base = meta
+        .get("antigravity_secret_credential_raw")
+        .cloned()
+        .or_else(|| {
+            current_antigravity_secret_payload(&data_root, ANTIGRAVITY_SECRET_CREDENTIAL_NAME)
+        })
+        .unwrap_or_else(|| serde_json::json!({}));
+    let credential = build_antigravity_secret_credential(acc, &meta, credential_base);
+    let credential_raw = serde_json::to_string(&credential)
+        .map_err(|e| format!("序列化 Antigravity credential 失败: {}", e))?;
+    inject_secret_to_state_db_for_antigravity(
+        db_path.as_path(),
+        ANTIGRAVITY_SECRET_CREDENTIAL_DB_KEY,
+        &credential_raw,
+    )?;
+
+    let credentials_base = meta
+        .get("antigravity_secret_credentials_raw")
+        .cloned()
+        .or_else(|| {
+            current_antigravity_secret_payload(&data_root, ANTIGRAVITY_SECRET_CREDENTIALS_NAME)
+        })
+        .unwrap_or_else(|| serde_json::json!({}));
+    let credentials = build_antigravity_credentials_payload(acc, credentials_base, credential);
+    let credentials_raw = serde_json::to_string(&credentials)
+        .map_err(|e| format!("序列化 Antigravity credentials 失败: {}", e))?;
+    inject_secret_to_state_db_for_antigravity(
+        db_path.as_path(),
+        ANTIGRAVITY_SECRET_CREDENTIALS_DB_KEY,
+        &credentials_raw,
+    )?;
+
+    Ok(())
 }
 
 fn inject_qoder_account(acc: &IdeAccount) -> Result<(), String> {
@@ -703,4 +955,119 @@ fn inject_trae_account(acc: &IdeAccount) -> Result<(), String> {
     std::fs::write(&storage_path, content)
         .map_err(|e| format!("写入 Trae storage.json 失败: {}", e))?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        build_antigravity_auth_status, build_antigravity_credentials_payload,
+        build_antigravity_secret_credential,
+    };
+    use crate::models::{AccountStatus, IdeAccount, OAuthToken};
+    use chrono::{TimeZone, Utc};
+    use serde_json::json;
+
+    fn sample_antigravity_account() -> IdeAccount {
+        IdeAccount {
+            id: "antigravity-test".to_string(),
+            email: "tester@example.com".to_string(),
+            origin_platform: "antigravity".to_string(),
+            token: OAuthToken {
+                access_token: "access-token-123".to_string(),
+                refresh_token: "refresh-token-456".to_string(),
+                expires_in: 3600,
+                token_type: "Bearer".to_string(),
+                updated_at: Utc.with_ymd_and_hms(2026, 4, 20, 12, 0, 0).unwrap(),
+            },
+            status: AccountStatus::Active,
+            disabled_reason: None,
+            is_proxy_disabled: false,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            last_used: Utc::now(),
+            device_profile: None,
+            quota_json: None,
+            project_id: Some("sample-project".to_string()),
+            meta_json: None,
+            label: Some("Tester".to_string()),
+            tags: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn antigravity_auth_status_prefers_current_account_fields() {
+        let account = sample_antigravity_account();
+        let meta = serde_json::Map::new();
+        let auth_status = build_antigravity_auth_status(
+            &account,
+            &meta,
+            json!({
+                "apiKey": "old-access",
+                "email": "old@example.com",
+                "name": "Old Name",
+                "userStatusProtoBinaryBase64": "keep-me",
+            }),
+        );
+
+        assert_eq!(auth_status["apiKey"], json!("access-token-123"));
+        assert_eq!(auth_status["email"], json!("tester@example.com"));
+        assert_eq!(auth_status["name"], json!("Tester"));
+        assert_eq!(auth_status["userStatusProtoBinaryBase64"], json!("keep-me"));
+    }
+
+    #[test]
+    fn antigravity_secret_credential_keeps_shape_and_updates_tokens() {
+        let account = sample_antigravity_account();
+        let meta = serde_json::Map::new();
+        let credential = build_antigravity_secret_credential(
+            &account,
+            &meta,
+            json!({
+                "clientId": "client-id",
+                "clientSecret": "client-secret",
+                "accessToken": "old-access",
+                "refreshToken": "old-refresh",
+                "email": "old@example.com",
+                "isInvalid": true,
+            }),
+        );
+
+        assert_eq!(credential["clientId"], json!("client-id"));
+        assert_eq!(credential["clientSecret"], json!("client-secret"));
+        assert_eq!(credential["accessToken"], json!("access-token-123"));
+        assert_eq!(credential["refreshToken"], json!("refresh-token-456"));
+        assert_eq!(credential["email"], json!("tester@example.com"));
+        assert_eq!(credential["isInvalid"], json!(false));
+        assert_eq!(credential["projectId"], json!("sample-project"));
+    }
+
+    #[test]
+    fn antigravity_credentials_payload_preserves_other_accounts() {
+        let account = sample_antigravity_account();
+        let credential = json!({
+            "accessToken": "access-token-123",
+            "refreshToken": "refresh-token-456",
+            "email": "tester@example.com",
+        });
+        let credentials = build_antigravity_credentials_payload(
+            &account,
+            json!({
+                "accounts": {
+                    "other@example.com": {
+                        "accessToken": "other-token"
+                    }
+                }
+            }),
+            credential,
+        );
+
+        assert_eq!(
+            credentials["accounts"]["other@example.com"]["accessToken"],
+            json!("other-token")
+        );
+        assert_eq!(
+            credentials["accounts"]["tester@example.com"]["accessToken"],
+            json!("access-token-123")
+        );
+    }
 }

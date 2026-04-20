@@ -1,9 +1,8 @@
-use super::{
-    WakeupHistoryItem, WakeupService, WakeupTask, SCHEDULER_INTERVAL_SECS,
-    WAKEUP_SCHEDULER_STARTED,
-};
 use super::execution::{
     apply_attempt_outcome_to_task, execute_wakeup_task_with_retry, notify_task_auto_paused,
+};
+use super::{
+    WakeupHistoryItem, WakeupService, WakeupTask, SCHEDULER_INTERVAL_SECS, WAKEUP_SCHEDULER_STARTED,
 };
 use crate::db::Database;
 use crate::services::event_bus::EventBus;
@@ -151,8 +150,7 @@ impl WakeupService {
         let db = app.state::<Database>();
 
         let now = Utc::now();
-        let window_start =
-            now - chrono::Duration::seconds((SCHEDULER_INTERVAL_SECS as i64) + 35);
+        let window_start = now - chrono::Duration::seconds((SCHEDULER_INTERVAL_SECS as i64) + 35);
         let mut history_items = Vec::new();
         let mut changed = false;
 

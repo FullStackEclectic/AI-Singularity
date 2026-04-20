@@ -343,7 +343,7 @@ fn build_status_page(app_data_dir: &Path) -> String {
                 .map(|item| {
                     format!(
                         "<div><code>{}</code> {}</div>",
-                        item.platform,
+                        format_platform_label(&item.platform),
                         item.label
                             .or(item.email)
                             .unwrap_or_else(|| "未解析到当前账号".to_string())
@@ -424,6 +424,26 @@ fn build_status_page(app_data_dir: &Path) -> String {
             .unwrap_or_else(|| "—".to_string()),
         json_hint,
     )
+}
+
+fn format_platform_label(platform: &str) -> &str {
+    match platform.trim().to_ascii_lowercase().as_str() {
+        "antigravity" => "Antigravity",
+        "github_copilot" => "GitHub Copilot",
+        "vscode" => "VS Code",
+        "codex" => "OpenAI Codex",
+        "gemini" => "Gemini CLI",
+        "cursor" => "Cursor",
+        "windsurf" => "Windsurf",
+        "kiro" => "Kiro",
+        "qoder" => "Qoder",
+        "trae" => "Trae",
+        "codebuddy" => "CodeBuddy",
+        "codebuddy_cn" => "CodeBuddy CN",
+        "workbuddy" => "WorkBuddy",
+        "zed" => "Zed",
+        _ => platform,
+    }
 }
 
 fn build_empty_response(status_code: u16, status_text: &str) -> String {

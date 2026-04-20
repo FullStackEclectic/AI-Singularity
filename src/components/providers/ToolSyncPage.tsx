@@ -26,6 +26,30 @@ const TOOL_ICONS: Record<ToolTarget, string> = {
   aider:       "💻",
 };
 
+function getToolModelOverride(localConfig: any): string {
+  if (!localConfig || typeof localConfig !== "object") return "";
+  if (typeof localConfig.model === "string") return localConfig.model;
+  if (typeof localConfig.model_name === "string") return localConfig.model_name;
+  return "";
+}
+
+function getToolDefaultBaseUrl(tool: ToolTarget): string {
+  switch (tool) {
+    case "claude_code":
+      return "https://api.anthropic.com";
+    case "gemini_cli":
+      return "https://generativelanguage.googleapis.com";
+    case "codex":
+    case "open_code":
+    case "open_claw":
+      return "https://api.openai.com/v1";
+    case "aider":
+      return "";
+    default:
+      return "";
+  }
+}
+
 function ProviderRow({ 
   provider, 
   isActive, 
@@ -73,7 +97,7 @@ function ProviderRow({
               className="premium-input form-input"
               style={{ padding: "6px 12px", fontSize: 13, borderRadius: 8 }}
               placeholder={provider.model_name || "自定义模型..."}
-              value={localConfig?.model_name || ""}
+              value={getToolModelOverride(localConfig)}
               onChange={(e) => onChangeModel(e.target.value)}
               onBlur={() => onSaveModel()}
             />
@@ -153,7 +177,14 @@ export default function ToolSyncPage() {
       if (p.id === providerId) {
         const configs = parseToolSpecificConfigs(p);
         if (!configs[activeTab]) configs[activeTab] = {} as any;
-        (configs[activeTab] as any).model_name = overrideModel;
+        if (overrideModel.trim()) {
+          (configs[activeTab] as any).model = overrideModel;
+        } else if ((configs[activeTab] as any)?.model) {
+          delete (configs[activeTab] as any).model;
+        }
+        if ((configs[activeTab] as any)?.model_name) {
+          delete (configs[activeTab] as any).model_name;
+        }
         return { ...p, extra_config: serializeToolSpecificConfigs(p.extra_config, configs) };
       }
       return p;
@@ -277,8 +308,9 @@ export default function ToolSyncPage() {
                 </div>
                 {activeProvider ? (
                   <ConfigPreview
-                    baseUrl={activeProvider.base_url || "https://api.anthropic.com"}
+                    baseUrl={activeProvider.base_url || getToolDefaultBaseUrl(activeTab)}
                     apiKey={activeProvider.api_key_id ? "sk-ais-*********" : ""}
+                    provider={activeProvider}
                     toolTargets={[activeTab]}
                     toolConfigs={{
                       [activeTab]: parseToolSpecificConfigs(activeProvider)[activeTab]

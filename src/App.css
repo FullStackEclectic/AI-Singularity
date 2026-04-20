@@ -1,1 +1,28 @@
 .app-layout { display: flex; height: 100vh; }
+
+.page-loading-state {
+  height: 100%;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-secondary);
+}
+
+.page-loading-spinner {
+  font-size: 28px;
+  line-height: 1;
+  color: var(--color-accent);
+  animation: page-loading-spin 1.2s linear infinite;
+}
+
+.page-loading-text {
+  font-size: 13px;
+}
+
+@keyframes page-loading-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

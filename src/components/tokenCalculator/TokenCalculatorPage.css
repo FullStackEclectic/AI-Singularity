@@ -268,9 +268,59 @@
 
 .token-manual-row {
   display: grid;
-  grid-template-columns: minmax(220px, 2fr) repeat(3, minmax(120px, 1fr)) auto;
+  grid-template-columns: minmax(220px, 2fr) repeat(6, minmax(110px, 1fr)) auto;
   gap: var(--space-2);
   align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.token-manual-row.request-mode {
+  background: linear-gradient(180deg, rgba(245, 158, 11, 0.08), rgba(255, 255, 255, 0.92));
+}
+
+.token-manual-row.token-mode {
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.05), rgba(255, 255, 255, 0.92));
+}
+
+.token-manual-input-disabled,
+.token-manual-input-disabled:disabled {
+  opacity: 0.62;
+  cursor: not-allowed;
+  color: var(--color-text-muted);
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.token-manual-meta {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.token-manual-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.token-manual-mode-badge.request {
+  background: rgba(245, 158, 11, 0.12);
+  color: #9a6700;
+}
+
+.token-manual-mode-badge.token {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-accent);
 }
 
 .token-highlight-panel {

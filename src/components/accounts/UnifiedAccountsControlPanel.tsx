@@ -489,7 +489,7 @@ export function UnifiedAccountsControlPanel({
                   设为当前
                 </button>
                 {!canBatchSetCurrent && (
-                  <span className="accounts-selection-text">批量设为当前仅支持同一平台的已选 IDE</span>
+                  <span className="accounts-selection-text">批量设为当前仅支持同一平台且具备注入能力的已选 IDE</span>
                 )}
                 <button
                   className="btn-outline"

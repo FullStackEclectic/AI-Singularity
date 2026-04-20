@@ -150,9 +150,22 @@ pub struct Model {
     pub context_length: Option<u32>,
     pub supports_vision: bool,
     pub supports_tools: bool,
+    pub fixed_price: Option<f64>,
+    pub request_price: Option<f64>,
     pub input_price_per_1m: Option<f64>,
     pub output_price_per_1m: Option<f64>,
     pub is_available: bool,
+    pub base_fixed_price: Option<f64>,
+    pub base_request_price: Option<f64>,
+    pub base_input_price_per_1m: Option<f64>,
+    pub base_output_price_per_1m: Option<f64>,
+    pub pricing_currency: Option<String>,
+    pub pricing_unit: Option<String>,
+    pub base_pricing_currency: Option<String>,
+    pub base_pricing_unit: Option<String>,
+    pub pricing_source: Option<String>,
+    pub pricing_note: Option<String>,
+    pub pricing_updated_at: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

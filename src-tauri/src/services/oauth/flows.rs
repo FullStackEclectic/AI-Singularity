@@ -287,12 +287,10 @@ impl OauthManager {
                         let _ = app_handle.opener().open_url(&real_auth_url, None::<String>);
                         match wait_for_callback(port, state_bg.clone(), cancel_rx).await {
                             Ok((refresh_token, _redir)) => {
-                                let (email, name) = trae_get_user_info(
-                                    &refresh_token,
-                                    &redirect_uri_bg,
-                                )
-                                .await
-                                .unwrap_or((None, None));
+                                let (email, name) =
+                                    trae_get_user_info(&refresh_token, &redirect_uri_bg)
+                                        .await
+                                        .unwrap_or((None, None));
                                 Ok(OAuthResult {
                                     token: refresh_token,
                                     access_token: None,

@@ -1,336 +1,81 @@
+use crate::db::Database;
+use crate::error::AppResult;
 use crate::models::{Model, Platform};
+use crate::services::event_bus::EventBus;
+use crate::services::model_catalog::{
+    ModelCatalogService, SaveModelPricingRequest as ServiceSaveModelPricingRequest,
+};
+use tauri::{AppHandle, State};
 
-fn model(
-    id: &str,
-    name: &str,
-    platform: Platform,
-    context_length: Option<u32>,
-    supports_vision: bool,
-    supports_tools: bool,
-    input_price_per_1m: Option<f64>,
-    output_price_per_1m: Option<f64>,
-) -> Model {
-    Model {
-        id: id.to_string(),
-        name: name.to_string(),
-        platform,
-        context_length,
-        supports_vision,
-        supports_tools,
-        input_price_per_1m,
-        output_price_per_1m,
-        is_available: true,
-    }
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveModelPricingRequest {
+    pub platform: Platform,
+    pub model_id: String,
+    pub fixed_price: Option<f64>,
+    pub request_price: Option<f64>,
+    pub input_price_per_1m: Option<f64>,
+    pub output_price_per_1m: Option<f64>,
+    pub pricing_currency: Option<String>,
+    pub pricing_unit: Option<String>,
+    pub note: Option<String>,
 }
 
-fn catalog() -> Vec<Model> {
-    vec![
-        model(
-            "gpt-5.4",
-            "GPT-5.4",
-            Platform::OpenAI,
-            Some(400_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "gpt-4.1",
-            "GPT-4.1",
-            Platform::OpenAI,
-            Some(1_000_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "gpt-4o",
-            "GPT-4o",
-            Platform::OpenAI,
-            Some(128_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "o4-mini",
-            "o4-mini",
-            Platform::OpenAI,
-            Some(200_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "claude-opus-4-5",
-            "Claude Opus 4.5",
-            Platform::Anthropic,
-            Some(200_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "claude-sonnet-4-5",
-            "Claude Sonnet 4.5",
-            Platform::Anthropic,
-            Some(200_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "claude-haiku-4-5",
-            "Claude Haiku 4.5",
-            Platform::Anthropic,
-            Some(200_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "gemini-2.5-pro",
-            "Gemini 2.5 Pro",
-            Platform::Gemini,
-            Some(1_000_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "gemini-2.5-flash",
-            "Gemini 2.5 Flash",
-            Platform::Gemini,
-            Some(1_000_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "deepseek-chat",
-            "DeepSeek Chat",
-            Platform::DeepSeek,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "deepseek-reasoner",
-            "DeepSeek Reasoner",
-            Platform::DeepSeek,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "qwen-max",
-            "Qwen Max",
-            Platform::Aliyun,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "doubao-1.5-pro",
-            "Doubao 1.5 Pro",
-            Platform::Bytedance,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "kimi-k2",
-            "Kimi K2",
-            Platform::Moonshot,
-            Some(200_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "glm-4.5",
-            "GLM 4.5",
-            Platform::Zhipu,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "glm-4.5-air",
-            "GLM 4.5 Air",
-            Platform::Zhipu,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "MiniMax-M2.7",
-            "MiniMax M2.7",
-            Platform::MiniMax,
-            Some(1_000_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "step-2",
-            "Step 2",
-            Platform::StepFun,
-            Some(256_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "llama-3.3-70b",
-            "Llama 3.3 70B",
-            Platform::OpenRouter,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "qwen/qwen3-coder",
-            "Qwen3 Coder",
-            Platform::OpenRouter,
-            Some(256_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "mistral-large",
-            "Mistral Large",
-            Platform::Mistral,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "grok-4",
-            "Grok 4",
-            Platform::XAi,
-            Some(128_000),
-            true,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "command-r-plus",
-            "Command R+",
-            Platform::Cohere,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "sonar-reasoning-pro",
-            "Sonar Reasoning Pro",
-            Platform::Perplexity,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "meta-llama/Llama-3.1-405B-Instruct",
-            "Llama 3.1 405B",
-            Platform::TogetherAi,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "llama3.2",
-            "Llama 3.2",
-            Platform::Ollama,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "deepseek/deepseek-r1",
-            "DeepSeek R1",
-            Platform::HuggingFace,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-        model(
-            "black-forest-labs/flux-1.1-pro",
-            "FLUX 1.1 Pro",
-            Platform::Replicate,
-            Some(32_000),
-            true,
-            false,
-            None,
-            None,
-        ),
-        model(
-            "copilot-chat",
-            "Copilot Chat",
-            Platform::Copilot,
-            Some(128_000),
-            false,
-            true,
-            None,
-            None,
-        ),
-    ]
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResetModelPricingRequest {
+    pub platform: Platform,
+    pub model_id: String,
 }
 
 #[tauri::command]
-pub fn list_models() -> Vec<Model> {
-    catalog()
+pub fn list_models(db: State<'_, Database>) -> AppResult<Vec<Model>> {
+    ModelCatalogService::new(&db).list_models()
 }
 
 #[tauri::command]
-pub fn get_platform_models(platform: String) -> Vec<Model> {
+pub fn get_platform_models(platform: String, db: State<'_, Database>) -> AppResult<Vec<Model>> {
     let parsed = serde_json::from_str::<Platform>(&format!("\"{}\"", platform)).ok();
     match parsed {
-        Some(target) => catalog()
-            .into_iter()
-            .filter(|model| model.platform == target)
-            .collect(),
-        None => vec![],
+        Some(target) => ModelCatalogService::new(&db).get_platform_models(&target),
+        None => Ok(vec![]),
     }
+}
+
+#[tauri::command]
+pub fn save_model_pricing(
+    request: SaveModelPricingRequest,
+    db: State<'_, Database>,
+    app: AppHandle,
+) -> AppResult<Model> {
+    let model = ModelCatalogService::new(&db).save_pricing(ServiceSaveModelPricingRequest {
+        platform: request.platform,
+        model_id: request.model_id,
+        fixed_price: request.fixed_price,
+        request_price: request.request_price,
+        input_price_per_1m: request.input_price_per_1m,
+        output_price_per_1m: request.output_price_per_1m,
+        pricing_currency: request.pricing_currency,
+        pricing_unit: request.pricing_unit,
+        note: request.note,
+    })?;
+    EventBus::emit_data_changed(&app, "models", "update_pricing", "model.save_pricing");
+    Ok(model)
+}
+
+#[tauri::command]
+pub fn reset_model_pricing(
+    request: ResetModelPricingRequest,
+    db: State<'_, Database>,
+    app: AppHandle,
+) -> AppResult<Model> {
+    let service = ModelCatalogService::new(&db);
+    service.reset_pricing(&request.platform, &request.model_id)?;
+    let model = service
+        .get_platform_models(&request.platform)?
+        .into_iter()
+        .find(|item| item.id == request.model_id)
+        .ok_or_else(|| anyhow::anyhow!("模型不存在，无法恢复基础价格"))?;
+    EventBus::emit_data_changed(&app, "models", "reset_pricing", "model.reset_pricing");
+    Ok(model)
 }

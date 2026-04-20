@@ -1,4 +1,4 @@
-import { alerts, env, proxy, security, skills, speedtest, stats, tools } from "./system";
+import { alerts, env, proxy, security, skills, speedtest, stats } from "./system";
 import { balance, keys, models, providers, tokenCalculator } from "./finance";
 import { analytics, floatingCards, ideAccounts, mcp, prompts, providerCurrent, userTokens } from "./integration";
 import { announcements, logs, update, webReport, websocket } from "./runtime";
@@ -21,7 +21,6 @@ export const api = {
   alerts,
   speedtest,
   ideAccounts,
-  tools,
   userTokens,
   analytics,
   logs,
