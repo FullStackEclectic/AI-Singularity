@@ -6,6 +6,7 @@ use super::helpers::{
 use super::CodexIdeService;
 use crate::db::Database;
 use crate::models::{AccountStatus, IdeAccount};
+use crate::services::account_health::AccountHealthService;
 use chrono::Utc;
 use serde_json::Value;
 
@@ -28,6 +29,27 @@ impl CodexIdeService {
     }
 
     pub async fn refresh_account(db: &Database, account_id: &str) -> Result<IdeAccount, String> {
+        match Self::refresh_account_inner(db, account_id).await {
+            Ok(account) => {
+                AccountHealthService::try_clear_invalid_grant(db, &account);
+                AccountHealthService::clear_quota_error(db, &account.id);
+                Ok(account)
+            }
+            Err(err) => {
+                if AccountHealthService::looks_like_invalid_grant(&err) {
+                    AccountHealthService::mark_invalid_grant(db, account_id, &err);
+                } else {
+                    AccountHealthService::record_quota_error(db, account_id, None, &err);
+                }
+                Err(err)
+            }
+        }
+    }
+
+    async fn refresh_account_inner(
+        db: &Database,
+        account_id: &str,
+    ) -> Result<IdeAccount, String> {
         let mut account = db
             .get_all_ide_accounts()
             .map_err(|e| e.to_string())?
@@ -53,14 +75,14 @@ impl CodexIdeService {
             Self::refresh_tokens(&mut account, &mut meta, "Token 已过期").await?;
         }
 
-        let mut quota_result = Self::fetch_quota(&account, &meta).await;
+        let mut quota_result = Self::fetch_quota(db, &account, &meta, false).await;
         if quota_result
             .as_ref()
             .err()
             .is_some_and(|err| should_force_refresh_token(err))
         {
             Self::refresh_tokens(&mut account, &mut meta, "Codex 配额请求要求刷新 Token").await?;
-            quota_result = Self::fetch_quota(&account, &meta).await;
+            quota_result = Self::fetch_quota(db, &account, &meta, true).await;
         }
 
         let (quota_json, plan_type) = quota_result?;

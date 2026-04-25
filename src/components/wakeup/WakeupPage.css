@@ -19,6 +19,67 @@
   gap: var(--space-4);
 }
 
+.wakeup-distribution-card {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.wakeup-distribution-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wakeup-distribution-row {
+  display: grid;
+  grid-template-columns: 160px 1fr 80px;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.wakeup-distribution-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wakeup-distribution-track {
+  position: relative;
+  height: 8px;
+  background: var(--color-surface-2, rgba(120, 120, 120, 0.12));
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.wakeup-distribution-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  transition: width 240ms ease-out;
+}
+
+.wakeup-distribution-success {
+  background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+.wakeup-distribution-warn {
+  background: linear-gradient(90deg, #d97706, #f59e0b);
+}
+
+.wakeup-distribution-danger {
+  background: linear-gradient(90deg, #b91c1c, #ef4444);
+}
+
+.wakeup-distribution-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text);
+}
+
 .wakeup-stat {
   padding: var(--space-5);
 }

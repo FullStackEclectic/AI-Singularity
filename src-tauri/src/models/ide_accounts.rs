@@ -48,4 +48,10 @@ pub struct IdeAccount {
     pub label: Option<String>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub disabled_at: Option<DateTime<Utc>>,
+    #[serde(default)]
+    pub fingerprint_id: Option<String>,
+    #[serde(default)]
+    pub quota_error_json: Option<String>,
 }

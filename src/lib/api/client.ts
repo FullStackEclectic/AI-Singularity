@@ -2,7 +2,7 @@ import { alerts, env, proxy, security, skills, speedtest, stats } from "./system
 import { balance, keys, models, providers, tokenCalculator } from "./finance";
 import { analytics, floatingCards, ideAccounts, mcp, prompts, providerCurrent, userTokens } from "./integration";
 import { announcements, logs, update, webReport, websocket } from "./runtime";
-import { geminiInstances, oauth, wakeup, webdav } from "./automation";
+import { accountHealth, codexQuota, geminiInstances, oauth, wakeup, webdav } from "./automation";
 
 export const api = {
   stats,
@@ -33,4 +33,6 @@ export const api = {
   geminiInstances,
   webdav,
   skills,
+  codexQuota,
+  accountHealth,
 };

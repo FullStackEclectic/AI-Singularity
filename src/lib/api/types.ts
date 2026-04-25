@@ -252,18 +252,18 @@ export interface Announcement {
   summary: string;
   content: string;
   action?: AnnouncementAction | null;
-  target_versions: string;
-  target_languages?: string[];
-  show_once?: boolean;
+  targetVersions: string;
+  targetLanguages?: string[];
+  showOnce?: boolean;
   popup: boolean;
-  created_at: string;
-  expires_at?: string | null;
+  createdAt: string;
+  expiresAt?: string | null;
 }
 
 export interface AnnouncementState {
   announcements: Announcement[];
-  unread_ids: string[];
-  popup_announcement?: Announcement | null;
+  unreadIds: string[];
+  popupAnnouncement?: Announcement | null;
 }
 
 export interface WakeupTask {
@@ -334,6 +334,57 @@ export interface WakeupVerificationBatchResult {
   canceled: boolean;
   category_counts: WakeupCategoryCount[];
   items: WakeupVerificationBatchItem[];
+}
+
+export interface WakeupRunRecord {
+  id: string;
+  kind: string;
+  taskId: string | null;
+  triggeredBy: string;
+  startedAt: string;
+  finishedAt: string | null;
+  totalCount: number;
+  successCount: number;
+  failedCount: number;
+  canceled: boolean;
+  summaryJson: string | null;
+}
+
+export interface WakeupRunHistoryRow {
+  id: string;
+  runId: string;
+  taskId: string | null;
+  taskName: string;
+  accountId: string;
+  model: string;
+  status: string;
+  category: string;
+  message: string | null;
+  attempts: number;
+  createdAt: string;
+}
+
+export interface WakeupRunsPage {
+  items: WakeupRunRecord[];
+  total: number;
+}
+
+export interface WakeupRuntimeStatus {
+  concurrencyInUse: number;
+  concurrencyLimit: number;
+}
+
+export interface WakeupCategorySummary {
+  category: string;
+  total: number;
+  success: number;
+}
+
+export interface WakeupSummary24h {
+  categories: WakeupCategorySummary[];
+  totalCount: number;
+  successCount: number;
+  failureCount: number;
 }
 
 export type { AccountGroup };

@@ -42,6 +42,13 @@ fn map_ide_account_row(row: &rusqlite::Row<'_>) -> SqlResult<crate::models::IdeA
         .and_then(|j| serde_json::from_str(&j).ok())
         .unwrap_or_default();
 
+    let disabled_at_str: Option<String> = row.get(22).ok().flatten();
+    let disabled_at = disabled_at_str
+        .as_deref()
+        .and_then(|s| DateTime::<Utc>::from_str(s).ok());
+    let fingerprint_id: Option<String> = row.get(23).ok().flatten();
+    let quota_error_json: Option<String> = row.get(24).ok().flatten();
+
     Ok(crate::models::IdeAccount {
         id: row.get(0)?,
         email: row.get(1)?,
@@ -69,6 +76,9 @@ fn map_ide_account_row(row: &rusqlite::Row<'_>) -> SqlResult<crate::models::IdeA
         meta_json: row.get(16)?,
         label: row.get(21).ok(),
         tags,
+        disabled_at,
+        fingerprint_id,
+        quota_error_json,
     })
 }
 
@@ -79,11 +89,12 @@ impl Database {
         origin_platform: &str,
     ) -> SqlResult<Vec<crate::models::IdeAccount>> {
         self.query_rows(
-            "SELECT 
-                id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
-                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
-                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, tags, label
-             FROM ide_accounts 
+            "SELECT
+                id, email, origin_platform, access_token, refresh_token, expires_in, token_type,
+                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id,
+                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, tags, label,
+                disabled_at, fingerprint_id, quota_error_json
+             FROM ide_accounts
              WHERE origin_platform = ? AND status = 'active' AND is_proxy_disabled = 0",
             &[&origin_platform],
             map_ide_account_row,
@@ -106,10 +117,11 @@ impl Database {
 
     pub fn get_all_ide_accounts(&self) -> SqlResult<Vec<crate::models::IdeAccount>> {
         self.query_rows(
-            "SELECT 
-                id, email, origin_platform, access_token, refresh_token, expires_in, token_type, 
-                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id, 
-                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, tags, label
+            "SELECT
+                id, email, origin_platform, access_token, refresh_token, expires_in, token_type,
+                status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id,
+                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, tags, label,
+                disabled_at, fingerprint_id, quota_error_json
              FROM ide_accounts ORDER BY created_at DESC",
             &[],
             map_ide_account_row,
@@ -131,14 +143,16 @@ impl Database {
         let c_at = acc.created_at.to_rfc3339();
         let u_at = acc.updated_at.to_rfc3339();
         let lu = acc.last_used.to_rfc3339();
+        let disabled_at = acc.disabled_at.map(|dt| dt.to_rfc3339());
 
         self.execute(
             "INSERT INTO ide_accounts (
                 id, email, origin_platform, access_token, refresh_token, expires_in, token_type,
                 status, disabled_reason, is_proxy_disabled, machine_id, mac_machine_id,
-                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, label
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)
-            ON CONFLICT(id) DO UPDATE SET 
+                dev_device_id, sqm_id, quota_json, project_id, meta_json, created_at, updated_at, last_used, label,
+                disabled_at, fingerprint_id, quota_error_json
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24)
+            ON CONFLICT(id) DO UPDATE SET
                 email = excluded.email,
                 origin_platform = excluded.origin_platform,
                 access_token = excluded.access_token,
@@ -157,11 +171,15 @@ impl Database {
                 meta_json = excluded.meta_json,
                 label = excluded.label,
                 updated_at = excluded.updated_at,
-                last_used = excluded.last_used",
+                last_used = excluded.last_used,
+                disabled_at = excluded.disabled_at,
+                fingerprint_id = excluded.fingerprint_id,
+                quota_error_json = excluded.quota_error_json",
             rusqlite::params![
                 acc.id, acc.email, acc.origin_platform, acc.token.access_token, acc.token.refresh_token,
                 acc.token.expires_in, acc.token.token_type, status_str, acc.disabled_reason,
-                acc.is_proxy_disabled, mid, mac, did, sqm, acc.quota_json, acc.project_id, acc.meta_json, c_at, u_at, lu, acc.label
+                acc.is_proxy_disabled, mid, mac, did, sqm, acc.quota_json, acc.project_id, acc.meta_json,
+                c_at, u_at, lu, acc.label, disabled_at, acc.fingerprint_id, acc.quota_error_json
             ],
         )
     }
@@ -192,6 +210,50 @@ impl Database {
         self.execute(
             "UPDATE ide_accounts SET label = ?, updated_at = datetime('now') WHERE id = ?",
             &[&label, &id],
+        )
+    }
+
+    pub fn mark_ide_account_disabled(
+        &self,
+        id: &str,
+        reason: &str,
+    ) -> SqlResult<usize> {
+        let now = Utc::now().to_rfc3339();
+        self.execute(
+            "UPDATE ide_accounts SET status = 'forbidden', disabled_reason = ?, disabled_at = ?, updated_at = ? WHERE id = ?",
+            &[&reason, &now, &now, &id],
+        )
+    }
+
+    pub fn clear_ide_account_disabled(&self, id: &str) -> SqlResult<usize> {
+        let now = Utc::now().to_rfc3339();
+        self.execute(
+            "UPDATE ide_accounts SET status = 'active', disabled_reason = NULL, disabled_at = NULL, updated_at = ? WHERE id = ?",
+            &[&now, &id],
+        )
+    }
+
+    pub fn update_ide_account_fingerprint(
+        &self,
+        id: &str,
+        fingerprint_id: Option<&str>,
+    ) -> SqlResult<usize> {
+        let now = Utc::now().to_rfc3339();
+        self.execute(
+            "UPDATE ide_accounts SET fingerprint_id = ?, updated_at = ? WHERE id = ?",
+            &[&fingerprint_id, &now, &id],
+        )
+    }
+
+    pub fn update_ide_account_quota_error(
+        &self,
+        id: &str,
+        quota_error_json: Option<&str>,
+    ) -> SqlResult<usize> {
+        let now = Utc::now().to_rfc3339();
+        self.execute(
+            "UPDATE ide_accounts SET quota_error_json = ?, updated_at = ? WHERE id = ?",
+            &[&quota_error_json, &now, &id],
         )
     }
 }

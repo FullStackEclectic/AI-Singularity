@@ -243,7 +243,7 @@ export default function WebReportPage() {
         </div>
         <div className="card web-report-stat">
           <div className="web-report-stat-label">未读公告</div>
-          <div className="web-report-stat-value">{announcementsQuery.data?.unread_ids?.length ?? 0}</div>
+          <div className="web-report-stat-value">{announcementsQuery.data?.unreadIds?.length ?? 0}</div>
         </div>
         <div className="card web-report-stat">
           <div className="web-report-stat-label">桌面日志文件</div>
@@ -258,7 +258,7 @@ export default function WebReportPage() {
             {(announcementsQuery.data?.announcements || []).slice(0, 5).map((item) => (
               <div key={item.id} className="web-report-item">
                 <div className="web-report-item-title">{item.title}</div>
-                <div className="web-report-item-meta">{formatDateTime(item.created_at)}</div>
+                <div className="web-report-item-meta">{formatDateTime(item.createdAt)}</div>
                 <div className="web-report-item-body">{item.summary || item.content || "—"}</div>
               </div>
             ))}

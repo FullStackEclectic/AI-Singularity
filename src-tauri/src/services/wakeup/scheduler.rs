@@ -1,14 +1,10 @@
-use super::execution::{
-    apply_attempt_outcome_to_task, execute_wakeup_task_with_retry, notify_task_auto_paused,
-};
+use super::gateway::{DispatchAccountInput, DispatchRequest, RunKind, WakeupGateway};
 use super::{
-    WakeupHistoryItem, WakeupService, WakeupTask, SCHEDULER_INTERVAL_SECS, WAKEUP_SCHEDULER_STARTED,
+    WakeupService, WakeupTask, SCHEDULER_INTERVAL_SECS, WAKEUP_SCHEDULER_STARTED,
 };
 use crate::db::Database;
-use crate::services::event_bus::EventBus;
 use chrono::{DateTime, Datelike, Local, Utc, Weekday};
 use cron::Schedule;
-use std::path::Path;
 use std::str::FromStr;
 use tauri::{AppHandle, Manager};
 
@@ -36,43 +32,13 @@ pub(super) fn next_task_due_time(
     }
 }
 
-pub(super) fn describe_task_trigger(task: &WakeupTask) -> String {
-    let version_desc = format!(
-        "客户端模式 {}（回退 {}）",
-        super::execution::normalize_client_version_mode(&task.client_version_mode),
-        super::execution::normalize_client_version_mode(&task.client_version_fallback_mode)
-    );
-    if task.trigger_mode.trim() == "quota_reset" {
-        let window = match task.reset_window.trim() {
-            "secondary_window" => "quota secondary_window 重置窗口",
-            "either_window" => "quota 任一重置窗口",
-            _ => "quota primary_window 重置窗口",
-        };
-        let mut desc = format!("{}（{}）", window, describe_window_day_policy(task));
-        if task.reset_window.trim() == "primary_window"
-            && task.window_fallback_policy.trim() == "primary_then_secondary_on_failure"
-        {
-            desc.push_str("，主窗口失败后回退次窗口");
-        }
-        format!("{}；{}", desc, version_desc)
-    } else {
-        format!("cron 表达式（{}）；{}", task.cron, version_desc)
-    }
-}
-
 impl WakeupService {
     pub fn run_task_now(app: &AppHandle, task_id: &str) -> Result<WakeupTask, String> {
-        let app_data_dir = app
-            .path()
-            .app_data_dir()
-            .map_err(|e| format!("获取应用目录失败: {}", e))?;
-        let mut state = Self::load_state(&app_data_dir)?;
         let db = app.state::<Database>();
-        let now = Utc::now().to_rfc3339();
-
+        let state = Self::load_state(&db)?;
         let task = state
             .tasks
-            .iter_mut()
+            .into_iter()
             .find(|item| item.id == task_id)
             .ok_or_else(|| "未找到对应的 Wakeup 任务".to_string())?;
 
@@ -83,50 +49,32 @@ impl WakeupService {
             return Err("任务缺少账号、模型或命令模板，无法立即执行".to_string());
         }
 
-        let outcome =
-            execute_wakeup_task_with_retry(&db, task, task.retry_failed_times as usize, None);
-        let auto_paused = apply_attempt_outcome_to_task(task, &outcome, &now);
-        let saved = Self::save_state(&app_data_dir, state)?;
-        let updated_task = saved
+        let req = DispatchRequest {
+            kind: RunKind::Manual,
+            task_template: task.clone(),
+            accounts: vec![DispatchAccountInput {
+                account_id: task.account_id.clone(),
+                task_id: Some(task.id.clone()),
+                task_name: if task.name.trim().is_empty() {
+                    "未命名任务".to_string()
+                } else {
+                    task.name.clone()
+                },
+            }],
+            triggered_by: "manual.run_task_now".to_string(),
+            run_id: None,
+            mutate_task: true,
+        };
+        let _ = WakeupGateway::dispatch(app, req)?;
+
+        Self::load_state(&db)?
             .tasks
             .into_iter()
             .find(|item| item.id == task_id)
-            .ok_or_else(|| "任务执行后未能重新读取状态".to_string())?;
-
-        let run_id = format!("run-{}", uuid::Uuid::new_v4());
-
-        let _ = Self::add_history_items(
-            &app_data_dir,
-            vec![WakeupHistoryItem {
-                id: format!("history-{}", uuid::Uuid::new_v4()),
-                run_id: Some(run_id),
-                task_id: Some(updated_task.id.clone()),
-                task_name: if updated_task.name.trim().is_empty() {
-                    "未命名任务".to_string()
-                } else {
-                    updated_task.name.clone()
-                },
-                account_id: updated_task.account_id.clone(),
-                model: updated_task.model.clone(),
-                status: updated_task
-                    .last_status
-                    .clone()
-                    .unwrap_or_else(|| "unknown".to_string()),
-                category: outcome.category.clone(),
-                message: updated_task.last_message.clone(),
-                created_at: now,
-            }],
-        )?;
-
-        if auto_paused {
-            notify_task_auto_paused(app, &updated_task);
-        }
-
-        EventBus::emit_data_changed(app, "wakeup", "run_task_now", "wakeup.run_task_now");
-        Ok(updated_task)
+            .ok_or_else(|| "任务执行后未能重新读取状态".to_string())
     }
 
-    pub fn ensure_scheduler_started(app: AppHandle, app_data_dir: std::path::PathBuf) {
+    pub fn ensure_scheduler_started(app: AppHandle) {
         if WAKEUP_SCHEDULER_STARTED.set(()).is_err() {
             return;
         }
@@ -135,37 +83,34 @@ impl WakeupService {
             let app_handle = app.clone();
             loop {
                 tokio::time::sleep(tokio::time::Duration::from_secs(SCHEDULER_INTERVAL_SECS)).await;
-                if let Err(err) = Self::run_scheduler_tick(&app_handle, &app_data_dir) {
+                if let Err(err) = Self::run_scheduler_tick(&app_handle) {
                     tracing::warn!("[Wakeup] 调度器执行失败: {}", err);
                 }
             }
         });
     }
 
-    fn run_scheduler_tick(app: &AppHandle, app_data_dir: &Path) -> Result<(), String> {
-        let mut state = Self::load_state(app_data_dir)?;
+    fn run_scheduler_tick(app: &AppHandle) -> Result<(), String> {
+        let db = app.state::<Database>();
+        let state = Self::load_state(&db)?;
         if !state.enabled {
             return Ok(());
         }
-        let db = app.state::<Database>();
 
         let now = Utc::now();
         let window_start = now - chrono::Duration::seconds((SCHEDULER_INTERVAL_SECS as i64) + 35);
-        let mut history_items = Vec::new();
-        let mut changed = false;
 
-        for task in &mut state.tasks {
-            if !task.enabled {
-                continue;
-            }
-            if task.account_id.trim().is_empty()
+        for task in state.tasks.into_iter() {
+            if !task.enabled
+                || task.account_id.trim().is_empty()
                 || task.model.trim().is_empty()
                 || task.command_template.trim().is_empty()
             {
                 continue;
             }
 
-            let (scheduled_for, schedule_reason) = next_task_due_time(&db, task, window_start, now);
+            let (scheduled_for, schedule_reason) =
+                next_task_due_time(&db, &task, window_start, now);
             let Some(scheduled_for) = scheduled_for else {
                 tracing::debug!(
                     "[Wakeup] 任务跳过: id={} name={} reason={}",
@@ -200,50 +145,29 @@ impl WakeupService {
                 continue;
             }
 
-            let outcome =
-                execute_wakeup_task_with_retry(&db, task, task.retry_failed_times as usize, None);
-            let auto_paused = apply_attempt_outcome_to_task(task, &outcome, &now.to_rfc3339());
-            changed = true;
-            let run_id = format!("run-{}", uuid::Uuid::new_v4());
-
-            history_items.push(WakeupHistoryItem {
-                id: format!("history-{}", uuid::Uuid::new_v4()),
-                run_id: Some(run_id),
-                task_id: Some(task.id.clone()),
-                task_name: if task.name.trim().is_empty() {
-                    "未命名任务".to_string()
-                } else {
-                    task.name.clone()
-                },
-                account_id: task.account_id.clone(),
-                model: task.model.clone(),
-                status: if outcome.execution.success {
-                    "success".to_string()
-                } else {
-                    "error".to_string()
-                },
-                category: outcome.category.clone(),
-                message: Some(format!(
-                    "调度器命中了 {}（{}），执行了 {} 次。{}",
-                    describe_task_trigger(task),
-                    schedule_reason,
-                    outcome.attempts,
-                    outcome.execution.message
-                )),
-                created_at: now.to_rfc3339(),
-            });
-
-            if auto_paused {
-                notify_task_auto_paused(app, task);
+            let req = DispatchRequest {
+                kind: RunKind::Scheduler,
+                task_template: task.clone(),
+                accounts: vec![DispatchAccountInput {
+                    account_id: task.account_id.clone(),
+                    task_id: Some(task.id.clone()),
+                    task_name: if task.name.trim().is_empty() {
+                        "未命名任务".to_string()
+                    } else {
+                        task.name.clone()
+                    },
+                }],
+                triggered_by: format!("scheduler:{}", schedule_reason),
+                run_id: None,
+                mutate_task: true,
+            };
+            if let Err(err) = WakeupGateway::dispatch(app, req) {
+                tracing::warn!(
+                    "[Wakeup] 任务派发失败 task_id={} err={}",
+                    task.id,
+                    err
+                );
             }
-        }
-
-        if changed {
-            let _ = Self::save_state(app_data_dir, state)?;
-            if !history_items.is_empty() {
-                let _ = Self::add_history_items(app_data_dir, history_items)?;
-            }
-            EventBus::emit_data_changed(app, "wakeup", "scheduler_tick", "wakeup.scheduler");
         }
 
         Ok(())

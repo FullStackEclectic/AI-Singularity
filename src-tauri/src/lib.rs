@@ -61,6 +61,18 @@ pub fn run() {
             ))
             .start(30);
 
+            // --- 账号定期任务守护进程（每 10 分钟自动刷新配额 + 告警 + 自动切号） ---
+            crate::services::health_check_daemon::HealthCheckDaemon::new(std::sync::Arc::new(
+                db.clone(),
+            ))
+            .start_account_loop(app.handle().clone(), 10);
+
+            // --- Token Keeper：30s 扫描，token 过期前 5 分钟主动续期，与 health_check_daemon 互补 ---
+            crate::services::token_keeper::TokenKeeper::ensure_started(
+                std::sync::Arc::new(db.clone()),
+                app.handle().clone(),
+            );
+
             // --- WebDAV 配置状态漫游自动同步进程（每 15 分钟） ---
             crate::services::webdav_daemon::WebDavDaemon::new(
                 std::sync::Arc::new(db.clone()),
@@ -69,9 +81,10 @@ pub fn run() {
             .start(15);
 
             // --- Wakeup 调度器 ---
+            crate::services::wakeup::WakeupService::migrate_legacy_json(&app_data_dir, &db)
+                .unwrap_or_else(|err| tracing::warn!("[Wakeup] 旧 JSON 迁移失败: {}", err));
             crate::services::wakeup::WakeupService::ensure_scheduler_started(
                 app.handle().clone(),
-                app_data_dir.clone(),
             );
 
             // --- 本地 WebSocket 广播服务 ---
@@ -311,6 +324,10 @@ pub fn run() {
             commands::wakeup::wakeup_run_verification_batch,
             commands::wakeup::wakeup_cancel_verification_run,
             commands::wakeup::wakeup_run_task_now,
+            commands::wakeup::wakeup_list_runs,
+            commands::wakeup::wakeup_get_run_items,
+            commands::wakeup::wakeup_get_runtime_status,
+            commands::wakeup::wakeup_get_summary_24h,
             commands::websocket::get_websocket_status,
             commands::web_report::get_web_report_port,
             commands::web_report::get_web_report_status,
@@ -332,6 +349,35 @@ pub fn run() {
             crate::services::tunnel::start_tunnel,
             crate::services::tunnel::stop_tunnel,
             crate::services::tunnel::filter_tunnel_status,
+            // 账号管理增强：失效检测 + 恢复
+            commands::account_health::list_disabled_ide_accounts,
+            commands::account_health::clear_ide_account_disabled,
+            commands::account_health::mark_ide_account_disabled,
+            commands::account_health::get_token_health_overview,
+            // 账号管理增强：批量并发刷新
+            commands::account_refresh::refresh_all_ide_accounts,
+            // 账号管理增强：自动切号
+            commands::account_auto_switch::get_auto_switch_settings,
+            commands::account_auto_switch::set_auto_switch_settings,
+            commands::account_auto_switch::list_auto_switch_groups,
+            commands::account_auto_switch::run_auto_switch_now,
+            commands::account_auto_switch::list_account_switch_history,
+            // 账号管理增强：告警冷却
+            commands::quota_alert::get_quota_alert_settings,
+            commands::quota_alert::set_quota_alert_settings,
+            commands::quota_alert::preview_quota_alerts,
+            // 账号管理增强：设备指纹
+            commands::device_fingerprint::list_device_fingerprints,
+            commands::device_fingerprint::create_device_fingerprint,
+            commands::device_fingerprint::rename_device_fingerprint,
+            commands::device_fingerprint::delete_device_fingerprint,
+            commands::device_fingerprint::apply_device_fingerprint_to_account,
+            // 账号管理增强：VS Code Extension 导入
+            commands::extension_import::scan_extension_credentials,
+            commands::extension_import::import_from_extension,
+            // Codex 配额缓存
+            commands::codex_quota::codex_get_quota_cache_stats,
+            commands::codex_quota::codex_clear_quota_cache,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

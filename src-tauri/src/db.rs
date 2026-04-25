@@ -2,8 +2,18 @@ use rusqlite::{Connection, Result as SqlResult};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
+mod account_settings;
+mod account_switch_history;
+mod codex_quota_cache;
+mod device_fingerprints;
 mod ide_accounts;
 mod migrations;
+mod wakeup;
+
+pub use account_switch_history::AccountSwitchHistoryItem;
+pub use codex_quota_cache::{CachedCodexQuota, CodexQuotaCacheStats};
+pub use device_fingerprints::DeviceFingerprintRecord;
+pub use wakeup::{WakeupCategorySummary, WakeupHistoryRow, WakeupRunRow, WakeupTaskRow};
 
 pub struct Database {
     pub path: PathBuf,

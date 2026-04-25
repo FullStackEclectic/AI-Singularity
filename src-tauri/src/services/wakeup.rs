@@ -1,7 +1,13 @@
 mod batch;
 mod execution;
+mod gateway;
 mod scheduler;
 mod storage;
+
+pub use gateway::{
+    dispatch_outcome_to_batch_result, dispatch_outcome_to_history_items, DispatchAccountInput,
+    DispatchAccountOutcome, DispatchOutcome, DispatchRequest, RunKind, WakeupGateway,
+};
 
 use self::execution::normalize_client_version_mode;
 use serde::{Deserialize, Serialize};

@@ -1,4 +1,7 @@
+import { useState } from "react";
+import { Compass } from "lucide-react";
 import { maskEmail, maskToken } from "../../lib/privacyMode";
+import { AccountCockpitDrawer } from "./AccountCockpitDrawer";
 import { UnifiedAccountsControlPanel } from "./UnifiedAccountsControlPanel";
 import { UnifiedAccountsDataView } from "./UnifiedAccountsDataView";
 import type { UnifiedAccountItem } from "./unifiedAccountsTypes";
@@ -40,8 +43,42 @@ export function UnifiedAccountsWorkspace({
   actions,
   virtualizer,
 }: UnifiedAccountsWorkspaceProps) {
+  const [cockpitOpen, setCockpitOpen] = useState(false);
+  const cockpitAccounts = (queries.ideAccs ?? []).map((acc: any) => ({
+    id: acc.id,
+    email: acc.email,
+    origin_platform: acc.origin_platform,
+  }));
   return (
     <div className="unified-main">
+      <button
+        type="button"
+        onClick={() => setCockpitOpen(true)}
+        title="账号控制塔：失效检测 / 自动切号 / 配额告警 / 设备指纹 / 插件导入"
+        style={{
+          position: "absolute",
+          top: 12,
+          right: 16,
+          zIndex: 10,
+          background: "rgba(94, 132, 255, 0.18)",
+          border: "1px solid rgba(94, 132, 255, 0.45)",
+          color: "inherit",
+          padding: "6px 12px",
+          borderRadius: 8,
+          cursor: "pointer",
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 6,
+          fontSize: 13,
+        }}
+      >
+        <Compass size={14} /> 控制塔
+      </button>
+      <AccountCockpitDrawer
+        open={cockpitOpen}
+        onClose={() => setCockpitOpen(false)}
+        accounts={cockpitAccounts}
+      />
       <UnifiedAccountsControlPanel
         activeChannelName={derivedState.activeChannelName}
         totalFilteredCount={derivedState.totalFilteredCount}

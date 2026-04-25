@@ -4,6 +4,7 @@ use chrono::Utc;
 use reqwest::Client;
 use std::sync::Arc;
 use std::time::Duration;
+use tauri::AppHandle;
 use tokio::time;
 
 pub struct HealthCheckDaemon {
@@ -149,5 +150,56 @@ impl HealthCheckDaemon {
             "UPDATE api_keys SET status = ?1, last_checked_at = ?2 WHERE id = ?3",
             &[&status, &Utc::now().to_rfc3339(), &id],
         );
+    }
+
+    /// 账号守护循环：定时刷新所有 IDE 账号配额，跑告警检查与自动切号
+    pub fn start_account_loop(self, app: AppHandle, interval_minutes: u64) {
+        tauri::async_runtime::spawn(async move {
+            tracing::info!(
+                "守护进程已启动：IDE 账号自动刷新+告警+自动切号 (每 {} 分钟一次)",
+                interval_minutes
+            );
+            let mut interval = time::interval(Duration::from_secs(interval_minutes * 60));
+            interval.tick().await;
+            loop {
+                interval.tick().await;
+                tracing::info!("[AccountDaemon] 开始执行账号定期任务...");
+                let stats =
+                    crate::services::account_refresh_orchestrator::AccountRefreshOrchestrator::refresh_all(
+                        self.db.clone(),
+                        crate::services::account_refresh_orchestrator::RefreshTrigger::Auto,
+                    )
+                    .await;
+                tracing::info!(
+                    "[AccountDaemon] 自动刷新 total={} success={} failed={}",
+                    stats.total,
+                    stats.success,
+                    stats.failed
+                );
+                let alerts =
+                    crate::services::quota_alert::QuotaAlertService::run_if_needed(&self.db, Some(&app));
+                if !alerts.is_empty() {
+                    tracing::info!("[AccountDaemon] 触发 {} 条配额告警", alerts.len());
+                }
+                match crate::services::account_auto_switch::AutoSwitchService::run_if_needed(
+                    &self.db,
+                    Some(&app),
+                )
+                .await
+                {
+                    Ok(outcome) if outcome.triggered => {
+                        tracing::info!(
+                            "[AccountDaemon] 自动切号成功 from={:?} to={:?} rule={:?}",
+                            outcome.from_account_id,
+                            outcome.to_account_id,
+                            outcome.rule
+                        );
+                    }
+                    Ok(_) => {}
+                    Err(e) => tracing::warn!("[AccountDaemon] 自动切号失败: {}", e),
+                }
+                tracing::info!("[AccountDaemon] 本轮任务完成");
+            }
+        });
     }
 }

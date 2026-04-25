@@ -233,12 +233,19 @@ fn build_response(request: &HttpRequest, app_data_dir: &Path) -> String {
 fn build_snapshot(app_data_dir: &Path) -> WebReportSnapshot {
     let websocket = get_websocket_status();
     let db_path = app_data_dir.join("data.db");
-    let current_accounts = crate::db::Database::new(&db_path)
-        .ok()
-        .and_then(|db| ProviderCurrentService::list_current_account_snapshots(&db).ok())
+    let db_handle = crate::db::Database::new(&db_path).ok();
+    let current_accounts = db_handle
+        .as_ref()
+        .and_then(|db| ProviderCurrentService::list_current_account_snapshots(db).ok())
         .unwrap_or_default();
-    let wakeup_state = WakeupService::load_state(app_data_dir).unwrap_or_default();
-    let wakeup_history = WakeupService::load_history(app_data_dir).unwrap_or_default();
+    let wakeup_state = db_handle
+        .as_ref()
+        .and_then(|db| WakeupService::load_state(db).ok())
+        .unwrap_or_default();
+    let wakeup_history = db_handle
+        .as_ref()
+        .and_then(|db| WakeupService::load_history(db).ok())
+        .unwrap_or_default();
     let sessions = SessionManager::list_sessions().unwrap_or_default();
 
     let mut category_counts = HashMap::<String, usize>::new();

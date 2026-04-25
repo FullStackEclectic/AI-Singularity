@@ -991,6 +991,9 @@ mod tests {
             meta_json: None,
             label: Some("Tester".to_string()),
             tags: Vec::new(),
+            disabled_at: None,
+            fingerprint_id: None,
+            quota_error_json: None,
         }
     }
 

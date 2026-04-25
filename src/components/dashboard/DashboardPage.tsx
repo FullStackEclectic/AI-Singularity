@@ -85,7 +85,7 @@ export default function DashboardPage() {
                 <h3 className="chart-title">系统公告</h3>
                 <div className="announcement-panel-meta">
                   共 {announcementState.announcements.length} 条
-                  {announcementState.unread_ids.length > 0 ? `，未读 ${announcementState.unread_ids.length} 条` : "，全部已读"}
+                  {announcementState.unreadIds.length > 0 ? `，未读 ${announcementState.unreadIds.length} 条` : "，全部已读"}
                 </div>
               </div>
               <div className="announcement-panel-actions">
@@ -100,7 +100,7 @@ export default function DashboardPage() {
                 </button>
                 <button
                   className="btn btn-ghost btn-sm"
-                  disabled={announcementState.unread_ids.length === 0}
+                  disabled={announcementState.unreadIds.length === 0}
                   onClick={async () => {
                     await api.announcements.markAllRead(i18n.language);
                     queryClient.invalidateQueries({ queryKey: ["announcement-state", i18n.language] });
@@ -112,7 +112,7 @@ export default function DashboardPage() {
             </div>
             <div className="announcement-list">
               {announcementState.announcements.slice(0, 3).map((item) => {
-                const unread = announcementState.unread_ids.includes(item.id);
+                const unread = announcementState.unreadIds.includes(item.id);
                 return (
                   <div key={item.id} className={`announcement-item ${unread ? "unread" : ""}`}>
                     <div className="announcement-item-top">
@@ -121,7 +121,7 @@ export default function DashboardPage() {
                         <span className="announcement-item-title">{item.title}</span>
                       </div>
                       <span className="announcement-item-time">
-                        {item.created_at ? new Date(item.created_at).toLocaleDateString() : "未知时间"}
+                        {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : "未知时间"}
                       </span>
                     </div>
                     {item.summary && <div className="announcement-item-summary">{item.summary}</div>}

@@ -114,6 +114,147 @@ export const ideAccounts = {
     invoke("force_inject_ide", { accountId }),
 };
 
+// ===== 账号管理增强：失效检测、批量刷新、自动切号、告警冷却、指纹、Extension 导入 =====
+
+export const accountHealth = {
+  listDisabled: (): Promise<any[]> => invoke("list_disabled_ide_accounts"),
+  clearDisabled: (id: string): Promise<number> =>
+    invoke("clear_ide_account_disabled", { id }),
+  markDisabled: (id: string, reason: string): Promise<number> =>
+    invoke("mark_ide_account_disabled", { id, reason }),
+};
+
+export type RefreshTriggerLabel = "auto" | "manual_batch";
+export interface RefreshStats {
+  total: number;
+  success: number;
+  failed: number;
+  details: string[];
+}
+export const accountRefresh = {
+  refreshAll: (trigger: RefreshTriggerLabel = "manual_batch"): Promise<RefreshStats> =>
+    invoke("refresh_all_ide_accounts", { trigger }),
+};
+
+export interface AutoSwitchSettings {
+  enabled: boolean;
+  threshold: number;
+  scopeMode: string;
+  selectedGroupIds: string[];
+  accountScopeMode: string;
+  selectedAccountIds: string[];
+  hardSwitchEnabled: boolean;
+}
+export interface AutoSwitchGroupDefinition {
+  id: string;
+  name: string;
+  models: string[];
+}
+export interface AutoSwitchOutcome {
+  triggered: boolean;
+  fromAccountId?: string;
+  toAccountId?: string;
+  rule?: string;
+  reason?: string;
+}
+export interface AccountSwitchHistoryItem {
+  id: string;
+  ts: string;
+  trigger: string;
+  rule?: string | null;
+  fromAccountId?: string | null;
+  fromEmail?: string | null;
+  toAccountId: string;
+  toEmail: string;
+  reasonJson?: string | null;
+}
+export const autoSwitch = {
+  getSettings: (): Promise<AutoSwitchSettings> =>
+    invoke("get_auto_switch_settings"),
+  setSettings: (settings: AutoSwitchSettings): Promise<AutoSwitchSettings> =>
+    invoke("set_auto_switch_settings", { settings }),
+  listGroups: (): Promise<AutoSwitchGroupDefinition[]> =>
+    invoke("list_auto_switch_groups"),
+  runNow: (): Promise<AutoSwitchOutcome> => invoke("run_auto_switch_now"),
+  listHistory: (limit = 50): Promise<AccountSwitchHistoryItem[]> =>
+    invoke("list_account_switch_history", { limit }),
+};
+
+export interface QuotaAlertSettings {
+  enabled: boolean;
+  threshold: number;
+  cooldownSeconds: number;
+}
+export interface QuotaAlertPayload {
+  accountId: string;
+  email: string;
+  originPlatform: string;
+  threshold: number;
+  lowestPercentage: number;
+  lowModels: string[];
+  triggeredAt: number;
+}
+export const quotaAlert = {
+  getSettings: (): Promise<QuotaAlertSettings> =>
+    invoke("get_quota_alert_settings"),
+  setSettings: (settings: QuotaAlertSettings): Promise<QuotaAlertSettings> =>
+    invoke("set_quota_alert_settings", { settings }),
+  preview: (): Promise<QuotaAlertPayload[]> => invoke("preview_quota_alerts"),
+};
+
+export interface DeviceFingerprintRecord {
+  id: string;
+  name: string;
+  machineId: string;
+  macMachineId: string;
+  devDeviceId: string;
+  sqmId: string;
+  serviceMachineId?: string | null;
+  createdAt: string;
+}
+export const deviceFingerprints = {
+  list: (): Promise<DeviceFingerprintRecord[]> =>
+    invoke("list_device_fingerprints"),
+  create: (
+    name: string,
+    seed?: DeviceFingerprintRecord | null,
+  ): Promise<DeviceFingerprintRecord> =>
+    invoke("create_device_fingerprint", { name, seed: seed ?? null }),
+  rename: (id: string, name: string): Promise<number> =>
+    invoke("rename_device_fingerprint", { id, name }),
+  delete: (id: string): Promise<number> =>
+    invoke("delete_device_fingerprint", { id }),
+  applyToAccount: (
+    accountId: string,
+    fingerprintId?: string | null,
+  ): Promise<number> =>
+    invoke("apply_device_fingerprint_to_account", {
+      accountId,
+      fingerprintId: fingerprintId ?? null,
+    }),
+};
+
+export interface ExtensionScanResult {
+  source: string;
+  extensionId: string;
+  email: string;
+  projectId?: string | null;
+  hasRefreshToken: boolean;
+}
+export interface ExtensionImportStats {
+  scanned: number;
+  imported: number;
+  skipped: number;
+  failed: number;
+  details: string[];
+}
+export const extensionImport = {
+  scan: (): Promise<ExtensionScanResult[]> =>
+    invoke("scan_extension_credentials"),
+  importAll: (): Promise<ExtensionImportStats> =>
+    invoke("import_from_extension"),
+};
+
 export const userTokens = {
   list: (): Promise<any[]> => invoke("get_all_user_tokens"),
   create: (req: any): Promise<any> => invoke("create_user_token", { req }),

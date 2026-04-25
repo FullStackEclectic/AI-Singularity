@@ -26,7 +26,10 @@ impl AccountPoolManager {
         let accounts = self
             .db
             .get_active_ide_accounts(origin_platform)
-            .unwrap_or_default();
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|acc| acc.disabled_reason.is_none() && acc.disabled_at.is_none())
+            .collect::<Vec<_>>();
 
         if accounts.is_empty() {
             return None;
@@ -47,6 +50,13 @@ impl AccountPoolManager {
         );
 
         Some(selected)
+    }
+
+    /// 触发 invalid_grant 熔断：refresh_token 失效，不可自动恢复（只能用户重新授权）
+    pub fn report_invalid_grant(&self, id: &str, reason: &str) {
+        crate::services::account_health::AccountHealthService::mark_invalid_grant(
+            &self.db, id, reason,
+        );
     }
 
     /// 触发 403 熔断保护：当任意下位客户端触发原站 403 惩罚时，直接将该账号从池子中摘除！

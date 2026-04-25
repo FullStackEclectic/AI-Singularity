@@ -353,6 +353,172 @@ impl Database {
             )?;
         }
 
+        if current_version < 19 {
+            let _ = conn.execute_batch("ALTER TABLE ide_accounts ADD COLUMN disabled_at TEXT;");
+            let _ = conn.execute_batch("ALTER TABLE ide_accounts ADD COLUMN fingerprint_id TEXT;");
+            let _ =
+                conn.execute_batch("ALTER TABLE ide_accounts ADD COLUMN quota_error_json TEXT;");
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS account_settings (
+                    key         TEXT PRIMARY KEY,
+                    value       TEXT NOT NULL,
+                    updated_at  TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS device_fingerprints (
+                    id                  TEXT PRIMARY KEY,
+                    name                TEXT NOT NULL,
+                    machine_id          TEXT NOT NULL,
+                    mac_machine_id      TEXT NOT NULL,
+                    dev_device_id       TEXT NOT NULL,
+                    sqm_id              TEXT NOT NULL,
+                    service_machine_id  TEXT,
+                    created_at          TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS deleted_account_fingerprint_bindings (
+                    email_lower     TEXT PRIMARY KEY,
+                    fingerprint_id  TEXT NOT NULL,
+                    deleted_at      TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS account_switch_history (
+                    id                TEXT PRIMARY KEY,
+                    ts                TEXT NOT NULL,
+                    trigger           TEXT NOT NULL,
+                    rule              TEXT,
+                    from_account_id   TEXT,
+                    from_email        TEXT,
+                    to_account_id     TEXT NOT NULL,
+                    to_email          TEXT NOT NULL,
+                    reason_json       TEXT
+                );",
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (19, datetime('now'));",
+            )?;
+        }
+
+        if current_version < 20 {
+            let now = chrono::Utc::now().to_rfc3339();
+            let defaults: &[(&str, &str)] = &[
+                ("auto_switch_enabled", "false"),
+                ("auto_switch_threshold", "20"),
+                ("auto_switch_scope_mode", "any_group"),
+                ("auto_switch_selected_group_ids", "[]"),
+                ("auto_switch_account_scope_mode", "all_accounts"),
+                ("auto_switch_selected_account_ids", "[]"),
+                ("auto_switch_hard_switch_enabled", "true"),
+                ("quota_alert_enabled", "true"),
+                ("quota_alert_threshold", "10"),
+                ("quota_alert_cooldown_seconds", "300"),
+            ];
+            for (k, v) in defaults {
+                let _ = conn.execute(
+                    "INSERT OR IGNORE INTO account_settings (key, value, updated_at) VALUES (?1, ?2, ?3);",
+                    rusqlite::params![*k, *v, now],
+                );
+            }
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO device_fingerprints (id, name, machine_id, mac_machine_id, dev_device_id, sqm_id, service_machine_id, created_at) VALUES ('original', '原始指纹', '', '', '', '', NULL, ?1);",
+                rusqlite::params![now],
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (20, datetime('now'));",
+            )?;
+        }
+
+        if current_version < 21 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS wakeup_tasks (
+                    id                   TEXT PRIMARY KEY,
+                    name                 TEXT NOT NULL,
+                    enabled              INTEGER NOT NULL DEFAULT 0,
+                    account_id           TEXT NOT NULL,
+                    trigger_mode         TEXT NOT NULL DEFAULT 'cron',
+                    config_json          TEXT NOT NULL,
+                    model                TEXT NOT NULL,
+                    prompt               TEXT,
+                    command_template     TEXT NOT NULL DEFAULT '',
+                    notes                TEXT,
+                    last_run_at          TEXT,
+                    last_status          TEXT,
+                    last_category        TEXT,
+                    last_message         TEXT,
+                    consecutive_failures INTEGER NOT NULL DEFAULT 0,
+                    created_at           TEXT NOT NULL,
+                    updated_at           TEXT NOT NULL
+                );
+
+                CREATE TABLE IF NOT EXISTS wakeup_runs (
+                    id              TEXT PRIMARY KEY,
+                    kind            TEXT NOT NULL,
+                    task_id         TEXT,
+                    triggered_by    TEXT NOT NULL,
+                    started_at      TEXT NOT NULL,
+                    finished_at     TEXT,
+                    total_count     INTEGER NOT NULL DEFAULT 0,
+                    success_count   INTEGER NOT NULL DEFAULT 0,
+                    failed_count    INTEGER NOT NULL DEFAULT 0,
+                    canceled        INTEGER NOT NULL DEFAULT 0,
+                    summary_json    TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS wakeup_history (
+                    id              TEXT PRIMARY KEY,
+                    run_id          TEXT NOT NULL,
+                    task_id         TEXT,
+                    task_name       TEXT NOT NULL,
+                    account_id      TEXT NOT NULL,
+                    model           TEXT NOT NULL,
+                    status          TEXT NOT NULL,
+                    category        TEXT NOT NULL,
+                    message         TEXT,
+                    attempts        INTEGER NOT NULL DEFAULT 1,
+                    created_at      TEXT NOT NULL
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_wakeup_history_run ON wakeup_history(run_id);
+                CREATE INDEX IF NOT EXISTS idx_wakeup_history_account ON wakeup_history(account_id, created_at DESC);
+                CREATE INDEX IF NOT EXISTS idx_wakeup_runs_started ON wakeup_runs(started_at DESC);",
+            );
+            let now = chrono::Utc::now().to_rfc3339();
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO account_settings (key, value, updated_at) VALUES (?1, ?2, ?3);",
+                rusqlite::params!["wakeup_global_enabled", "false", now],
+            );
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO account_settings (key, value, updated_at) VALUES (?1, ?2, ?3);",
+                rusqlite::params!["wakeup_gateway_concurrency", "3", now],
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (21, datetime('now'));",
+            )?;
+        }
+
+        if current_version < 22 {
+            let _ = conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS codex_quota_cache (
+                    account_id      TEXT PRIMARY KEY,
+                    plan_type       TEXT,
+                    body_json       TEXT NOT NULL,
+                    fetched_at      TEXT NOT NULL,
+                    expires_at      TEXT NOT NULL,
+                    hit_count       INTEGER NOT NULL DEFAULT 0
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_codex_quota_cache_expires ON codex_quota_cache(expires_at);",
+            );
+            let now = chrono::Utc::now().to_rfc3339();
+            let _ = conn.execute(
+                "INSERT OR IGNORE INTO account_settings (key, value, updated_at) VALUES (?1, ?2, ?3);",
+                rusqlite::params!["codex_quota_cache_ttl_seconds", "60", now],
+            );
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (22, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 }

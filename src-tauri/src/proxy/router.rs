@@ -175,3 +175,166 @@ impl Router {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use std::path::Path;
+
+    /// 构造一个跑完 migrations 的内存库，供路由测试使用
+    fn make_db() -> Arc<Database> {
+        let db = Database::new(Path::new(":memory:")).expect("open in-memory db");
+        Arc::new(db)
+    }
+
+    fn insert_ide_account(
+        db: &Database,
+        id: &str,
+        platform: &str,
+        status: &str,
+        access_token: &str,
+        last_used: &str,
+        tags: Option<&str>,
+    ) {
+        let now = "2026-01-01T00:00:00Z";
+        let tags_sql = tags.unwrap_or("[]");
+        db.execute(
+            "INSERT INTO ide_accounts \
+             (id, email, origin_platform, access_token, refresh_token, expires_in, token_type, \
+              status, is_proxy_disabled, created_at, updated_at, last_used, tags) \
+             VALUES (?1, ?2, ?3, ?4, '', 0, 'Bearer', ?5, 0, ?6, ?6, ?7, ?8)",
+            &[&id, &"x@example.com", &platform, &access_token, &status, &now, &last_used, &tags_sql],
+        )
+        .expect("insert ide_account");
+    }
+
+    fn scope(name: &str) -> TokenScope {
+        TokenScope {
+            scope: name.to_string(),
+            desc: None,
+            channels: vec![],
+            tags: vec![],
+            single_account: None,
+        }
+    }
+
+    #[test]
+    fn global_scope_picks_oldest_used_active_account() {
+        let db = make_db();
+        // Router 默认按 priority DESC, last_checked_at DESC 排序。两条 ide_account 优先级都是 80(硬编码)，
+        // 此时由 last_checked_at(=last_used) DESC 决定 — 最近使用的优先。
+        insert_ide_account(&db, "a", "anthropic", "active", "tok-a", "2026-01-01T10:00:00Z", None);
+        insert_ide_account(&db, "b", "anthropic", "active", "tok-b", "2026-01-02T10:00:00Z", None);
+
+        let target = Router::new(db).pick_best_key(None, &scope("global")).expect("有结果");
+        assert_eq!(target.key_id, "b", "应当挑 last_used 更新的账号");
+        assert_eq!(target.secret, "tok-b");
+    }
+
+    #[test]
+    fn global_scope_skips_inactive_accounts() {
+        let db = make_db();
+        insert_ide_account(&db, "dead", "anthropic", "forbidden", "tok-dead", "2026-01-03T00:00:00Z", None);
+        insert_ide_account(&db, "alive", "anthropic", "active", "tok-alive", "2026-01-01T00:00:00Z", None);
+
+        let target = Router::new(db).pick_best_key(None, &scope("global")).expect("有结果");
+        assert_eq!(target.key_id, "alive");
+    }
+
+    #[test]
+    fn single_scope_returns_targeted_account() {
+        let db = make_db();
+        insert_ide_account(&db, "a", "anthropic", "active", "tok-a", "2026-01-01T00:00:00Z", None);
+        insert_ide_account(&db, "b", "anthropic", "active", "tok-b", "2026-01-02T00:00:00Z", None);
+
+        let mut s = scope("single");
+        s.single_account = Some("a".to_string());
+
+        let target = Router::new(db).pick_best_key(None, &s).expect("有结果");
+        assert_eq!(target.key_id, "a");
+    }
+
+    #[test]
+    fn single_scope_returns_none_without_target_id() {
+        let db = make_db();
+        insert_ide_account(&db, "a", "anthropic", "active", "tok-a", "2026-01-01T00:00:00Z", None);
+
+        // single 但没指定 single_account，应该被拦截返回 None
+        let s = scope("single");
+        assert!(Router::new(db).pick_best_key(None, &s).is_none());
+    }
+
+    #[test]
+    fn channel_scope_filters_by_ide_prefix() {
+        let db = make_db();
+        insert_ide_account(&db, "claude", "anthropic", "active", "tok-c", "2026-01-01T00:00:00Z", None);
+        insert_ide_account(&db, "gem", "gemini", "active", "tok-g", "2026-01-02T00:00:00Z", None);
+
+        let mut s = scope("channel");
+        s.channels = vec!["ide_anthropic".to_string()];
+
+        let target = Router::new(db).pick_best_key(None, &s).expect("有结果");
+        assert_eq!(target.key_id, "claude");
+    }
+
+    #[test]
+    fn channel_scope_with_only_api_channels_returns_none_for_ide_only_pool() {
+        let db = make_db();
+        insert_ide_account(&db, "claude", "anthropic", "active", "tok-c", "2026-01-01T00:00:00Z", None);
+
+        // 只允许 api_anthropic 类型，但池子里只有 ide_account → 应找不到
+        let mut s = scope("channel");
+        s.channels = vec!["api_anthropic".to_string()];
+
+        assert!(Router::new(db).pick_best_key(None, &s).is_none());
+    }
+
+    #[test]
+    fn tag_scope_filters_by_tag_in_json_array() {
+        let db = make_db();
+        insert_ide_account(&db, "vip", "anthropic", "active", "tok-vip", "2026-01-01T00:00:00Z", Some(r#"["pro","ultra"]"#));
+        insert_ide_account(&db, "norm", "anthropic", "active", "tok-norm", "2026-01-02T00:00:00Z", Some(r#"["free"]"#));
+
+        let mut s = scope("tag");
+        s.tags = vec!["ultra".to_string()];
+
+        let target = Router::new(db).pick_best_key(None, &s).expect("有结果");
+        assert_eq!(target.key_id, "vip");
+    }
+
+    #[test]
+    fn tag_scope_with_empty_tags_returns_none() {
+        let db = make_db();
+        insert_ide_account(&db, "vip", "anthropic", "active", "tok-vip", "2026-01-01T00:00:00Z", Some(r#"["pro"]"#));
+
+        // tag scope 但 tags 列表为空 → 拦截
+        let s = scope("tag");
+        assert!(Router::new(db).pick_best_key(None, &s).is_none());
+    }
+
+    #[test]
+    fn force_platform_overrides_pool_when_mismatched() {
+        let db = make_db();
+        insert_ide_account(&db, "claude", "anthropic", "active", "tok-c", "2026-01-01T00:00:00Z", None);
+
+        // 强制 gemini，但池子里只有 anthropic → 找不到
+        assert!(Router::new(db.clone()).pick_best_key(Some("gemini"), &scope("global")).is_none());
+        // 强制 anthropic 与池子一致 → 命中
+        let target = Router::new(db).pick_best_key(Some("anthropic"), &scope("global")).expect("有结果");
+        assert_eq!(target.key_id, "claude");
+    }
+
+    #[test]
+    fn mark_key_status_writes_back_for_ide_account() {
+        let db = make_db();
+        insert_ide_account(&db, "a", "anthropic", "active", "tok-a", "2026-01-01T00:00:00Z", None);
+
+        Router::new(db.clone()).mark_key_status("a", true, "rate_limited");
+
+        let status: String = db
+            .query_one("SELECT status FROM ide_accounts WHERE id = ?1", &[&"a"], |r| r.get(0))
+            .expect("读取状态");
+        assert_eq!(status, "rate_limited");
+    }
+}

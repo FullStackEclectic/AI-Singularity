@@ -3,6 +3,7 @@ use crate::error::AppResult;
 use crate::models::IdeAccount;
 use crate::services::antigravity_ide::AntigravityIdeService;
 use crate::services::codex_ide::CodexIdeService;
+use crate::services::device_fingerprint::DeviceFingerprintService;
 use crate::services::event_bus::EventBus;
 use crate::services::gemini_ide::{GeminiCloudProject, GeminiIdeService};
 use crate::services::local_ide_refresh::LocalIdeRefreshService;
@@ -32,7 +33,11 @@ pub async fn import_ide_accounts(
     accounts: Vec<IdeAccount>,
 ) -> AppResult<usize> {
     let mut count = 0;
-    for acc in accounts {
+    for mut acc in accounts {
+        if acc.fingerprint_id.is_none() {
+            acc.fingerprint_id =
+                DeviceFingerprintService::lookup_for_email(db.inner(), &acc.email);
+        }
         if db.upsert_ide_account(&acc).is_ok() {
             count += 1;
         }
@@ -50,6 +55,17 @@ pub async fn delete_ide_account(
     db: State<'_, Database>,
     id: String,
 ) -> AppResult<usize> {
+    let snapshot = db
+        .get_all_ide_accounts()
+        .ok()
+        .and_then(|list| list.into_iter().find(|a| a.id == id));
+    if let Some(acc) = snapshot.as_ref() {
+        DeviceFingerprintService::remember_for_deleted_account(
+            db.inner(),
+            &acc.email,
+            acc.fingerprint_id.as_deref(),
+        );
+    }
     let count = db.delete_ide_account(&id)?;
     if count > 0 {
         crate::tray::update_tray_menu(&app);

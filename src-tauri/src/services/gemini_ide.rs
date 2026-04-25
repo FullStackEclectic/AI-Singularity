@@ -1,5 +1,6 @@
 use crate::db::Database;
 use crate::models::{AccountStatus, IdeAccount};
+use crate::services::account_health::AccountHealthService;
 use chrono::Utc;
 use reqwest::header::{AUTHORIZATION, CONTENT_TYPE};
 use serde::Deserialize;
@@ -122,6 +123,27 @@ impl GeminiIdeService {
     }
 
     pub async fn refresh_account(db: &Database, account_id: &str) -> Result<IdeAccount, String> {
+        match Self::refresh_account_inner(db, account_id).await {
+            Ok(account) => {
+                AccountHealthService::try_clear_invalid_grant(db, &account);
+                AccountHealthService::clear_quota_error(db, &account.id);
+                Ok(account)
+            }
+            Err(err) => {
+                if AccountHealthService::looks_like_invalid_grant(&err) {
+                    AccountHealthService::mark_invalid_grant(db, account_id, &err);
+                } else {
+                    AccountHealthService::record_quota_error(db, account_id, None, &err);
+                }
+                Err(err)
+            }
+        }
+    }
+
+    async fn refresh_account_inner(
+        db: &Database,
+        account_id: &str,
+    ) -> Result<IdeAccount, String> {
         let mut account = db
             .get_all_ide_accounts()
             .map_err(|e| e.to_string())?

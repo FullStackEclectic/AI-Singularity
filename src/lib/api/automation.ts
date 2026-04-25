@@ -4,7 +4,11 @@ import type {
   GeminiInstanceRecord,
   OAuthEnvStatusItem,
   WakeupHistoryItem,
+  WakeupRunHistoryRow,
+  WakeupRunsPage,
+  WakeupRuntimeStatus,
   WakeupState,
+  WakeupSummary24h,
   WakeupVerificationBatchResult,
 } from "./types";
 
@@ -39,6 +43,22 @@ export const wakeup = {
     }),
   cancelVerificationRun: (runId: string): Promise<boolean> =>
     invoke("wakeup_cancel_verification_run", { runId }),
+  listRuns: (
+    kind?: string,
+    limit = 50,
+    offset = 0,
+  ): Promise<WakeupRunsPage> =>
+    invoke("wakeup_list_runs", {
+      kind: kind ?? null,
+      limit,
+      offset,
+    }),
+  getRunItems: (runId: string): Promise<WakeupRunHistoryRow[]> =>
+    invoke("wakeup_get_run_items", { runId }),
+  getRuntimeStatus: (): Promise<WakeupRuntimeStatus> =>
+    invoke("wakeup_get_runtime_status"),
+  getSummary24h: (): Promise<WakeupSummary24h> =>
+    invoke("wakeup_get_summary_24h"),
 };
 
 export const oauth = {
@@ -81,4 +101,30 @@ export const webdav = {
     invoke("webdav_test_connection", { config }),
   push: (config: any): Promise<void> => invoke("webdav_push", { config }),
   pull: (config: any): Promise<void> => invoke("webdav_pull", { config }),
+};
+
+export type CodexQuotaCacheStats = {
+  total: number;
+  valid: number;
+  hitTotal: number;
+  lastWrittenAt: string | null;
+};
+
+export type TokenHealthOverview = {
+  expiringWithin1h: number;
+  alreadyExpired: number;
+  lastKeeperTick: string | null;
+  lastKeeperRescues: number;
+};
+
+export const codexQuota = {
+  getCacheStats: (): Promise<CodexQuotaCacheStats> =>
+    invoke("codex_get_quota_cache_stats"),
+  clearCache: (accountId?: string): Promise<number> =>
+    invoke("codex_clear_quota_cache", { accountId: accountId ?? null }),
+};
+
+export const accountHealth = {
+  getTokenOverview: (): Promise<TokenHealthOverview> =>
+    invoke("get_token_health_overview"),
 };

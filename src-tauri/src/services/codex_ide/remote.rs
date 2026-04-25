@@ -4,6 +4,7 @@ use super::profile::{
     parse_remote_profile,
 };
 use super::{CodexIdeService, CodexProfile, CodexTokenRefreshResponse, UsageResponse};
+use crate::db::Database;
 use crate::models::IdeAccount;
 use chrono::Utc;
 use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION};
@@ -13,6 +14,8 @@ const CODEX_CLIENT_ID: &str = "app_EMoamEEZ73f0CkXaXp7hrann";
 const CODEX_TOKEN_ENDPOINT: &str = "https://auth.openai.com/oauth/token";
 const CODEX_USAGE_ENDPOINT: &str = "https://chatgpt.com/backend-api/wham/usage";
 const CODEX_ACCOUNT_CHECK_ENDPOINT: &str = "https://chatgpt.com/backend-api/wham/accounts/check";
+const QUOTA_CACHE_TTL_KEY: &str = "codex_quota_cache_ttl_seconds";
+const DEFAULT_QUOTA_CACHE_TTL_SECONDS: i64 = 60;
 
 impl CodexIdeService {
     pub(super) async fn refresh_tokens(
@@ -97,9 +100,25 @@ impl CodexIdeService {
     }
 
     pub(super) async fn fetch_quota(
+        db: &Database,
         account: &IdeAccount,
         meta: &Map<String, Value>,
+        force: bool,
     ) -> Result<(Value, Option<String>), String> {
+        if !force {
+            if let Ok(Some(cached)) = db.read_codex_quota_cache(&account.id) {
+                if let Ok(quota_value) = serde_json::from_str::<Value>(&cached.body_json) {
+                    let _ = db.bump_codex_quota_cache_hit(&account.id);
+                    tracing::debug!(
+                        "[Codex] quota cache hit account_id={} hit_count={}",
+                        account.id,
+                        cached.hit_count + 1
+                    );
+                    return Ok((quota_value, cached.plan_type));
+                }
+            }
+        }
+
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(20))
             .build()
@@ -156,6 +175,26 @@ impl CodexIdeService {
             "weekly_window_minutes": secondary.and_then(normalize_window_minutes),
             "raw": raw_value,
         });
+
+        let ttl_seconds = db
+            .get_account_setting(QUOTA_CACHE_TTL_KEY)
+            .ok()
+            .flatten()
+            .and_then(|v| v.trim().parse::<i64>().ok())
+            .filter(|v| *v > 0)
+            .unwrap_or(DEFAULT_QUOTA_CACHE_TTL_SECONDS);
+        if let Err(err) = db.write_codex_quota_cache(
+            &account.id,
+            usage.plan_type.as_deref(),
+            &quota.to_string(),
+            ttl_seconds,
+        ) {
+            tracing::warn!(
+                "[Codex] quota cache write failed account_id={} err={}",
+                account.id,
+                err
+            );
+        }
 
         Ok((quota, usage.plan_type))
     }
