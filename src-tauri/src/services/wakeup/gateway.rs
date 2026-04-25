@@ -297,6 +297,15 @@ impl WakeupGateway {
             &format!("wakeup.gateway:{}", run_id),
         );
 
+        // 链式触发：在异步任务里 spawn 派发下游 chain task，避免同步递归
+        if !req.task_template.id.trim().is_empty() {
+            super::listener::resolve_chain_after_dispatch(
+                app,
+                &req.task_template.id,
+                success_count > 0,
+            );
+        }
+
         Ok(DispatchOutcome {
             run_id,
             items,

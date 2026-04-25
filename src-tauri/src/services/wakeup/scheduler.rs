@@ -438,6 +438,8 @@ mod tests {
             last_category: None,
             last_message: None,
             consecutive_failures: 0,
+            event_subscribe: None,
+            chain_depends_on: None,
         }
     }
 

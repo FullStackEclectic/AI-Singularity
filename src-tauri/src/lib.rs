@@ -86,6 +86,8 @@ pub fn run() {
             crate::services::wakeup::WakeupService::ensure_scheduler_started(
                 app.handle().clone(),
             );
+            // --- Wakeup 事件驱动 / 链式触发监听器 ---
+            crate::services::wakeup::WakeupListener::ensure_started(app.handle().clone());
 
             // --- 本地 WebSocket 广播服务 ---
             tauri::async_runtime::spawn(crate::services::websocket::start_server());

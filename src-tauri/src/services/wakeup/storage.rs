@@ -1,6 +1,6 @@
 use super::{
-    normalize_client_version_mode, WakeupHistoryItem, WakeupService, WakeupState, WakeupTask,
-    WAKEUP_HISTORY_FILE, WAKEUP_STATE_FILE,
+    normalize_client_version_mode, ChainConfig, EventSubscribeConfig, WakeupHistoryItem,
+    WakeupService, WakeupState, WakeupTask, WAKEUP_HISTORY_FILE, WAKEUP_STATE_FILE,
 };
 use crate::db::{Database, WakeupHistoryRow, WakeupTaskRow};
 use chrono::Utc;
@@ -31,6 +31,10 @@ struct WakeupTaskConfig {
     retry_failed_times: Option<u8>,
     #[serde(default)]
     pause_after_failures: Option<u8>,
+    #[serde(default)]
+    event_subscribe: Option<EventSubscribeConfig>,
+    #[serde(default)]
+    chain_depends_on: Option<ChainConfig>,
 }
 
 fn task_to_row(task: &WakeupTask) -> WakeupTaskRow {
@@ -44,6 +48,8 @@ fn task_to_row(task: &WakeupTask) -> WakeupTaskRow {
         timeout_seconds: Some(task.timeout_seconds),
         retry_failed_times: Some(task.retry_failed_times),
         pause_after_failures: Some(task.pause_after_failures),
+        event_subscribe: task.event_subscribe.clone(),
+        chain_depends_on: task.chain_depends_on.clone(),
     };
     let config_json = serde_json::to_string(&config).unwrap_or_else(|_| "{}".to_string());
     WakeupTaskRow {
@@ -104,6 +110,8 @@ fn row_to_task(row: WakeupTaskRow) -> WakeupTask {
         last_category: row.last_category,
         last_message: row.last_message,
         consecutive_failures: row.consecutive_failures.max(0).min(u8::MAX as i64) as u8,
+        event_subscribe: config.event_subscribe,
+        chain_depends_on: config.chain_depends_on,
     }
 }
 

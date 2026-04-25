@@ -1,6 +1,7 @@
 mod batch;
 mod execution;
 mod gateway;
+mod listener;
 mod scheduler;
 mod storage;
 
@@ -8,6 +9,7 @@ pub use gateway::{
     dispatch_outcome_to_batch_result, dispatch_outcome_to_history_items, DispatchAccountInput,
     DispatchAccountOutcome, DispatchOutcome, DispatchRequest, RunKind, WakeupGateway,
 };
+pub use listener::WakeupListener;
 
 use self::execution::normalize_client_version_mode;
 use serde::{Deserialize, Serialize};
@@ -17,6 +19,24 @@ const WAKEUP_STATE_FILE: &str = "wakeup_state.json";
 const WAKEUP_HISTORY_FILE: &str = "wakeup_history.json";
 const MAX_HISTORY_ITEMS: usize = 200;
 const SCHEDULER_INTERVAL_SECS: u64 = 30;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EventSubscribeConfig {
+    pub domain: String,
+    #[serde(default)]
+    pub action: Option<String>,
+    #[serde(default = "default_min_interval_seconds")]
+    pub min_interval_seconds: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChainConfig {
+    pub depends_on_task_id: String,
+    #[serde(default = "default_chain_on_status")]
+    pub on_status: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -60,6 +80,10 @@ pub struct WakeupTask {
     pub last_message: Option<String>,
     #[serde(default)]
     pub consecutive_failures: u8,
+    #[serde(default)]
+    pub event_subscribe: Option<EventSubscribeConfig>,
+    #[serde(default)]
+    pub chain_depends_on: Option<ChainConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -149,6 +173,14 @@ fn default_client_version_mode() -> String {
 
 fn default_client_version_fallback_mode() -> String {
     "auto".to_string()
+}
+
+fn default_min_interval_seconds() -> u64 {
+    300
+}
+
+fn default_chain_on_status() -> String {
+    "success".to_string()
 }
 
 impl WakeupService {}
