@@ -189,3 +189,127 @@ pub fn gemini_to_openai_response(gemini_resp: &Value, model: &str) -> Value {
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_request(with_system: bool) -> OpenAIRequest {
+        let mut messages = vec![];
+        if with_system {
+            messages.push(OpenAIMessage {
+                role: "system".to_string(),
+                content: "你是一个助手".to_string(),
+            });
+        }
+        messages.push(OpenAIMessage {
+            role: "user".to_string(),
+            content: "你好".to_string(),
+        });
+        messages.push(OpenAIMessage {
+            role: "assistant".to_string(),
+            content: "你好，有什么可以帮你的？".to_string(),
+        });
+        OpenAIRequest {
+            model: "gpt-4o".to_string(),
+            messages,
+            max_tokens: Some(512),
+            temperature: Some(0.7),
+            stream: Some(true),
+        }
+    }
+
+    #[test]
+    fn openai_to_anthropic_extracts_system_prompt() {
+        let req = sample_request(true);
+        let body = openai_to_anthropic(&req);
+
+        assert_eq!(body["model"], "gpt-4o");
+        assert_eq!(body["system"], "你是一个助手");
+        assert_eq!(body["max_tokens"], 512);
+        assert_eq!(body["temperature"], 0.7);
+        assert_eq!(body["stream"], true);
+
+        // system 应被剔除，messages 仅剩 user / assistant
+        let messages = body["messages"].as_array().expect("messages 数组");
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[0]["role"], "user");
+        assert_eq!(messages[1]["role"], "assistant");
+    }
+
+    #[test]
+    fn openai_to_anthropic_without_system_uses_default_max_tokens() {
+        let mut req = sample_request(false);
+        req.max_tokens = None;
+        let body = openai_to_anthropic(&req);
+        assert!(body.get("system").is_none());
+        assert_eq!(body["max_tokens"], 4096);
+    }
+
+    #[test]
+    fn anthropic_to_openai_response_maps_usage_and_content() {
+        let anthropic_resp = json!({
+            "id": "msg_01",
+            "model": "claude-3-5-sonnet-20241022",
+            "content": [{"type": "text", "text": "hello"}],
+            "usage": {"input_tokens": 10, "output_tokens": 7}
+        });
+        let resp = anthropic_to_openai_response(&anthropic_resp);
+
+        assert_eq!(resp["id"], "msg_01");
+        assert_eq!(resp["object"], "chat.completion");
+        assert_eq!(resp["choices"][0]["message"]["content"], "hello");
+        assert_eq!(resp["choices"][0]["finish_reason"], "stop");
+        assert_eq!(resp["usage"]["prompt_tokens"], 10);
+        assert_eq!(resp["usage"]["completion_tokens"], 7);
+        assert_eq!(resp["usage"]["total_tokens"], 17);
+    }
+
+    #[test]
+    fn openai_to_gemini_remaps_assistant_role_to_model() {
+        let req = sample_request(true);
+        let (model, body) = openai_to_gemini(&req);
+        assert_eq!(model, "gpt-4o");
+
+        let contents = body["contents"].as_array().expect("contents 数组");
+        assert_eq!(contents.len(), 2);
+        assert_eq!(contents[0]["role"], "user");
+        assert_eq!(contents[1]["role"], "model"); // assistant 映射为 model
+
+        assert_eq!(body["systemInstruction"]["parts"][0]["text"], "你是一个助手");
+        assert_eq!(body["generationConfig"]["maxOutputTokens"], 512);
+        assert_eq!(body["generationConfig"]["temperature"], 0.7);
+    }
+
+    #[test]
+    fn openai_to_gemini_strips_models_prefix() {
+        let mut req = sample_request(false);
+        req.model = "models/gemini-2.0-flash".to_string();
+        let (model, _) = openai_to_gemini(&req);
+        assert_eq!(model, "gemini-2.0-flash");
+    }
+
+    #[test]
+    fn gemini_to_openai_response_handles_missing_usage_gracefully() {
+        let gemini_resp = json!({
+            "candidates": [{"content": {"parts": [{"text": "hi"}]}}]
+        });
+        let resp = gemini_to_openai_response(&gemini_resp, "gemini-2.0-flash");
+        assert_eq!(resp["choices"][0]["message"]["content"], "hi");
+        assert_eq!(resp["usage"]["prompt_tokens"], 0);
+        assert_eq!(resp["usage"]["completion_tokens"], 0);
+        assert_eq!(resp["usage"]["total_tokens"], 0);
+    }
+
+    #[test]
+    fn gemini_to_openai_response_extracts_usage_when_present() {
+        let gemini_resp = json!({
+            "candidates": [{"content": {"parts": [{"text": "hi"}]}}],
+            "usageMetadata": {"promptTokenCount": 12, "candidatesTokenCount": 5}
+        });
+        let resp = gemini_to_openai_response(&gemini_resp, "gemini-2.0-flash");
+        assert_eq!(resp["usage"]["prompt_tokens"], 12);
+        assert_eq!(resp["usage"]["completion_tokens"], 5);
+        assert_eq!(resp["usage"]["total_tokens"], 17);
+    }
+}

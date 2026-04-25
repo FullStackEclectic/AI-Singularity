@@ -2,13 +2,13 @@ use tauri::Manager;
 
 mod atomic_write;
 mod commands;
-mod db;
+pub mod db;
 mod error;
-mod models;
+pub mod models;
 mod panic_hook;
-mod proxy;
-mod services;
-mod store;
+pub mod proxy;
+pub mod services;
+pub mod store;
 pub mod tray;
 
 pub use error::{AppError, AppResult};
@@ -106,10 +106,9 @@ pub fn run() {
             // --- V2.0 系统级守护任务 ---
             let app_handle = app.handle().clone();
             std::thread::spawn(move || {
+                // 启动后等待 60s 让 UI/数据库稳定，立即跑一次首轮余额快照，避免冷启动 2h 内看板为空
+                std::thread::sleep(std::time::Duration::from_secs(60));
                 loop {
-                    // 每 2 小时轮询一次平台余额快照 (先 Sleep 等待系统稳定运行)
-                    std::thread::sleep(std::time::Duration::from_secs(7200));
-
                     let app_h = app_handle.clone();
                     tauri::async_runtime::block_on(async move {
                         use tauri::Manager;
@@ -122,6 +121,9 @@ pub fn run() {
                         let alerts = alert_service.get_alerts();
                         alert_service.notify_os_throttle(&app_h, alerts);
                     });
+
+                    // 每 2 小时轮询一次
+                    std::thread::sleep(std::time::Duration::from_secs(7200));
                 }
             });
 

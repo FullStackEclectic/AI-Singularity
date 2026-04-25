@@ -104,17 +104,29 @@ async fn handle_chat_completions(
     forward_chat_completion(&state, &request_ctx, &mut body, current_model, is_stream).await
 }
 
-/// 处理 /v1/models 请求（返回可用模型列表）
-async fn handle_list_models(State(_state): State<ProxyState>) -> impl IntoResponse {
+/// 处理 /v1/models 请求（从模型目录读取真实可用模型）
+async fn handle_list_models(State(state): State<ProxyState>) -> impl IntoResponse {
+    let catalog = crate::services::model_catalog::ModelCatalogService::new(&state.db);
+    let models = catalog.list_models().unwrap_or_default();
+
+    let data: Vec<serde_json::Value> = models
+        .into_iter()
+        .filter(|m| m.is_available)
+        .map(|m| {
+            let owned_by = serde_json::to_string(&m.platform)
+                .unwrap_or_else(|_| "\"unknown\"".to_string())
+                .trim_matches('"')
+                .to_string();
+            json!({
+                "id": m.id,
+                "object": "model",
+                "owned_by": owned_by,
+            })
+        })
+        .collect();
+
     Json(json!({
         "object": "list",
-        "data": [
-            {"id": "gpt-4o", "object": "model"},
-            {"id": "gpt-4o-mini", "object": "model"},
-            {"id": "claude-3-5-sonnet-20241022", "object": "model"},
-            {"id": "claude-3-haiku-20240307", "object": "model"},
-            {"id": "gemini-2.0-flash", "object": "model"},
-            {"id": "deepseek-chat", "object": "model"},
-        ]
+        "data": data,
     }))
 }
