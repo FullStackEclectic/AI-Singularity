@@ -50,7 +50,7 @@
 .wakeup-distribution-track {
   position: relative;
   height: 8px;
-  background: var(--color-surface-2, rgba(120, 120, 120, 0.12));
+  background: var(--color-bg-secondary));
   border-radius: 4px;
   overflow: hidden;
 }
@@ -77,7 +77,7 @@
 .wakeup-distribution-count {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .wakeup-stat {
@@ -322,7 +322,7 @@
 .wakeup-message {
   padding: 12px 14px;
   border-radius: var(--radius-md);
-  background: var(--color-info-alpha);
+  background: var(--color-info-dim);
   border: 1px solid var(--color-border);
 }
 

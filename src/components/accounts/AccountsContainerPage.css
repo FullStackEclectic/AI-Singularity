@@ -25,12 +25,12 @@
 }
 
 .accounts-tabs button:hover {
-  color: var(--color-text);
+  color: var(--color-text-primary);
   background: rgba(255, 255, 255, 0.05);
 }
 
 .accounts-tabs button.active {
-  color: var(--color-primary);
+  color: var(--color-accent);
   background: rgba(56, 189, 248, 0.1);
   border-color: rgba(56, 189, 248, 0.3);
 }

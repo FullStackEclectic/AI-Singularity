@@ -23,7 +23,7 @@
   padding: 10px 20px;
   border-radius: 12px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   color: var(--color-text-secondary);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
@@ -32,16 +32,16 @@
 }
 
 .premium-tab:hover {
-  background: var(--color-surface-hover, var(--color-surface));
+  background: var(--color-bg-hover));
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0,0,0,0.05);
   border-color: var(--color-border-hover, var(--color-border));
 }
 
 .premium-tab.active {
-  background: var(--color-primary-alpha);
-  border-color: var(--color-primary);
-  color: var(--color-primary);
+  background: var(--color-accent-dim);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
 }
 
@@ -71,7 +71,7 @@
 .info-banner .banner-title {
   font-size: 1.15rem;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -99,7 +99,7 @@
 
 .action-icon-btn:hover {
   background: rgba(15, 23, 42, 0.04);
-  color: var(--color-text);
+  color: var(--color-text-primary);
   transform: scale(0.92);
   opacity: 1 !important;
 }
@@ -111,7 +111,7 @@
 
 /* Provider Row Action Overrides */
 .provider-card {
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 16px 20px;
@@ -139,14 +139,14 @@
 }
 
 .provider-card.active {
-  background: var(--color-primary-alpha);
-  border-color: var(--color-primary);
+  background: var(--color-accent-dim);
+  border-color: var(--color-accent);
   box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.12), inset 0 0 0 1px rgba(37, 99, 235, 0.05);
   cursor: default;
 }
 
 .provider-card.active::before {
-  background: var(--color-primary);
+  background: var(--color-accent);
 }
 
 .provider-card.active:hover {
@@ -173,8 +173,8 @@
 
 .premium-input:focus {
   outline: none;
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-alpha);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
 }
 
 .premium-btn {
@@ -228,7 +228,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: var(--color-surface);
+  background: var(--color-bg-card);
 }
 
 .modal-header h2 {
@@ -249,7 +249,7 @@
   display: flex;
   justify-content: flex-end;
   gap: 12px;
-  background: var(--color-surface);
+  background: var(--color-bg-card);
 }
 
 @keyframes modal-fade-in {

@@ -72,7 +72,7 @@
 
 .provider-balance-row {
   position: relative;
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -157,7 +157,7 @@
 
 /* ── Trend Chart ────────────────────────────────────────────────────────── */
 .trend-chart-container {
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: var(--space-4);
@@ -185,7 +185,7 @@
 }
 
 .empty-chart {
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   display: flex;
@@ -307,7 +307,7 @@
 
 .token-bar-track {
   height: 8px;
-  background: var(--color-surface-raised);
+  background: var(--color-bg-active);
   border-radius: 99px;
   overflow: hidden;
 }

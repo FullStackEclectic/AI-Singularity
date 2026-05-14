@@ -33,7 +33,7 @@ export function SessionsWorkspace({
 }: SessionsWorkspaceProps) {
   return (
     <>
-      <div className="session-content cyber-main">
+      <div className="session-content">
         <SessionDetailPane
           selectedSession={selectedSession}
           visibleMessages={pageState.visibleMessages}

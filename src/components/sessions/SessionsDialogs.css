@@ -1,7 +1,9 @@
+/* Sessions Dialogs — 浅色主题 */
 .instance-overview-card {
-  padding: 10px;
-  border: 1px solid rgba(0, 255, 170, 0.12);
-  background: rgba(0, 255, 170, 0.03);
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -14,43 +16,48 @@
 }
 
 .instance-overview-stat {
-  padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-card);
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
 .instance-overview-value {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
-  color: #d7fff4;
+  color: var(--color-text-primary);
+  font-family: var(--font-display);
 }
 
 .instance-overview-label {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 .instance-overview-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .instance-overview-item {
   width: 100%;
   padding: 8px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-card);
   color: inherit;
   text-align: left;
+  cursor: pointer;
+  transition: all var(--transition-fast);
 }
 
 .instance-overview-item:hover {
-  background: rgba(0, 255, 170, 0.06);
-  border-color: rgba(0, 255, 170, 0.2);
+  background: var(--color-bg-hover);
+  border-color: var(--color-accent);
 }
 
 .instance-overview-item-main,
@@ -64,32 +71,33 @@
 
 .instance-overview-item-meta {
   margin-top: 4px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 .instance-overview-item-name {
-  font-size: 12px;
-  font-weight: 700;
-  color: #d7fff4;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .instance-overview-state {
-  font-size: 10px;
+  font-size: 11px;
   padding: 2px 8px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  border: 1px solid var(--color-border);
 }
 
 .instance-overview-state.running {
-  color: #a8f5d8;
-  border-color: rgba(0, 255, 170, 0.22);
-  background: rgba(0, 255, 170, 0.06);
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.25);
+  background: var(--color-success-dim);
 }
 
 .instance-overview-state.stopped {
-  color: #ffb6c8;
-  border-color: rgba(255, 92, 135, 0.22);
-  background: rgba(255, 92, 135, 0.06);
+  color: var(--color-text-muted);
+  background: var(--color-bg-active);
 }
 
 .session-instance-list {
@@ -103,21 +111,23 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 12px;
-  background: rgba(0, 255, 170, 0.04);
-  border: 1px solid rgba(0, 255, 170, 0.12);
+  padding: 12px 14px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .session-instance-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #d7fff4;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .session-instance-path {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.55);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
   word-break: break-all;
 }
 
@@ -126,8 +136,8 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 6px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+  color: var(--color-text-muted);
 }
 
 .session-instance-flags {
@@ -142,24 +152,28 @@
   flex-wrap: wrap;
   gap: 6px;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .instance-flag {
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  font-size: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-secondary);
+  color: var(--color-text-muted);
 }
 
 .instance-flag.ok {
-  color: #a8f5d8;
-  border-color: rgba(0, 255, 170, 0.22);
-  background: rgba(0, 255, 170, 0.06);
+  color: var(--color-success);
+  border-color: rgba(16, 185, 129, 0.25);
+  background: var(--color-success-dim);
 }
 
 .instance-flag.bad {
-  color: #ffb1c4;
-  border-color: rgba(255, 92, 135, 0.22);
-  background: rgba(255, 92, 135, 0.06);
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.2);
+  background: var(--color-danger-dim);
 }

@@ -33,12 +33,12 @@
   transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
   transform: translateY(0);
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .preset-card:hover {
   border-color: var(--color-accent);
-  background: var(--color-surface-raised);
+  background: var(--color-bg-secondary);
   transform: translateY(-3px);
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
 }
@@ -57,7 +57,7 @@
   border: 1px solid rgba(139, 92, 246, 0.4);
   background:
     linear-gradient(160deg, rgba(139, 92, 246, 0.05) 0%, rgba(217, 70, 239, 0.02) 100%),
-    var(--color-surface);
+    var(--color-bg-card);
   box-shadow: 0 4px 12px rgba(139, 92, 246, 0.08);
   overflow: hidden;
 }
@@ -87,7 +87,7 @@
 [data-theme="dark"] .preset-card.preset-card-premium {
   background:
     linear-gradient(160deg, rgba(139, 92, 246, 0.15) 0%, rgba(217, 70, 239, 0.05) 100%),
-    var(--color-surface);
+    var(--color-bg-card);
 }
 
 .preset-name {

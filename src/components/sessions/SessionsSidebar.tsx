@@ -156,47 +156,47 @@ export function SessionsSidebar(props: SessionsSidebarProps) {
   } = props;
 
   return (
-    <div className="sessions-sidebar cyber-sidebar">
+    <div className="sessions-sidebar">
       <div className="sessions-header">
-        <h2 className="cyber-title-sm">
-          <Activity size={16} className="pulse-icon text-accent" /> ZOMBIE_RADAR // 全域劫持雷达
+        <h2 className="sessions-title">
+          <Activity size={15} className="pulse-icon text-accent" /> 会话历史
         </h2>
         <div className="sessions-header-actions">
           <button
-            className="cyber-icon-btn"
+            className="sessions-icon-btn"
             onClick={onRepairCodexIndex}
             title="修复 Codex 会话索引"
           >
             <Folder size={14} />
           </button>
           <button
-            className="cyber-icon-btn"
+            className="sessions-icon-btn"
             onClick={onSyncCodexThreads}
-            title="同步 Codex 缺失线程"
+            title="同步多实例缺失线程"
             disabled={codexInstanceCount < 2}
           >
             <RefreshCw size={14} />
           </button>
           <button
-            className="cyber-icon-btn"
+            className="sessions-icon-btn"
             onClick={onShowCodexInstances}
-            title="管理 Codex 实例目录"
+            title="管理 Codex 实例"
           >
             <Cpu size={14} />
           </button>
           <button
-            className="cyber-icon-btn danger"
+            className="sessions-icon-btn danger"
             onClick={onMoveToTrash}
             disabled={selectedFilepaths.length === 0}
-            title="将选中的会话移到废纸篓"
+            title="将选中会话移到废纸篓"
           >
             <Skull size={14} />
           </button>
           <button
-            className="cyber-icon-btn"
+            className="sessions-icon-btn"
             onClick={onRefresh}
             disabled={loading}
-            title="刷新系统探针"
+            title="刷新"
           >
             <RefreshCw size={14} className={loading ? "spin" : ""} />
           </button>
@@ -266,11 +266,11 @@ export function SessionsSidebar(props: SessionsSidebarProps) {
 
       <div className="sessions-list">
         <div className="section-divider">
-          <span>[ 活跃宿主进程 ] ACTIVE_ZOMBIES</span>
+          <span>活跃进程</span>
         </div>
 
         {zombies.length === 0 && !loading && (
-          <div className="empty-text">未探测到活动的受体进程</div>
+          <div className="empty-text">当前没有检测到运行中的 AI 工具进程</div>
         )}
 
         {zombies.map((z) => (
@@ -283,28 +283,28 @@ export function SessionsSidebar(props: SessionsSidebarProps) {
             </div>
             <div className="zombie-meta">
               <span title={z.cwd}>
-                CWD: {z.cwd.length > 20 ? "..." + z.cwd.slice(-20) : z.cwd}
+                {z.cwd.length > 20 ? "..." + z.cwd.slice(-20) : z.cwd}
               </span>
-              <span>UP: {formatUptime(z.active_time_sec)}</span>
+              <span>运行 {formatUptime(z.active_time_sec)}</span>
             </div>
             <div className="zombie-actions">
               <button
-                className="cyber-btn-mini toxic"
+                className="btn-mini-action"
                 onClick={() =>
                   onPushActionMessage({
-                    text: `功能研发中：自动修改 ${z.tool_type} 的路由并热重启进程`,
+                    text: `功能开发中：自动切换 ${z.tool_type} 的代理路由`,
                     tone: "info",
                   })
                 }
               >
-                <Skull size={10} /> 注入毒素代理
+                <Skull size={10} /> 注入代理
               </button>
             </div>
           </div>
         ))}
 
         <div className="section-divider mt-4">
-          <span>[ CODEX 多实例 ] INSTANCE_MATRIX</span>
+          <span>Codex 实例</span>
         </div>
 
         <div className="instance-overview-card">

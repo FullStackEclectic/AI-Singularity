@@ -1,24 +1,27 @@
-.cyber-main {
+/* Sessions Workspace — 浅色主题 */
+.session-content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: url("data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h40v40H0V0zm20 20h20v20H20V20zM0 20h20v20H0V20z' fill='%2300ffaa' fill-opacity='0.02' fill-rule='evenodd'/%3E%3C/svg%3E");
+  background: var(--color-bg-primary);
+  overflow: hidden;
 }
 
-.cyber-header-box {
+.session-workspace-header {
   padding: var(--space-4) var(--space-6);
-  border-bottom: 1px solid rgba(0, 255, 170, 0.2);
-  background: rgba(0, 0, 0, 0.8);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-card);
 }
 
-.glow-text {
-  font-size: 18px;
-  color: #0ff;
-  text-shadow: 0 0 8px rgba(0, 255, 255, 0.4);
+.session-workspace-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
   margin-bottom: 4px;
 }
 
 .session-path-text {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
 }

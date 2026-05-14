@@ -23,7 +23,7 @@
   font-size: 1.35rem;
   font-weight: 700;
   margin: 0 0 8px 0;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
   gap: 12px;
@@ -81,7 +81,7 @@
 }
 
 .proxy-card {
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: 16px;
   padding: 24px;
@@ -91,7 +91,7 @@
 .proxy-card-header {
   font-size: 15px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
   margin-bottom: 20px;
   display: flex;
   align-items: center;
@@ -99,7 +99,7 @@
 }
 
 .proxy-card-header-icon {
-  color: var(--color-primary);
+  color: var(--color-accent);
   opacity: 0.8;
 }
 
@@ -122,7 +122,7 @@
 .protocol-flow {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }
 
 .protocol-meta {
@@ -134,14 +134,14 @@
 .protocol-tag {
   font-size: 11px;
   color: var(--color-text-secondary);
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   padding: 2px 8px;
   border-radius: 6px;
 }
 
 .protocol-status.online { color: #10B981; font-weight: 600; font-size: 11px; }
-.protocol-status.standby { color: var(--color-text-tertiary); font-weight: 600; font-size: 11px; }
+.protocol-status.standby { color: var(--color-text-muted); font-weight: 600; font-size: 11px; }
 
 .proxy-stat-row {
   display: flex;
@@ -159,5 +159,5 @@
 .proxy-stat-value {
   font-size: 13px;
   font-weight: 600;
-  color: var(--color-text);
+  color: var(--color-text-primary);
 }

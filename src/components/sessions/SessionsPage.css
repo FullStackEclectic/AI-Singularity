@@ -1,10 +1,9 @@
-/* Cyberpunk Theme for Sessions Radar */
-.sessions-page.cyberpunk-theme {
+/* Sessions Page — 浅色主题 */
+.sessions-page {
   display: flex;
   height: 100%;
-  background-color: #050510;
-  color: #e0e0e0;
-  font-family: var(--font-mono);
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
   overflow: hidden;
 }
 
@@ -14,19 +13,19 @@
 
 @keyframes pulse-op {
   0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; text-shadow: 0 0 8px currentColor; }
+  50% { opacity: 1; }
 }
 
 .spin { animation: spin 2s linear infinite; }
 @keyframes spin { 100% { transform: rotate(360deg); } }
 
 .empty-text {
-  font-size: 11px;
-  color: #555;
+  font-size: 12px;
+  color: var(--color-text-muted);
   text-align: center;
   padding: var(--space-4) 0;
 }
 
 .text-accent {
-  color: #00ffaa;
+  color: var(--color-accent);
 }

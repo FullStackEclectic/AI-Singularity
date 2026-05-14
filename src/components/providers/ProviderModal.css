@@ -45,14 +45,14 @@
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--transition-fast);
-  background: var(--color-surface);
+  background: var(--color-bg-card);
   position: relative;
   user-select: none;
 }
 
 .tool-target-chip:hover {
   border-color: var(--color-accent);
-  background: var(--color-surface-raised);
+  background: var(--color-bg-secondary);
 }
 
 .tool-target-chip.checked {
@@ -97,7 +97,7 @@
   padding: 0 24px;
   border-bottom: 1px solid var(--color-border);
   margin: -16px -24px 20px -24px;
-  background: var(--color-surface-raised);
+  background: var(--color-bg-secondary);
 }
 
 .form-tab {

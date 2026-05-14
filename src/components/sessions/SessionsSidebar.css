@@ -1,74 +1,69 @@
-.cyber-sidebar {
+/* Sessions Sidebar — 浅色主题 */
+.sessions-sidebar {
   width: 320px;
-  background: rgba(10, 15, 25, 0.9);
-  border-right: 1px solid rgba(0, 255, 170, 0.2);
+  background: var(--color-bg-card);
+  border-right: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
-  box-shadow: inset -5px 0 20px rgba(0, 0, 0, 0.5);
-  position: relative;
-}
-
-.cyber-sidebar::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  right: 0;
-  width: 1px;
-  height: 100%;
-  background: linear-gradient(to bottom, transparent, rgba(0, 255, 170, 0.5), transparent);
+  overflow: hidden;
 }
 
 .sessions-header {
-  padding: var(--space-4);
-  border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(0, 0, 0, 0.3);
+  background: var(--color-bg-card);
+  flex-shrink: 0;
 }
 
-.cyber-title-sm {
+.sessions-title {
   font-size: 13px;
-  font-weight: 700;
-  color: #00ffaa;
+  font-weight: 600;
+  color: var(--color-text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
-  text-shadow: 0 0 5px rgba(0, 255, 170, 0.3);
-  letter-spacing: 1px;
 }
 
-.cyber-icon-btn {
+.sessions-icon-btn {
   background: transparent;
-  border: 1px solid rgba(0, 255, 170, 0.3);
-  color: #00ffaa;
-  padding: 4px;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  padding: 5px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
-.cyber-icon-btn:hover {
-  background: rgba(0, 255, 170, 0.1);
-  box-shadow: 0 0 10px rgba(0, 255, 170, 0.2);
+.sessions-icon-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-active);
+}
+
+.sessions-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .sessions-header-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
-.cyber-icon-btn.danger {
-  color: #ff5c87;
-  border-color: rgba(255, 92, 135, 0.35);
+.sessions-icon-btn.danger {
+  color: var(--color-danger);
+  border-color: rgba(239, 68, 68, 0.25);
 }
 
-.cyber-icon-btn.danger:hover {
-  background: rgba(255, 92, 135, 0.12);
-  box-shadow: 0 0 10px rgba(255, 92, 135, 0.25);
+.sessions-icon-btn.danger:hover {
+  background: var(--color-danger-dim);
 }
 
 .sessions-list {
@@ -77,41 +72,44 @@
   padding: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .session-batch-bar {
-  margin: 10px 12px 0;
-  padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.03);
+  margin: 8px 12px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg-secondary);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 
 .session-batch-title {
   font-size: 12px;
-  font-weight: 700;
-  color: #d7fff4;
+  font-weight: 600;
+  color: var(--color-text-primary);
 }
 
 .session-batch-meta {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.65);
+  color: var(--color-text-muted);
 }
 
 .session-batch-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px;
 }
 
 .section-divider {
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 1px;
-  margin-top: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-top: 8px;
   margin-bottom: 4px;
   display: flex;
   align-items: center;
@@ -122,22 +120,18 @@
   content: "";
   flex: 1;
   height: 1px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.1),
-    rgba(255, 255, 255, 0.1) 2px,
-    transparent 2px,
-    transparent 4px
-  );
+  background: var(--color-border);
 }
 
 .mt-4 {
   margin-top: 16px;
 }
 
+/* 活跃进程卡片 */
 .zombie-item {
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px dashed rgba(255, 51, 102, 0.3);
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
   padding: var(--space-3);
   font-size: 12px;
 }
@@ -147,8 +141,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 6px;
-  color: #ff3366;
-  font-weight: bold;
+  color: var(--color-text-primary);
+  font-weight: 600;
 }
 
 .zombie-name {
@@ -158,16 +152,18 @@
 }
 
 .zombie-pid {
-  font-size: 10px;
-  opacity: 0.8;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
 }
 
 .zombie-meta {
   display: flex;
   justify-content: space-between;
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 10px;
+  color: var(--color-text-muted);
+  font-size: 11px;
   margin-bottom: 8px;
+  font-family: var(--font-mono);
 }
 
 .zombie-actions {
@@ -175,21 +171,22 @@
   justify-content: flex-end;
 }
 
-.cyber-btn-mini.toxic {
-  background: rgba(255, 51, 102, 0.1);
-  border: 1px solid rgba(255, 51, 102, 0.5);
-  color: #ff3366;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 4px 8px;
+.btn-mini-action {
+  background: var(--color-bg-hover);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   display: flex;
   align-items: center;
   gap: 4px;
-  transition: all 0.2s;
+  transition: all var(--transition-fast);
 }
 
-.cyber-btn-mini.toxic:hover {
-  background: rgba(255, 51, 102, 0.2);
-  box-shadow: 0 0 10px rgba(255, 51, 102, 0.3);
+.btn-mini-action:hover {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+  border-color: rgba(37, 99, 235, 0.2);
 }
