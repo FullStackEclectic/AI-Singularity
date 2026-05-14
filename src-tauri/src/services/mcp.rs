@@ -74,3 +74,108 @@ impl<'a> McpService<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use std::path::Path;
+    use chrono::Utc;
+
+    fn make_db() -> Database {
+        Database::new(Path::new(":memory:")).expect("open in-memory db")
+    }
+
+    fn sample_mcp(id: &str) -> McpServer {
+        McpServer {
+            id: id.to_string(),
+            name: format!("Test MCP {}", id),
+            command: "npx".to_string(),
+            args: Some(r#"["-y","@test/mcp"]"#.to_string()),
+            env: None,
+            description: Some("Test description".to_string()),
+            is_active: true,
+            tool_targets: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn add_and_list_mcp() {
+        let db = make_db();
+        let svc = McpService::new(&db);
+        svc.add_mcp(sample_mcp("m1")).unwrap();
+        svc.add_mcp(sample_mcp("m2")).unwrap();
+        let list = svc.list_mcps().unwrap();
+        assert_eq!(list.len(), 2);
+        assert!(list.iter().any(|m| m.id == "m1"));
+        assert!(list.iter().any(|m| m.id == "m2"));
+    }
+
+    #[test]
+    fn toggle_mcp_active_state() {
+        let db = make_db();
+        let svc = McpService::new(&db);
+        svc.add_mcp(sample_mcp("m1")).unwrap();
+        svc.toggle_mcp("m1", false).unwrap();
+        let list = svc.list_mcps().unwrap();
+        assert!(!list[0].is_active);
+        svc.toggle_mcp("m1", true).unwrap();
+        let list = svc.list_mcps().unwrap();
+        assert!(list[0].is_active);
+    }
+
+    #[test]
+    fn delete_mcp_removes_entry() {
+        let db = make_db();
+        let svc = McpService::new(&db);
+        svc.add_mcp(sample_mcp("m1")).unwrap();
+        svc.delete_mcp("m1").unwrap();
+        let list = svc.list_mcps().unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn list_empty_returns_empty_vec() {
+        let db = make_db();
+        let svc = McpService::new(&db);
+        let list = svc.list_mcps().unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn add_mcp_preserves_fields() {
+        let db = make_db();
+        let svc = McpService::new(&db);
+        let mcp = McpServer {
+            id: "m_fields".to_string(),
+            name: "Field Test".to_string(),
+            command: "node".to_string(),
+            args: Some(r#"["server.js"]"#.to_string()),
+            env: Some(r#"{"PORT":"3000"}"#.to_string()),
+            description: Some("desc".to_string()),
+            is_active: false,
+            tool_targets: Some("claude".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        svc.add_mcp(mcp).unwrap();
+        let list = svc.list_mcps().unwrap();
+        let found = list.iter().find(|m| m.id == "m_fields").unwrap();
+        assert_eq!(found.command, "node");
+        assert_eq!(found.args.as_deref(), Some(r#"["server.js"]"#));
+        assert_eq!(found.env.as_deref(), Some(r#"{"PORT":"3000"}"#));
+        assert_eq!(found.description.as_deref(), Some("desc"));
+        assert!(!found.is_active);
+        assert_eq!(found.tool_targets.as_deref(), Some("claude"));
+    }
+
+    #[test]
+    fn delete_nonexistent_mcp_is_ok() {
+        let db = make_db();
+        let svc = McpService::new(&db);
+        // Deleting a non-existent ID should not return an error
+        assert!(svc.delete_mcp("ghost").is_ok());
+    }
+}

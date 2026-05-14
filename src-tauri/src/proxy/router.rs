@@ -220,16 +220,18 @@ mod tests {
     }
 
     #[test]
-    fn global_scope_picks_oldest_used_active_account() {
+    fn global_scope_picks_least_recently_used_active_account() {
         let db = make_db();
-        // Router 默认按 priority DESC, last_checked_at DESC 排序。两条 ide_account 优先级都是 80(硬编码)，
-        // 此时由 last_checked_at(=last_used) DESC 决定 — 最近使用的优先。
+        // 默认调度模式（priority 模式）：ORDER BY priority DESC, last_checked_at ASC
+        // 即优先选"最久没用的"账号，实现负载均衡。
+        // 两条 ide_account 优先级均为 80，因此由 last_used ASC 决定 — 最久没用的优先。
         insert_ide_account(&db, "a", "anthropic", "active", "tok-a", "2026-01-01T10:00:00Z", None);
         insert_ide_account(&db, "b", "anthropic", "active", "tok-b", "2026-01-02T10:00:00Z", None);
 
         let target = Router::new(db).pick_best_key(None, &scope("global")).expect("有结果");
-        assert_eq!(target.key_id, "b", "应当挑 last_used 更新的账号");
-        assert_eq!(target.secret, "tok-b");
+        // a 的 last_used 更旧（2026-01-01 < 2026-01-02），在 priority 模式下应当被优先选中
+        assert_eq!(target.key_id, "a", "应当挑 last_used 更旧的账号（最久没用的优先）");
+        assert_eq!(target.secret, "tok-a");
     }
 
     #[test]

@@ -154,6 +154,8 @@ ais mcp add <url>                     # 添加 MCP Server
 | AWS Bedrock | ✅ | — | — | ✅ | ✅ |
 | NVIDIA NIM | ✅ | — | — | ✅ | ✅ |
 
+> **Key 有效性校验说明**：AWS Bedrock（需 SigV4 签名）、Azure OpenAI（需 deployment 名 + api-version）、GitHub Copilot（需 OAuth Token 兑换）这三个平台的 Key 校验因鉴权流程特殊，当前版本返回"未知"状态，不影响实际使用。
+
 ### AI 编码工具 (CLI Tool Hub)
 
 | 工具 | Provider 管理 | MCP 同步 | Prompts 同步 | 会话历史 |

@@ -152,7 +152,12 @@ impl SecurityShield {
         let mut limiter = RATE_LIMITER.lock().unwrap();
         let now = Instant::now();
 
-        // 垃圾回收，保持 HashMap 干净（此处简化为每次访问时顺手清理当前 key，实际高并发可用专门线程或更复杂的结构）
+        // 定期清理过期条目，防止 HashMap 无限增长
+        // 每 1000 次调用清理一次（用 HashMap 长度作为触发条件，避免额外的原子计数器）
+        if limiter.len() > 1000 {
+            limiter.retain(|_, (_, expires)| now < *expires);
+        }
+
         let (count, expires) = limiter
             .entry(key.clone())
             .or_insert((0, now + Duration::from_secs(RATE_LIMIT_WINDOW_SECS)));

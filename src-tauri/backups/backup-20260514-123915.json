@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "timestamp": "2026-05-14T12:39:15.608928600+00:00",
+  "providers": [
+    {
+      "id": "p1",
+      "name": "Updated Name",
+      "platform": "open_a_i",
+      "category": null,
+      "base_url": null,
+      "api_key_id": null,
+      "model_name": "gpt-4o-mini",
+      "is_active": false,
+      "tool_targets": null,
+      "icon": null,
+      "icon_color": null,
+      "website_url": null,
+      "api_key_url": null,
+      "notes": null,
+      "extra_config": null,
+      "sort_order": 0,
+      "created_at": "2026-05-14T12:39:15.608822600Z",
+      "updated_at": "2026-05-14T12:39:15.608844200Z"
+    }
+  ],
+  "api_keys": [],
+  "mcp_servers": [],
+  "prompts": []
+}

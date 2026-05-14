@@ -380,6 +380,10 @@ pub fn run() {
             // Codex 配额缓存
             commands::codex_quota::codex_get_quota_cache_stats,
             commands::codex_quota::codex_clear_quota_cache,
+            // 告警通知通道（Webhook + 邮件）
+            commands::notify::get_notify_config,
+            commands::notify::save_notify_config,
+            commands::notify::test_notify_channel,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {

@@ -519,6 +519,27 @@ impl Database {
             )?;
         }
 
+        if current_version < 23 {
+            conn.execute_batch(
+                "INSERT OR IGNORE INTO account_settings (key, value, updated_at) VALUES
+                    ('notify_feishu_enabled',    'false',    datetime('now')),
+                    ('notify_feishu_webhook',    '',         datetime('now')),
+                    ('notify_dingtalk_enabled',  'false',    datetime('now')),
+                    ('notify_dingtalk_webhook',  '',         datetime('now')),
+                    ('notify_dingtalk_secret',   '',         datetime('now')),
+                    ('notify_wecom_enabled',     'false',    datetime('now')),
+                    ('notify_wecom_webhook',     '',         datetime('now')),
+                    ('notify_email_enabled',     'false',    datetime('now')),
+                    ('notify_email_smtp_host',   '',         datetime('now')),
+                    ('notify_email_smtp_port',   '465',      datetime('now')),
+                    ('notify_email_username',    '',         datetime('now')),
+                    ('notify_email_password',    '',         datetime('now')),
+                    ('notify_email_to',          '',         datetime('now'));
+
+                INSERT OR IGNORE INTO schema_version (version, applied_at) VALUES (23, datetime('now'));",
+            )?;
+        }
+
         Ok(())
     }
 }

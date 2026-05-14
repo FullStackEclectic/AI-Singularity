@@ -541,3 +541,156 @@ impl AutoSwitchService {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use std::path::Path;
+
+    fn make_db() -> Database {
+        Database::new(Path::new(":memory:")).expect("open in-memory db")
+    }
+
+    // ── normalize_threshold ──────────────────────────────────────────────────
+
+    #[test]
+    fn normalize_threshold_clamps_to_0_100() {
+        assert_eq!(AutoSwitchService::normalize_threshold(-5), 0);
+        assert_eq!(AutoSwitchService::normalize_threshold(105), 100);
+        assert_eq!(AutoSwitchService::normalize_threshold(50), 50);
+        assert_eq!(AutoSwitchService::normalize_threshold(0), 0);
+        assert_eq!(AutoSwitchService::normalize_threshold(100), 100);
+    }
+
+    // ── normalize_scope_mode ─────────────────────────────────────────────────
+
+    #[test]
+    fn normalize_scope_mode_defaults_to_any_group() {
+        // Unknown / garbage values should fall back to "any_group"
+        assert_eq!(
+            AutoSwitchService::normalize_scope_mode("unknown_value"),
+            AUTO_SWITCH_SCOPE_ANY_GROUP
+        );
+        assert_eq!(
+            AutoSwitchService::normalize_scope_mode(""),
+            AUTO_SWITCH_SCOPE_ANY_GROUP
+        );
+        assert_eq!(
+            AutoSwitchService::normalize_scope_mode("SELECTED_GROUPS"),
+            AUTO_SWITCH_SCOPE_SELECTED_GROUPS,
+            "case-insensitive match should work"
+        );
+        assert_eq!(
+            AutoSwitchService::normalize_scope_mode("selected_groups"),
+            AUTO_SWITCH_SCOPE_SELECTED_GROUPS
+        );
+    }
+
+    // ── model_matches_group ──────────────────────────────────────────────────
+
+    #[test]
+    fn model_matches_group_exact() {
+        assert!(AutoSwitchService::model_matches_group(
+            "claude-opus-4-6",
+            "claude-opus-4-6"
+        ));
+    }
+
+    #[test]
+    fn model_matches_group_prefix() {
+        // "claude-opus-4-6-thinking" starts with "claude-opus-4-6-"
+        assert!(AutoSwitchService::model_matches_group(
+            "claude-opus-4-6-thinking",
+            "claude-opus-4-6"
+        ));
+    }
+
+    #[test]
+    fn model_matches_group_no_match() {
+        assert!(!AutoSwitchService::model_matches_group(
+            "gpt-4o",
+            "claude-opus-4-6"
+        ));
+        assert!(!AutoSwitchService::model_matches_group(
+            "claude-sonnet-4-5",
+            "claude-opus-4-6"
+        ));
+    }
+
+    // ── resolve_groups ───────────────────────────────────────────────────────
+
+    #[test]
+    fn resolve_groups_returns_all_when_any_group_mode() {
+        let all = AutoSwitchService::default_groups();
+        let resolved =
+            AutoSwitchService::resolve_groups(AUTO_SWITCH_SCOPE_ANY_GROUP, &[]);
+        assert_eq!(
+            resolved.len(),
+            all.len(),
+            "any_group mode should return all default groups"
+        );
+    }
+
+    #[test]
+    fn resolve_groups_filters_by_selected_ids() {
+        let selected = vec!["claude".to_string(), "gemini_pro".to_string()];
+        let resolved =
+            AutoSwitchService::resolve_groups(AUTO_SWITCH_SCOPE_SELECTED_GROUPS, &selected);
+        assert_eq!(resolved.len(), 2);
+        assert!(resolved.iter().any(|g| g.id == "claude"));
+        assert!(resolved.iter().any(|g| g.id == "gemini_pro"));
+        assert!(!resolved.iter().any(|g| g.id == "gemini_flash"));
+    }
+
+    #[test]
+    fn resolve_groups_falls_back_to_all_when_selected_empty() {
+        let all = AutoSwitchService::default_groups();
+        // selected_groups mode but empty selected_group_ids → fall back to all
+        let resolved =
+            AutoSwitchService::resolve_groups(AUTO_SWITCH_SCOPE_SELECTED_GROUPS, &[]);
+        assert_eq!(
+            resolved.len(),
+            all.len(),
+            "empty selected_group_ids should fall back to all groups"
+        );
+    }
+
+    // ── load_settings / save_settings roundtrip ──────────────────────────────
+
+    #[test]
+    fn load_settings_defaults() {
+        let db = make_db();
+        let settings = AutoSwitchService::load_settings(&db);
+        // Migration 20 inserts defaults: enabled=false, threshold=20
+        assert!(!settings.enabled);
+        assert_eq!(settings.threshold, 20);
+        assert_eq!(settings.scope_mode, AUTO_SWITCH_SCOPE_ANY_GROUP);
+        assert!(settings.selected_group_ids.is_empty());
+    }
+
+    #[test]
+    fn save_and_load_settings_roundtrip() {
+        let db = make_db();
+        let original = AutoSwitchSettings {
+            enabled: true,
+            threshold: 35,
+            scope_mode: AUTO_SWITCH_SCOPE_SELECTED_GROUPS.to_string(),
+            selected_group_ids: vec!["claude".to_string(), "gemini_pro".to_string()],
+            account_scope_mode: AUTO_SWITCH_ACCOUNT_SCOPE_ALL.to_string(),
+            selected_account_ids: vec!["acc-1".to_string()],
+            hard_switch_enabled: false,
+        };
+
+        AutoSwitchService::save_settings(&db, &original).unwrap();
+        let loaded = AutoSwitchService::load_settings(&db);
+
+        assert_eq!(loaded.enabled, original.enabled);
+        assert_eq!(loaded.threshold, original.threshold);
+        assert_eq!(loaded.scope_mode, original.scope_mode);
+        assert_eq!(loaded.selected_group_ids, original.selected_group_ids);
+        assert_eq!(loaded.account_scope_mode, original.account_scope_mode);
+        assert_eq!(loaded.selected_account_ids, original.selected_account_ids);
+        assert_eq!(loaded.hard_switch_enabled, original.hard_switch_enabled);
+    }
+}

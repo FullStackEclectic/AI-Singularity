@@ -204,3 +204,172 @@ impl<'a> PromptService<'a> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use std::path::Path;
+    use chrono::Utc;
+
+    fn make_db() -> Database {
+        Database::new(Path::new(":memory:")).expect("open in-memory db")
+    }
+
+    fn sample_prompt(id: &str) -> PromptConfig {
+        PromptConfig {
+            id: id.to_string(),
+            name: format!("Prompt {}", id),
+            description: Some("A test prompt".to_string()),
+            target_file: "CLAUDE.md".to_string(),
+            content: "You are a helpful assistant.".to_string(),
+            is_active: true,
+            tool_targets: Some("claude".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    // ── CRUD ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn save_and_list_prompt() {
+        let db = make_db();
+        let svc = PromptService::new(&db);
+        svc.save_prompt(sample_prompt("p1")).unwrap();
+        svc.save_prompt(sample_prompt("p2")).unwrap();
+        let list = svc.list_prompts().unwrap();
+        assert_eq!(list.len(), 2);
+        assert!(list.iter().any(|p| p.id == "p1"));
+        assert!(list.iter().any(|p| p.id == "p2"));
+    }
+
+    #[test]
+    fn delete_prompt_removes_entry() {
+        let db = make_db();
+        let svc = PromptService::new(&db);
+        svc.save_prompt(sample_prompt("p1")).unwrap();
+        svc.delete_prompt("p1").unwrap();
+        let list = svc.list_prompts().unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn list_empty_returns_empty_vec() {
+        let db = make_db();
+        let svc = PromptService::new(&db);
+        let list = svc.list_prompts().unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn save_prompt_upserts_on_same_id() {
+        let db = make_db();
+        let svc = PromptService::new(&db);
+        svc.save_prompt(sample_prompt("p1")).unwrap();
+        // Overwrite with different content
+        let updated = PromptConfig {
+            id: "p1".to_string(),
+            name: "Updated".to_string(),
+            description: None,
+            target_file: "AGENTS.md".to_string(),
+            content: "Updated content".to_string(),
+            is_active: false,
+            tool_targets: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        svc.save_prompt(updated).unwrap();
+        let list = svc.list_prompts().unwrap();
+        assert_eq!(list.len(), 1, "upsert should not create a duplicate");
+        assert_eq!(list[0].name, "Updated");
+        assert_eq!(list[0].content, "Updated content");
+        assert!(!list[0].is_active);
+    }
+
+    #[test]
+    fn delete_nonexistent_prompt_is_ok() {
+        let db = make_db();
+        let svc = PromptService::new(&db);
+        assert!(svc.delete_prompt("ghost").is_ok());
+    }
+
+    #[test]
+    fn save_prompt_preserves_fields() {
+        let db = make_db();
+        let svc = PromptService::new(&db);
+        let prompt = PromptConfig {
+            id: "p_fields".to_string(),
+            name: "Field Test".to_string(),
+            description: Some("desc".to_string()),
+            target_file: "CLAUDE.md".to_string(),
+            content: "content here".to_string(),
+            is_active: true,
+            tool_targets: Some("claude,aider".to_string()),
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        };
+        svc.save_prompt(prompt).unwrap();
+        let list = svc.list_prompts().unwrap();
+        let found = list.iter().find(|p| p.id == "p_fields").unwrap();
+        assert_eq!(found.description.as_deref(), Some("desc"));
+        assert_eq!(found.target_file, "CLAUDE.md");
+        assert_eq!(found.content, "content here");
+        assert_eq!(found.tool_targets.as_deref(), Some("claude,aider"));
+    }
+
+    // ── patch_aider_system_prompt ────────────────────────────────────────────
+
+    #[test]
+    fn patch_aider_inserts_into_empty_yaml() {
+        let result = PromptService::patch_aider_system_prompt("", "Be concise.");
+        assert!(result.contains("system-prompt:"));
+        assert!(result.contains("Be concise."));
+    }
+
+    #[test]
+    fn patch_aider_appends_to_existing_yaml_without_system_prompt() {
+        let existing = "model: gpt-4o\nauto-commits: false\n";
+        let result = PromptService::patch_aider_system_prompt(existing, "Be concise.");
+        assert!(result.contains("model: gpt-4o"));
+        assert!(result.contains("system-prompt:"));
+        assert!(result.contains("Be concise."));
+    }
+
+    #[test]
+    fn patch_aider_replaces_existing_system_prompt() {
+        let existing = "model: gpt-4o\nsystem-prompt: |\n  Old prompt text\nauto-commits: false\n";
+        let result = PromptService::patch_aider_system_prompt(existing, "New prompt text");
+        assert!(result.contains("New prompt text"), "new prompt should be present");
+        assert!(!result.contains("Old prompt text"), "old prompt should be replaced");
+        // Other keys should be preserved
+        assert!(result.contains("model: gpt-4o"));
+    }
+
+    #[test]
+    fn patch_aider_indents_multiline_prompt() {
+        let prompt = "Line one\nLine two\nLine three";
+        let result = PromptService::patch_aider_system_prompt("", prompt);
+        // Each line should be indented with two spaces
+        assert!(result.contains("  Line one"));
+        assert!(result.contains("  Line two"));
+        assert!(result.contains("  Line three"));
+    }
+
+    #[test]
+    fn patch_aider_block_scalar_format() {
+        let result = PromptService::patch_aider_system_prompt("", "Hello");
+        // The implementation uses "system-prompt:|" (no space before the pipe)
+        // followed by a newline and indented content.
+        assert!(
+            result.contains("system-prompt:"),
+            "expected system-prompt key, got: {}",
+            result
+        );
+        assert!(
+            result.contains("|\n  Hello"),
+            "expected block scalar body '|\\n  Hello', got: {}",
+            result
+        );
+    }
+}

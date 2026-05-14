@@ -184,6 +184,23 @@ impl<'a> AlertService<'a> {
                     "INSERT OR REPLACE INTO alert_history (alert_id, last_sent_at) VALUES (?1, ?2)",
                     rusqlite::params![&stable_id, &Utc::now().to_rfc3339()],
                 );
+
+                // 异步分发到 Webhook / 邮件通道，不阻塞当前线程
+                {
+                    use tauri::Manager;
+                    let db_state = app.state::<crate::db::Database>();
+                    let db_clone = db_state.inner().clone();
+                    let notify_title = title.clone();
+                    let notify_msg = msg.clone();
+                    tauri::async_runtime::spawn(async move {
+                        crate::services::notify::dispatch_alert(
+                            &db_clone,
+                            &notify_title,
+                            &notify_msg,
+                        )
+                        .await;
+                    });
+                }
             }
         }
     }

@@ -20,6 +20,7 @@ pub mod keys;
 pub mod logs;
 pub mod mcp;
 pub mod models;
+pub mod notify;
 pub mod oauth;
 pub mod prompts;
 pub mod provider;

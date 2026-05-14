@@ -3,9 +3,10 @@ import { onOpenUrl } from "@tauri-apps/plugin-deep-link";
 import { useProviderStore } from "../stores/providerStore";
 import { useMcpStore } from "../stores/mcpStore";
 import { useQueryClient } from "@tanstack/react-query";
+import { api } from "../lib/api";
 
 interface PendingImport {
-  type: "provider" | "mcp" | "unknown";
+  type: "provider" | "mcp" | "prompt" | "unknown";
   data: any;
 }
 
@@ -53,7 +54,7 @@ export default function DeepLinkHandler() {
       const jsonStr = decodeURIComponent(atob(dataBase64));
       const parsed = JSON.parse(jsonStr);
 
-      if (type === "provider" || type === "mcp") {
+      if (type === "provider" || type === "mcp" || type === "prompt") {
         setPending({ type, data: parsed });
       }
     } catch (e) {
@@ -96,6 +97,18 @@ export default function DeepLinkHandler() {
           updated_at: now,
         });
         qc.invalidateQueries({ queryKey: ["mcps"] });
+      } else if (pending.type === "prompt") {
+        const now = new Date().toISOString();
+        await api.prompts.save({
+          id: pending.data.id || crypto.randomUUID(),
+          name: pending.data.name || "Imported Prompt",
+          target_file: pending.data.target_file || "CLAUDE.md",
+          content: pending.data.content || "",
+          is_active: Boolean(pending.data.is_active ?? true),
+          created_at: pending.data.created_at || now,
+          updated_at: now,
+        });
+        qc.invalidateQueries({ queryKey: ["prompts"] });
       }
       setPending(null);
     } catch (e) {
@@ -110,7 +123,7 @@ export default function DeepLinkHandler() {
     <div className="modal-overlay" style={{ zIndex: 9999 }}>
       <div className="modal">
         <div className="modal-header">
-          <h2>{pending ? `📥 确认导入 ${pending.type === "provider" ? "API 提供商" : "MCP 服务"}` : "深链提示"}</h2>
+          <h2>{pending ? `📥 确认导入 ${pending.type === "provider" ? "API 提供商" : pending.type === "mcp" ? "MCP 服务" : "系统提示词"}` : "深链提示"}</h2>
           <button className="btn btn-icon" onClick={() => { setPending(null); setMessage(""); }}>✕</button>
         </div>
         <div className="modal-body">
@@ -134,6 +147,12 @@ export default function DeepLinkHandler() {
                   <pre className="font-mono text-muted" style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap" }}>
                     Command: {pending.data.command}{"\n"}
                     Args: {pending.data.args}
+                  </pre>
+                )}
+                {pending.type === "prompt" && (
+                  <pre className="font-mono text-muted" style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap" }}>
+                    Target: {pending.data.target_file || "CLAUDE.md"}{"\n"}
+                    Content: {(pending.data.content || "").slice(0, 200)}{pending.data.content?.length > 200 ? "..." : ""}
                   </pre>
                 )}
               </div>

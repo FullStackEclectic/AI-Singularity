@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use serde::de::DeserializeOwned;
 
 pub mod anthropic;
+pub mod gemini;
 pub mod openai;
 
 /// 映射后的增量响应块

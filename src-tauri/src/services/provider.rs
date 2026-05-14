@@ -188,3 +188,150 @@ impl<'a> ProviderService<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use crate::models::Platform;
+    use chrono::Utc;
+    use std::path::Path;
+
+    fn make_db() -> Database {
+        Database::new(Path::new(":memory:")).expect("open in-memory db")
+    }
+
+    fn sample_provider(id: &str, name: &str, tool_targets: Option<&str>) -> ProviderConfig {
+        ProviderConfig {
+            id: id.to_string(),
+            name: name.to_string(),
+            platform: Platform::OpenAI,
+            category: None,
+            base_url: None,
+            api_key_id: None,
+            model_name: "gpt-4o".to_string(),
+            is_active: false,
+            tool_targets: tool_targets.map(|s| s.to_string()),
+            icon: None,
+            icon_color: None,
+            website_url: None,
+            api_key_url: None,
+            notes: None,
+            extra_config: None,
+            sort_order: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn add_and_list_provider() {
+        let db = make_db();
+        let svc = ProviderService::new(&db);
+        svc.add_provider(sample_provider("p1", "Provider One", None)).unwrap();
+        svc.add_provider(sample_provider("p2", "Provider Two", None)).unwrap();
+        let list = svc.list_providers().unwrap();
+        assert_eq!(list.len(), 2);
+        assert!(list.iter().any(|p| p.id == "p1"));
+        assert!(list.iter().any(|p| p.id == "p2"));
+    }
+
+    #[test]
+    fn switch_provider_deactivates_overlapping() {
+        let db = make_db();
+        let svc = ProviderService::new(&db);
+
+        // Both providers share the same tool_target: claude_code
+        let mut p1 = sample_provider("p1", "Provider One", Some(r#"["claude_code"]"#));
+        p1.is_active = true;
+        svc.add_provider(p1).unwrap();
+
+        let p2 = sample_provider("p2", "Provider Two", Some(r#"["claude_code"]"#));
+        svc.add_provider(p2).unwrap();
+
+        // Switch to p2 — p1 should be deactivated because they share claude_code
+        svc.switch_provider("p2").unwrap();
+
+        let list = svc.list_providers().unwrap();
+        let p1_entry = list.iter().find(|p| p.id == "p1").unwrap();
+        let p2_entry = list.iter().find(|p| p.id == "p2").unwrap();
+        assert!(!p1_entry.is_active, "p1 should be deactivated after switching to p2");
+        assert!(p2_entry.is_active, "p2 should be active after switch");
+    }
+
+    #[test]
+    fn switch_provider_allows_different_targets() {
+        let db = make_db();
+        let svc = ProviderService::new(&db);
+
+        // p1 targets claude_code, p2 targets codex — no overlap
+        let mut p1 = sample_provider("p1", "Provider One", Some(r#"["claude_code"]"#));
+        p1.is_active = true;
+        svc.add_provider(p1).unwrap();
+
+        let p2 = sample_provider("p2", "Provider Two", Some(r#"["codex"]"#));
+        svc.add_provider(p2).unwrap();
+
+        // Switch to p2 — p1 should remain active because targets don't overlap
+        svc.switch_provider("p2").unwrap();
+
+        let list = svc.list_providers().unwrap();
+        let p1_entry = list.iter().find(|p| p.id == "p1").unwrap();
+        let p2_entry = list.iter().find(|p| p.id == "p2").unwrap();
+        assert!(p1_entry.is_active, "p1 should remain active (different target)");
+        assert!(p2_entry.is_active, "p2 should be active after switch");
+    }
+
+    #[test]
+    fn delete_provider_removes_entry() {
+        let db = make_db();
+        let svc = ProviderService::new(&db);
+        svc.add_provider(sample_provider("p1", "Provider One", None)).unwrap();
+        svc.delete_provider("p1").unwrap();
+        let list = svc.list_providers().unwrap();
+        assert!(list.is_empty());
+    }
+
+    #[test]
+    fn update_provider_changes_name() {
+        let db = make_db();
+        let svc = ProviderService::new(&db);
+        svc.add_provider(sample_provider("p1", "Original Name", None)).unwrap();
+
+        let mut updated = sample_provider("p1", "Updated Name", None);
+        updated.model_name = "gpt-4o-mini".to_string();
+        svc.update_provider(updated).unwrap();
+
+        let list = svc.list_providers().unwrap();
+        let entry = list.iter().find(|p| p.id == "p1").unwrap();
+        assert_eq!(entry.name, "Updated Name");
+        assert_eq!(entry.model_name, "gpt-4o-mini");
+    }
+
+    #[test]
+    fn reorder_providers_updates_sort_order() {
+        let db = make_db();
+        let svc = ProviderService::new(&db);
+
+        let mut p1 = sample_provider("p1", "Provider One", None);
+        p1.sort_order = 0;
+        let mut p2 = sample_provider("p2", "Provider Two", None);
+        p2.sort_order = 1;
+        let mut p3 = sample_provider("p3", "Provider Three", None);
+        p3.sort_order = 2;
+
+        svc.add_provider(p1).unwrap();
+        svc.add_provider(p2).unwrap();
+        svc.add_provider(p3).unwrap();
+
+        // Reverse the order: p3, p1, p2
+        svc.reorder_providers(vec!["p3".to_string(), "p1".to_string(), "p2".to_string()]).unwrap();
+
+        let list = svc.list_providers().unwrap();
+        let get_order = |id: &str| list.iter().find(|p| p.id == id).unwrap().sort_order;
+
+        assert_eq!(get_order("p3"), 0);
+        assert_eq!(get_order("p1"), 1);
+        assert_eq!(get_order("p2"), 2);
+    }
+}

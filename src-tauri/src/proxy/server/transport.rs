@@ -352,6 +352,102 @@ pub(super) async fn handle_openai_compatible_stream(
     Ok(Sse::new(stream).into_response())
 }
 
+pub(super) async fn handle_gemini_stream(
+    client: &reqwest::Client,
+    secret: &str,
+    body: &OpenAIRequest,
+    audit: AuditContext,
+) -> anyhow::Result<axum::response::Response> {
+    use crate::proxy::mappers::{gemini::GeminiMapper, ProtocolMapper};
+
+    let (model, gemini_body) = openai_to_gemini(body);
+    let url = format!(
+        "https://generativelanguage.googleapis.com/v1beta/models/{}:streamGenerateContent?key={}&alt=sse",
+        model, secret
+    );
+
+    let req = client
+        .post(&url)
+        .header("Content-Type", "application/json")
+        .json(&gemini_body);
+
+    let mut es = EventSource::new(req)?;
+    let model_clone = model.clone();
+
+    let stream = async_stream::stream! {
+        let mut tool_call_buffer = String::new();
+        let mut in_tool_call = false;
+        let mut tool_call_index = 0u32;
+        let mut prompt_tokens: u64 = 0;
+        let mut completion_tokens: u64 = 0;
+
+        for chunk in GeminiMapper::initial_chunks() {
+            yield Ok::<_, std::convert::Infallible>(Event::default().data(chunk.data));
+        }
+
+        while let Some(event) = es.next().await {
+            match event {
+                Ok(ReqwestEvent::Open) => continue,
+                Ok(ReqwestEvent::Message(message)) => {
+                    let text = message.data.clone();
+
+                    // 提取 usageMetadata（Gemini 在最后一个 chunk 中携带）
+                    if let Ok(json_val) = serde_json::from_str::<serde_json::Value>(&text) {
+                        if let Some(meta) = json_val.get("usageMetadata") {
+                            prompt_tokens = meta["promptTokenCount"].as_u64().unwrap_or(prompt_tokens);
+                            completion_tokens = meta["candidatesTokenCount"].as_u64().unwrap_or(completion_tokens);
+                        }
+                    }
+
+                    if let Ok(chunks) = GeminiMapper::map_delta(
+                        &model_clone,
+                        text,
+                        false,
+                        &mut tool_call_buffer,
+                        &mut in_tool_call,
+                        &mut tool_call_index,
+                    )
+                    .await
+                    {
+                        for chunk in chunks {
+                            yield Ok(Event::default().data(chunk.data));
+                        }
+                    }
+                }
+                Err(e) => {
+                    if let reqwest_eventsource::Error::StreamEnded = e {
+                        if let Ok(chunks) = GeminiMapper::map_delta(
+                            &model_clone,
+                            String::new(),
+                            true,
+                            &mut tool_call_buffer,
+                            &mut in_tool_call,
+                            &mut tool_call_index,
+                        )
+                        .await
+                        {
+                            for chunk in chunks {
+                                yield Ok(Event::default().data(chunk.data));
+                            }
+                        }
+                        audit.write_usage(
+                            prompt_tokens,
+                            completion_tokens,
+                            prompt_tokens + completion_tokens,
+                        );
+                        yield Ok(Event::default().data("[DONE]"));
+                        break;
+                    }
+                    tracing::error!("Gemini SSE error: {}", e);
+                    break;
+                }
+            }
+        }
+    };
+
+    Ok(Sse::new(stream).into_response())
+}
+
 pub(super) async fn forward_to_ide_bypass(
     client: &reqwest::Client,
     secret: &str,

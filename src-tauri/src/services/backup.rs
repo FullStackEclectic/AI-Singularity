@@ -234,3 +234,198 @@ impl<'a> BackupService<'a> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use crate::models::{McpServer, Platform, PromptConfig, ProviderConfig};
+    use crate::services::mcp::McpService;
+    use crate::services::prompts::PromptService;
+    use crate::services::provider::ProviderService;
+    use chrono::Utc;
+    use std::fs;
+    use std::path::Path;
+
+    fn make_db() -> Database {
+        Database::new(Path::new(":memory:")).expect("open in-memory db")
+    }
+
+    fn test_backup_dir(suffix: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("ais_test_backup_{}", suffix));
+        fs::create_dir_all(&dir).expect("create test backup dir");
+        dir
+    }
+
+    fn cleanup_dir(dir: &PathBuf) {
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    fn sample_provider(id: &str) -> ProviderConfig {
+        ProviderConfig {
+            id: id.to_string(),
+            name: format!("Provider {}", id),
+            platform: Platform::OpenAI,
+            category: None,
+            base_url: None,
+            api_key_id: None,
+            model_name: "gpt-4o".to_string(),
+            is_active: false,
+            tool_targets: Some(r#"["claude_code"]"#.to_string()),
+            icon: None,
+            icon_color: None,
+            website_url: None,
+            api_key_url: None,
+            notes: None,
+            extra_config: None,
+            sort_order: 0,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn sample_mcp(id: &str) -> McpServer {
+        McpServer {
+            id: id.to_string(),
+            name: format!("MCP {}", id),
+            command: "npx".to_string(),
+            args: None,
+            env: None,
+            description: None,
+            is_active: true,
+            tool_targets: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    fn sample_prompt(id: &str) -> PromptConfig {
+        PromptConfig {
+            id: id.to_string(),
+            name: format!("Prompt {}", id),
+            description: None,
+            target_file: "CLAUDE.md".to_string(),
+            content: "Be helpful.".to_string(),
+            is_active: true,
+            tool_targets: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        }
+    }
+
+    #[test]
+    fn export_config_returns_empty_when_no_data() {
+        let db = make_db();
+        let dir = test_backup_dir("empty");
+        let svc = BackupService::new(&db, dir.clone());
+
+        let data = svc.export_config().unwrap();
+        assert!(data.providers.is_empty(), "providers should be empty");
+        assert!(data.mcp_servers.is_empty(), "mcp_servers should be empty");
+        assert!(data.prompts.is_empty(), "prompts should be empty");
+
+        cleanup_dir(&dir);
+    }
+
+    #[test]
+    fn import_config_restores_providers() {
+        let db = make_db();
+        let dir = test_backup_dir("providers");
+        let svc = BackupService::new(&db, dir.clone());
+
+        // Add a provider, export, then clear and re-import
+        ProviderService::new(&db).add_provider(sample_provider("p1")).unwrap();
+        let exported = svc.export_config().unwrap();
+        let json = serde_json::to_string(&exported).unwrap();
+
+        // Clear the table
+        db.execute("DELETE FROM providers", &[]).unwrap();
+        assert!(ProviderService::new(&db).list_providers().unwrap().is_empty());
+
+        // Import
+        svc.import_config(&json).unwrap();
+        let restored = ProviderService::new(&db).list_providers().unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].id, "p1");
+
+        cleanup_dir(&dir);
+    }
+
+    #[test]
+    fn import_config_restores_mcp_servers() {
+        let db = make_db();
+        let dir = test_backup_dir("mcps");
+        let svc = BackupService::new(&db, dir.clone());
+
+        McpService::new(&db).add_mcp(sample_mcp("m1")).unwrap();
+        let exported = svc.export_config().unwrap();
+        let json = serde_json::to_string(&exported).unwrap();
+
+        db.execute("DELETE FROM mcp_servers", &[]).unwrap();
+        assert!(McpService::new(&db).list_mcps().unwrap().is_empty());
+
+        svc.import_config(&json).unwrap();
+        let restored = McpService::new(&db).list_mcps().unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].id, "m1");
+
+        cleanup_dir(&dir);
+    }
+
+    #[test]
+    fn import_config_restores_prompts() {
+        let db = make_db();
+        let dir = test_backup_dir("prompts");
+        let svc = BackupService::new(&db, dir.clone());
+
+        PromptService::new(&db).save_prompt(sample_prompt("pr1")).unwrap();
+        let exported = svc.export_config().unwrap();
+        let json = serde_json::to_string(&exported).unwrap();
+
+        db.execute("DELETE FROM prompts", &[]).unwrap();
+        assert!(PromptService::new(&db).list_prompts().unwrap().is_empty());
+
+        svc.import_config(&json).unwrap();
+        let restored = PromptService::new(&db).list_prompts().unwrap();
+        assert_eq!(restored.len(), 1);
+        assert_eq!(restored[0].id, "pr1");
+
+        cleanup_dir(&dir);
+    }
+
+    #[test]
+    fn rotate_backups_keeps_max_files() {
+        let db = make_db();
+        let dir = test_backup_dir("rotate");
+        let backup_dir = dir.join("backups");
+        fs::create_dir_all(&backup_dir).unwrap();
+
+        // Create 12 dummy backup files with slightly different modification times
+        for i in 0..12 {
+            let path = backup_dir.join(format!("backup-2026010{:02}-{:06}.json", i / 10, i));
+            fs::write(&path, format!("{{\"version\":{}}}", i)).unwrap();
+            // Small sleep to ensure distinct mtime ordering on fast filesystems
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+
+        let entries_before: Vec<_> = fs::read_dir(&backup_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+            .collect();
+        assert_eq!(entries_before.len(), 12, "should have 12 files before rotation");
+
+        // create_auto_backup exports (empty db is fine) and then rotates to 10
+        let svc = BackupService::new(&db, dir.clone());
+        svc.create_auto_backup().unwrap();
+
+        let entries_after: Vec<_> = fs::read_dir(&backup_dir)
+            .unwrap()
+            .filter_map(Result::ok)
+            .filter(|e| e.path().extension().and_then(|s| s.to_str()) == Some("json"))
+            .collect();
+        assert_eq!(entries_after.len(), 10, "rotation should keep exactly 10 files");
+
+        cleanup_dir(&dir);
+    }
+}

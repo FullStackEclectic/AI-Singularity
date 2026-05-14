@@ -2,6 +2,7 @@ import type { ChangeEvent } from "react";
 import { api } from "../../lib/api";
 import { SettingsBackupAndUpdateSection } from "./SettingsBackupAndUpdateSection";
 import { SettingsGeminiSection } from "./SettingsGeminiSection";
+import { SettingsNotifySection } from "./SettingsNotifySection";
 import { SettingsRuntimeSection } from "./SettingsRuntimeSection";
 import type { FloatingCardsState } from "./useFloatingCards";
 import type { SettingsBackupAndUpdateState } from "./useSettingsBackupAndUpdate";
@@ -152,6 +153,8 @@ export function SettingsPageSections({
           onInstallUpdate={() => void backupAndUpdate.handleInstallUpdate()}
           onCollapseUpdateDetails={() => pageState.setAvailableUpdate(null)}
         />
+
+        <SettingsNotifySection />
       </div>
     </>
   );

@@ -6,7 +6,6 @@ import type {
 } from "../../types";
 import type {
   RuntimeEnvStatusItem,
-  SkillStorageInfo,
 } from "./types";
 
 export const stats = {
@@ -49,9 +48,4 @@ export const alerts = {
 
 export const speedtest = {
   run: (): Promise<any[]> => invoke("run_speedtest"),
-};
-
-export const skills = {
-  getStorageInfo: (): Promise<SkillStorageInfo> =>
-    invoke("get_skill_storage_info"),
 };

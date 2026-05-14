@@ -260,6 +260,7 @@ export const userTokens = {
   create: (req: any): Promise<any> => invoke("create_user_token", { req }),
   update: (req: any): Promise<void> => invoke("update_user_token", { req }),
   delete: (id: string): Promise<void> => invoke("delete_user_token", { id }),
+  getSummary: (): Promise<any> => invoke("get_user_token_summary"),
 };
 
 export const analytics = {

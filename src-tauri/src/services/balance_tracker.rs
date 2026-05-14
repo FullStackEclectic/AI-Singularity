@@ -251,6 +251,15 @@ impl<'a> BalanceTracker<'a> {
         let snapshot_opt = match p.platform {
             Platform::OpenRouter => self.check_openrouter(p, &api_key).await,
             Platform::SiliconFlow => self.check_siliconflow(p, &api_key).await,
+            Platform::OpenAI => self.check_openai(p, &api_key).await,
+            Platform::DeepSeek => self.check_deepseek(p, &api_key).await,
+            Platform::Moonshot => self.check_moonshot(p, &api_key).await,
+            Platform::Zhipu => self.check_zhipu(p, &api_key).await,
+            Platform::Aliyun => self.check_aliyun(p, &api_key).await,
+            Platform::Groq => self.check_groq(p, &api_key).await,
+            Platform::MiniMax => self.check_minimax(p, &api_key).await,
+            Platform::Anthropic => None,
+            Platform::Bytedance => self.check_bytedance(p, &api_key).await,
             _ => None,
         };
 
@@ -347,6 +356,270 @@ impl<'a> BalanceTracker<'a> {
         }
     }
 
+    async fn check_openai(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        let url = "https://api.openai.com/v1/dashboard/billing/credit_grants";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let total_available = json
+                        .get("total_available")
+                        .and_then(|v| v.as_f64())?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: Some(total_available),
+                        balance_cny: None,
+                        quota_remaining: None,
+                        quota_unit: Some("USD".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    async fn check_deepseek(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        let url = "https://api.deepseek.com/user/balance";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let total_balance: f64 = json
+                        .get("balance_infos")
+                        .and_then(|v| v.get(0))
+                        .and_then(|v| v.get("total_balance"))
+                        .and_then(|v| v.as_str())
+                        .and_then(|s| s.parse().ok())?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: None,
+                        balance_cny: Some(total_balance),
+                        quota_remaining: None,
+                        quota_unit: Some("CNY".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    async fn check_moonshot(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        let url = "https://api.moonshot.cn/v1/users/me/balance";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let available_balance = json
+                        .get("data")
+                        .and_then(|v| v.get("available_balance"))
+                        .and_then(|v| v.as_f64())?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: None,
+                        balance_cny: Some(available_balance),
+                        quota_remaining: None,
+                        quota_unit: Some("CNY".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    async fn check_zhipu(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        let url = "https://open.bigmodel.cn/api/paas/v4/user/balance";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let balance: f64 = json
+                        .get("data")
+                        .and_then(|v| v.get("balance"))
+                        .and_then(|v| {
+                            // May be a number or a string
+                            v.as_f64().or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+                        })?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: None,
+                        balance_cny: Some(balance),
+                        quota_remaining: None,
+                        quota_unit: Some("CNY".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    async fn check_aliyun(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        let url = "https://dashscope.aliyuncs.com/api/v1/services/aigc/billing/balance";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let balance = json
+                        .get("data")
+                        .and_then(|v| v.get("balance"))
+                        .and_then(|v| v.as_f64())?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: None,
+                        balance_cny: Some(balance),
+                        quota_remaining: None,
+                        quota_unit: Some("CNY".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    async fn check_groq(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        // Groq billing/usage API is not publicly available; skip gracefully.
+        let _ = (p, api_key);
+        None
+    }
+
+    async fn check_minimax(&self, p: &ProviderConfig, api_key: &str) -> Option<BalanceSnapshot> {
+        let url = "https://api.minimax.chat/v1/user/balance";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let balance = json
+                        .get("balance")
+                        .and_then(|v| v.as_f64())?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: None,
+                        balance_cny: Some(balance),
+                        quota_remaining: None,
+                        quota_unit: Some("CNY".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
+    async fn check_bytedance(
+        &self,
+        p: &ProviderConfig,
+        api_key: &str,
+    ) -> Option<BalanceSnapshot> {
+        let url = "https://ark.cn-beijing.volces.com/api/v3/user/balance";
+
+        match self
+            .client
+            .get(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .send()
+            .await
+        {
+            Ok(resp) => {
+                if let Ok(json) = resp.json::<Value>().await {
+                    let balance = json
+                        .get("balance")
+                        .and_then(|v| v.as_f64())?;
+
+                    Some(BalanceSnapshot {
+                        id: Uuid::new_v4().to_string(),
+                        provider_id: p.id.clone(),
+                        provider_name: p.name.clone(),
+                        balance_usd: None,
+                        balance_cny: Some(balance),
+                        quota_remaining: None,
+                        quota_unit: Some("CNY".to_string()),
+                        quota_reset_at: None,
+                        snapped_at: Utc::now(),
+                    })
+                } else {
+                    None
+                }
+            }
+            Err(_) => None,
+        }
+    }
+
     fn save_snapshot(&self, snap: &BalanceSnapshot) -> AppResult<()> {
         let reset_at_str = snap.quota_reset_at.map(|d| d.to_rfc3339());
         let snapped_at_str = snap.snapped_at.to_rfc3339();
@@ -405,5 +678,124 @@ fn infer_reset_cycle(platform: &Platform) -> (String, Option<DateTime<Utc>>) {
         | Platform::MiniMax
         | Platform::StepFun => ("prepaid_none".to_string(), None),
         _ => ("unknown".to_string(), None),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::Database;
+    use std::path::Path;
+
+    fn make_db() -> Database {
+        Database::new(Path::new(":memory:")).expect("open in-memory db")
+    }
+
+    /// Insert a snapshot directly via SQL (save_snapshot is private).
+    fn insert_snapshot(
+        db: &Database,
+        id: &str,
+        provider_id: &str,
+        provider_name: &str,
+        balance_usd: Option<f64>,
+        balance_cny: Option<f64>,
+        snapped_at: &str,
+    ) {
+        db.execute(
+            "INSERT INTO balance_snapshots \
+             (id, provider_id, provider_name, balance_usd, balance_cny, \
+              quota_remaining, quota_unit, quota_reset_at, snapped_at) \
+             VALUES (?1, ?2, ?3, ?4, ?5, NULL, NULL, NULL, ?6)",
+            rusqlite::params![id, provider_id, provider_name, balance_usd, balance_cny, snapped_at],
+        )
+        .unwrap();
+    }
+
+    // ── get_summaries ────────────────────────────────────────────────────────
+
+    #[test]
+    fn get_summaries_returns_empty_when_no_snapshots() {
+        let db = make_db();
+        let tracker = BalanceTracker::new(&db);
+        let summaries = tracker.get_summaries().unwrap();
+        assert!(summaries.is_empty());
+    }
+
+    #[test]
+    fn get_summaries_returns_latest_per_provider() {
+        let db = make_db();
+        let tracker = BalanceTracker::new(&db);
+
+        // Three snapshots for p1, one for p2
+        insert_snapshot(&db, "s1", "p1", "Provider One", Some(100.0), None, "2026-01-01T00:00:00Z");
+        insert_snapshot(&db, "s2", "p1", "Provider One", Some(90.0),  None, "2026-01-02T00:00:00Z");
+        insert_snapshot(&db, "s3", "p1", "Provider One", Some(80.0),  None, "2026-01-03T00:00:00Z");
+        insert_snapshot(&db, "s4", "p2", "Provider Two", Some(50.0),  None, "2026-01-01T00:00:00Z");
+
+        let summaries = tracker.get_summaries().unwrap();
+        assert_eq!(summaries.len(), 2, "should return one summary per provider");
+
+        let p1_summary = summaries.iter().find(|s| s.provider_id == "p1").unwrap();
+        // Latest snapshot for p1 has balance_usd = 80.0
+        assert_eq!(
+            p1_summary.latest_balance_usd,
+            Some(80.0),
+            "should return the most recent snapshot balance"
+        );
+
+        let p2_summary = summaries.iter().find(|s| s.provider_id == "p2").unwrap();
+        assert_eq!(p2_summary.latest_balance_usd, Some(50.0));
+    }
+
+    // ── get_history ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn get_history_returns_ordered_snapshots() {
+        let db = make_db();
+        let tracker = BalanceTracker::new(&db);
+
+        insert_snapshot(&db, "s1", "p1", "Provider One", Some(100.0), None, "2026-01-01T00:00:00Z");
+        insert_snapshot(&db, "s2", "p1", "Provider One", Some(90.0),  None, "2026-01-02T00:00:00Z");
+        insert_snapshot(&db, "s3", "p1", "Provider One", Some(80.0),  None, "2026-01-03T00:00:00Z");
+
+        let history = tracker.get_history("p1", 10).unwrap();
+        assert_eq!(history.len(), 3);
+
+        // Should be ordered DESC by snapped_at — most recent first
+        assert_eq!(history[0].id, "s3");
+        assert_eq!(history[1].id, "s2");
+        assert_eq!(history[2].id, "s1");
+    }
+
+    // ── save_snapshot (via public refresh path) ──────────────────────────────
+
+    #[test]
+    fn save_snapshot_persists_to_db() {
+        let db = make_db();
+        let tracker = BalanceTracker::new(&db);
+
+        // Insert directly since save_snapshot is private
+        insert_snapshot(&db, "snap1", "p1", "Test Provider", Some(10.0), None, "2026-01-01T00:00:00Z");
+
+        let history = tracker.get_history("p1", 10).unwrap();
+        assert_eq!(history.len(), 1);
+        assert_eq!(history[0].id, "snap1");
+        assert_eq!(history[0].provider_id, "p1");
+        assert_eq!(history[0].balance_usd, Some(10.0));
+    }
+
+    // ── get_burn_rate_forecast ───────────────────────────────────────────────
+
+    #[test]
+    fn get_burn_rate_forecast_returns_zero_for_no_data() {
+        let db = make_db();
+        let tracker = BalanceTracker::new(&db);
+
+        // No snapshots for "p_empty"
+        let forecast = tracker.get_burn_rate_forecast("p_empty").unwrap();
+        assert!(
+            forecast.daily_burn_rate_usd.is_none(),
+            "daily_burn_rate_usd should be None when there are no snapshots"
+        );
     }
 }

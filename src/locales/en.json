@@ -1,32 +1,36 @@
 {
   "sidebar": {
     "dashboard": "Dashboard",
+    "accounts": "Accounts & Assets",
     "keys": "API Keys",
-    "providers": "Provider",
-    "mcp": "MCP Server",
-    "skills": "Skills",
-    "tools": "Environment",
-    "prompts": "System Prompts",
+    "providers": "Endpoint Config",
+    "mcp": "Context Extensions (MCP)",
+    "skills": "Skills Center",
+    "tools": "Environment Config",
     "tokenCalculator": "Token Calculator",
+    "prompts": "System Prompts",
     "proxy": "Local Proxy",
-    "analytics": "Balance Analytics",
-    "speedtest": "Speed Test",
-    "models": "Models Directory",
+    "analytics": "Balance Dashboard",
+    "speedtest": "Latency Test",
+    "models": "Model Directory",
+    "sessions": "Session History",
+    "sharing": "Cards & Quotas",
+    "security": "Security Console",
     "settings": "Settings",
     "groups": {
       "account": "Account",
       "tools": "AI Tools",
       "proxy": "Proxy Gateway",
-      "info": "Information"
+      "info": "Info"
     }
   },
   "settings": {
-    "title": "Global Settings",
-    "subtitle": "Adjust global behavior and preferences for AI Singularity",
+    "title": "Global & Preferences",
+    "subtitle": "Configure the runtime behavior and core settings of AI Singularity",
     "language": "Interface Language",
-    "language_desc": "Select the application display language",
-    "auto_update": "Software Updates",
-    "auto_update_desc": "Automatically check for application updates",
+    "language_desc": "Select the display language for the application",
+    "auto_update": "Check for Updates",
+    "auto_update_desc": "Automatically fetch the latest application releases from remote",
     "check_now": "Check Now"
   },
   "common": {

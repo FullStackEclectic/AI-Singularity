@@ -1,0 +1,33 @@
+name: Security Audit
+
+on:
+  push:
+    paths:
+      - 'src-tauri/Cargo.lock'
+      - 'package-lock.json'
+  schedule:
+    - cron: '0 8 * * 1'  # 每周一 08:00 UTC
+
+jobs:
+  audit-rust:
+    name: Rust Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install cargo-audit
+        run: cargo install cargo-audit --locked
+      - name: Run cargo audit
+        working-directory: src-tauri
+        run: cargo audit
+
+  audit-npm:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run npm audit
+        run: npm audit --audit-level=high

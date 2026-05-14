@@ -103,6 +103,10 @@ pub async fn add_key(db: State<'_, Database>, request: AddKeyRequest) -> Result<
         .trim_matches('"')
         .to_string();
 
+    // key_hash 字段存储 "placeholder" 是有意为之：
+    // 真实的 API Key 已通过 SecureStore::store_key 存入系统 Keychain（Windows Credential Store / AES-256-GCM）。
+    // DB 中的 key_hash 列保留用于未来的哈希校验功能（防止重复导入），当前版本不使用。
+    // key_preview 字段存储 Key 的前几位明文预览，用于 UI 展示。
     db.execute(
         "INSERT INTO api_keys (id, name, platform, base_url, key_hash, key_preview, status, notes, created_at)
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, 'unknown', ?7, ?8)",

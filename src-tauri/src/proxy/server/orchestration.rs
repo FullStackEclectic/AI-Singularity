@@ -2,7 +2,7 @@ use super::helpers::{get_fallback_model, get_platform_for_model, platform_base_u
 use super::request::ProxyRequestContext;
 use super::transport::{
     forward_to_anthropic, forward_to_gemini, forward_to_ide_bypass, forward_to_openai_compatible,
-    handle_anthropic_stream, handle_openai_compatible_stream, AuditContext,
+    handle_anthropic_stream, handle_gemini_stream, handle_openai_compatible_stream, AuditContext,
 };
 use super::{ForwardTarget, ProxyState};
 use crate::models::Platform;
@@ -146,12 +146,10 @@ async fn forward_stream_request(
             .await
         }
         Platform::Gemini => {
-            handle_openai_compatible_stream(
+            handle_gemini_stream(
                 &state.http_client,
                 &target.secret,
-                platform_base_url(&target.platform),
                 body,
-                target.device_profile.as_ref(),
                 audit_ctx,
             )
             .await

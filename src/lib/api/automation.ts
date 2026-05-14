@@ -99,6 +99,8 @@ export const geminiInstances = {
 export const webdav = {
   testConnection: (config: any): Promise<void> =>
     invoke("webdav_test_connection", { config }),
+  saveConfig: (config: any): Promise<void> =>
+    invoke("webdav_save_config", { config }),
   push: (config: any): Promise<void> => invoke("webdav_push", { config }),
   pull: (config: any): Promise<void> => invoke("webdav_pull", { config }),
 };

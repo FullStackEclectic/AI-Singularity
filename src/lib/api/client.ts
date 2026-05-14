@@ -1,8 +1,11 @@
-import { alerts, env, proxy, security, skills, speedtest, stats } from "./system";
+import { alerts, env, proxy, security, speedtest, stats } from "./system";
 import { balance, keys, models, providers, tokenCalculator } from "./finance";
 import { analytics, floatingCards, ideAccounts, mcp, prompts, providerCurrent, userTokens } from "./integration";
 import { announcements, logs, update, webReport, websocket } from "./runtime";
 import { accountHealth, codexQuota, geminiInstances, oauth, wakeup, webdav } from "./automation";
+import { notify } from "./notify";
+import { sessions } from "./sessions";
+import { skills } from "./skills";
 
 export const api = {
   stats,
@@ -35,4 +38,6 @@ export const api = {
   skills,
   codexQuota,
   accountHealth,
+  notify,
+  sessions,
 };

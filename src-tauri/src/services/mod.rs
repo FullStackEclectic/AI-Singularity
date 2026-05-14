@@ -28,6 +28,7 @@ pub mod local_ide_refresh;
 pub mod logs;
 pub mod mcp;
 pub mod model_catalog;
+pub mod notify;
 pub mod model_mapping;
 pub mod oauth;
 pub mod platform_status_action;

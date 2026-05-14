@@ -41,14 +41,15 @@
   "plugins": {
     "deep-link": {
       "desktop": {
-        "schemes": ["aisingularity"]
+        "schemes": ["ais"]
       }
     },
     "updater": {
       "endpoints": [
-        "https://api.github.com/repos/tarui/AI-Singularity/releases/latest"
+        "https://api.github.com/repos/FullStackEclectic/AI-Singularity/releases/latest"
       ],
-      "pubkey": "YOUR_UPDATER_PUBLIC_KEY"
+      "pubkey": "YOUR_UPDATER_PUBLIC_KEY",
+      "_pubkey_note": "Run: tauri signer generate -w ~/.tauri/ai-singularity.key && copy public key here. Store private key in TAURI_SIGNING_PRIVATE_KEY GitHub Secret."
     }
   }
 }
