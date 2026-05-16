@@ -1,0 +1,188 @@
+.logs-page {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.logs-layout {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: var(--space-4);
+  padding: var(--space-2) var(--space-6) var(--space-6);
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* ── 左侧文件列表 ── */
+.logs-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  overflow: hidden;
+  padding: var(--space-4);
+}
+
+.logs-sidebar-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted);
+}
+
+.logs-file-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logs-file-item {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.logs-file-item:hover {
+  background: var(--color-bg-hover);
+}
+
+.logs-file-item.active {
+  background: var(--color-accent-dim);
+  border-color: rgba(37, 99, 235, 0.15);
+}
+
+.logs-file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+  font-family: var(--font-mono);
+  word-break: break-all;
+}
+
+.logs-file-item.active .logs-file-name {
+  color: var(--color-accent);
+}
+
+.logs-file-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+
+.logs-kind-badge {
+  padding: 1px 6px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.logs-kind-app {
+  background: var(--color-accent-dim);
+  color: var(--color-accent);
+}
+
+.logs-kind-panic {
+  background: var(--color-danger-dim);
+  color: var(--color-danger);
+}
+
+.logs-kind-other {
+  background: var(--color-bg-active);
+  color: var(--color-text-secondary);
+}
+
+/* ── 右侧内容区 ── */
+.logs-content-area {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+  overflow: hidden;
+}
+
+.logs-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  flex-shrink: 0;
+}
+
+.logs-search {
+  flex: 1;
+  min-width: 0;
+}
+
+.logs-lines-select {
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.logs-stat {
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.logs-error {
+  padding: var(--space-3) var(--space-4);
+  color: var(--color-danger);
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.logs-viewer-card {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logs-viewer {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--color-text-primary);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  background: transparent;
+}
+
+.log-line {
+  display: block;
+}
+
+.log-line-error { color: var(--color-danger); }
+.log-line-warn  { color: var(--color-warning); }
+.log-line-info  { color: var(--color-accent); }
+.log-line-debug { color: var(--color-text-muted); }
+
+.logs-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  padding: var(--space-8);
+}
