@@ -10,6 +10,7 @@ import {
   pickActiveLayoutId,
   type SidebarLayout,
 } from "./sidebarLayoutStore";
+import { AnnouncementCenter } from "../announcement/AnnouncementCenter";
 import "./Sidebar.css";
 
 interface NavItem {
@@ -294,8 +295,14 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         ))}
       </nav>
 
-      {/* 底部版本 */}
+      {/* 底部：公告铃铛 + 版本号 */}
       <div className="sidebar-footer">
+        <AnnouncementCenter
+          onNavigate={(target) => {
+            const page = target as NavPage;
+            onNavigate(page);
+          }}
+        />
         <div className="text-muted" style={{ fontSize: 12 }}>v0.1.0-alpha</div>
       </div>
 

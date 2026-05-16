@@ -1,7 +1,9 @@
+/* 浮动账号卡片层 — 浅色主题 */
 .floating-cards-layer {
   position: fixed;
   inset: 0;
   pointer-events: none;
+  z-index: 1500;
 }
 
 .floating-card {
@@ -9,19 +11,21 @@
   display: flex;
   flex-direction: column;
   pointer-events: auto;
-  background: rgba(15, 23, 42, 0.92);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 10px;
-  box-shadow: 0 14px 32px rgba(2, 6, 23, 0.4);
-  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 20px 40px -10px rgba(15, 23, 42, 0.12), 0 0 0 1px rgba(15, 23, 42, 0.03);
+  color: var(--color-text-primary);
   overflow: hidden;
   min-width: 260px;
   min-height: 120px;
-  backdrop-filter: blur(8px);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .floating-card.always-on-top {
-  border-color: rgba(14, 165, 233, 0.7);
+  border-color: var(--color-accent);
+  box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.15), 0 0 0 1px rgba(37, 99, 235, 0.1);
 }
 
 .floating-card.collapsed {
@@ -34,8 +38,10 @@
   justify-content: space-between;
   gap: 8px;
   padding: 10px 10px 8px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+  border-bottom: 1px solid var(--color-border);
   cursor: move;
+  background: var(--color-bg-secondary);
+  user-select: none;
 }
 
 .floating-card-title-wrap {
@@ -44,15 +50,15 @@
 
 .floating-card-title {
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.2;
-  color: #f8fafc;
+  color: var(--color-text-primary);
 }
 
 .floating-card-subtitle {
   margin-top: 2px;
   font-size: 10px;
-  color: rgba(226, 232, 240, 0.76);
+  color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -61,36 +67,38 @@
 
 .floating-card-header-actions {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 .floating-card-body {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 6px;
+  padding: 8px;
   overflow: auto;
 }
 
 .floating-card-warning {
   padding: 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   font-size: 11px;
   line-height: 1.4;
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
+  background: var(--color-warning-dim);
+  color: #92400e;
+  border: 1px solid rgba(245, 158, 11, 0.2);
 }
 
 .floating-card-platform-row {
   display: grid;
   grid-template-columns: 1fr;
-  gap: 6px;
+  gap: 5px;
   padding: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-secondary);
 }
 
 .floating-card-platform-meta {
@@ -98,17 +106,17 @@
 }
 
 .floating-card-platform-name {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: #93c5fd;
+  letter-spacing: 0.04em;
+  color: var(--color-accent);
 }
 
 .floating-card-platform-account {
   margin-top: 2px;
   font-size: 11px;
-  color: rgba(226, 232, 240, 0.92);
+  color: var(--color-text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -117,18 +125,27 @@
 .floating-card-switch-select {
   width: 100%;
   font-size: 12px;
-  color: #e2e8f0;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(148, 163, 184, 0.35);
-  border-radius: 6px;
-  padding: 6px 8px;
+  color: var(--color-text-primary);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
 }
 
 .floating-card-switch-select:focus {
   outline: none;
-  border-color: rgba(14, 165, 233, 0.8);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
 }
 
+.floating-card-switch-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 右下角拖拽调整大小手柄 */
 .floating-card-resize-handle {
   position: absolute;
   right: 0;
@@ -137,6 +154,11 @@
   height: 14px;
   cursor: nwse-resize;
   background:
-    linear-gradient(135deg, transparent 45%, rgba(148, 163, 184, 0.6) 45%, rgba(148, 163, 184, 0.6) 55%, transparent 55%),
-    linear-gradient(135deg, transparent 65%, rgba(148, 163, 184, 0.6) 65%, rgba(148, 163, 184, 0.6) 75%, transparent 75%);
+    linear-gradient(135deg, transparent 45%, var(--color-border-active) 45%, var(--color-border-active) 55%, transparent 55%),
+    linear-gradient(135deg, transparent 65%, var(--color-border-active) 65%, var(--color-border-active) 75%, transparent 75%);
+  opacity: 0.6;
+}
+
+.floating-card:hover .floating-card-resize-handle {
+  opacity: 1;
 }

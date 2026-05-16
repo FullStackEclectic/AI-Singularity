@@ -4,7 +4,6 @@ import Sidebar from "./components/layout/Sidebar";
 import DashboardPage from "./components/dashboard/DashboardPage";
 import DeepLinkHandler from "./components/DeepLinkHandler";
 import FloatingAccountCardsLayer from "./components/floating/FloatingAccountCardsLayer";
-import AnnouncementCenter from "./components/announcement/AnnouncementCenter";
 import { message } from "@tauri-apps/plugin-dialog";
 import { api } from "./lib/api";
 import "./App.css";
@@ -146,12 +145,6 @@ export default function App() {
         </Suspense>
       </main>
       <FloatingAccountCardsLayer />
-      <AnnouncementCenter
-        onNavigate={(target) => {
-          const next = normalizeNavPageTarget(target);
-          if (next) setActivePage(next);
-        }}
-      />
       <DeepLinkHandler />
     </div>
   );
