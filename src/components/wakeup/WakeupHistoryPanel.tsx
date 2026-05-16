@@ -70,9 +70,9 @@ export function WakeupHistoryPanel({
       </div>
 
       {historyCount === 0 ? (
-        <div className="wakeup-empty">当前还没有 Wakeup 历史</div>
+        <div className="wakeup-empty">暂无执行历史</div>
       ) : groupedHistory.length === 0 ? (
-        <div className="wakeup-empty">当前分组下没有 Wakeup 历史</div>
+        <div className="wakeup-empty">当前分组暂无执行历史</div>
       ) : (
         <div className="wakeup-history-list">
           {groupedHistory.map((group) => (

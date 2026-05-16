@@ -55,7 +55,7 @@ export default function SkillsPage() {
     <div className="skills-page animate-fade-in">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Skills 技能插件</h1>
+          <h1 className="page-title">技能包管理</h1>
           <p className="page-subtitle">
             统一管理本地技能仓，支持通过 Git 仓库地址安装、更新与清理，为多工具工作流沉淀通用能力。
           </p>
@@ -107,7 +107,7 @@ export default function SkillsPage() {
         <div className="modal-overlay" onClick={() => !isInstalling && setShowAdd(false)}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h2>从 Git 安装扩展技能</h2>
+              <h2>从 Git 安装技能</h2>
               <button className="btn btn-icon" onClick={() => setShowAdd(false)} disabled={isInstalling}>✕</button>
             </div>
             <form className="modal-body" onSubmit={handleInstall}>
@@ -138,7 +138,7 @@ export default function SkillsPage() {
               <div className="modal-footer">
                 <button type="button" className="btn btn-ghost" onClick={() => setShowAdd(false)} disabled={isInstalling}>取消</button>
                 <button type="submit" className="btn btn-primary" disabled={isInstalling || !installUrl.trim()}>
-                  {isInstalling ? "安装中..." : "立刻导入"}
+                  {isInstalling ? "安装中..." : "开始安装"}
                 </button>
               </div>
             </form>

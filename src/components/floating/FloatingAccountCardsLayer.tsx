@@ -350,7 +350,7 @@ export default function FloatingAccountCardsLayer() {
                           {normalizedPlatform ? formatIdePlatformKeyLabel(normalizedPlatform) : "unknown"}
                         </div>
                         <div className="floating-card-platform-account">
-                          {snapshot?.label || snapshot?.email || "未解析到当前账号"}
+                          {snapshot?.label || snapshot?.email || "未设置当前账号"}
                         </div>
                       </div>
                       <select

@@ -46,7 +46,7 @@ export default function ModelMappingPanel() {
         <input 
           value={source} 
           onChange={e => setSource(e.target.value)} 
-          placeholder="拦截来源 (例: gpt-4)" 
+          placeholder="来源模型（如 gpt-4）" 
           className="form-input" 
           style={{ flex: 1 }}
         />
@@ -54,7 +54,7 @@ export default function ModelMappingPanel() {
         <input 
           value={target} 
           onChange={e => setTarget(e.target.value)} 
-          placeholder="转发目标 (例: gemini-1.5-pro)" 
+          placeholder="目标模型（如 gemini-1.5-pro）" 
           className="form-input" 
           style={{ flex: 1 }}
         />
@@ -68,7 +68,7 @@ export default function ModelMappingPanel() {
       </div>
 
       <div className="mapping-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 16 }}>
-        {mappings.length === 0 && <div className="text-muted" style={{fontSize: 13}}>暂未配置任何拦截映射规则</div>}
+        {mappings.length === 0 && <div className="text-muted" style={{fontSize: 13}}>暂无映射规则</div>}
         {mappings.map(m => (
           <div key={m.id} className={`protocol-item ${!m.is_active ? "opacity-50" : ""}`}>
             <div className="protocol-meta" style={{ flex: 1 }}>

@@ -381,7 +381,7 @@ export function SettingsRuntimeSection({
                   <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 4 }}>
                     {formatIdePlatformKeyLabel(item.platform)}
                   </div>
-                  <div style={{ fontSize: 13 }}>{item.label || "未解析到当前账号"}</div>
+                  <div style={{ fontSize: 13 }}>{item.label || "未设置当前账号"}</div>
                   <div className="text-muted" style={{ fontSize: 11, marginTop: 4 }}>
                     {item.email || "—"} · {item.status || "unknown"}
                   </div>

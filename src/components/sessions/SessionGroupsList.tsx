@@ -48,11 +48,11 @@ export function SessionGroupsList({
   return (
     <>
       <div className="section-divider mt-4">
-        <span>[ 沉睡数据缓冲 ] OFFLINE_CACHE</span>
+        <span>离线缓存</span>
       </div>
 
       {sessions.length === 0 && !loading && (
-        <div className="empty-text">未发现沉睡的历史数据</div>
+        <div className="empty-text">暂无离线历史数据</div>
       )}
 
       {sessions.length > 0 && sessionGroups.length === 0 && !loading && (

@@ -56,7 +56,7 @@ export function SessionDetailPane({
       <div className="empty-chat cyber-placeholder">
         <Activity size={48} className="placeholder-icon pulse-icon" />
         <div>SYSTEM_STANDBY</div>
-        <div className="text-muted" style={{ fontSize: 12, marginTop: 8 }}>请选择左侧内存残片进行逆向还原</div>
+        <div className="text-muted" style={{ fontSize: 12, marginTop: 8 }}>请从左侧选择一条会话</div>
       </div>
     );
   }
@@ -152,9 +152,9 @@ export function SessionDetailPane({
 
       <div className="chat-messages cyber-chat-box">
         {messagesLoading ? (
-          <div className="empty-chat glitch-text">解析内存残片中... DECRYPTING...</div>
+          <div className="empty-chat glitch-text">加载中...</div>
         ) : visibleMessages.length === 0 ? (
-          <div className="empty-chat text-muted">残片已清空或无法还原</div>
+          <div className="empty-chat text-muted">暂无消息内容</div>
         ) : (
           visibleMessages.map((message, idx) => {
             const isUser = message.role === "user";

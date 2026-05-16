@@ -94,7 +94,7 @@ export default function SecurityPage() {
     <div className="proxy-container">
       <header className="proxy-header flex-row">
         <div>
-          <h1 className="proxy-title"><Shield size={22} className="text-primary" /> 哨站风控台 (Security Gateway)</h1>
+          <h1 className="proxy-title"><Shield size={22} className="text-primary" /> 安全风控</h1>
           <p className="proxy-subtitle">Monitor proxy inbound traffic and manage IP access limits dynamically.</p>
         </div>
         <div style={{ display: "flex", gap: 12 }}>
@@ -188,22 +188,22 @@ export default function SecurityPage() {
                高维防御界限 (Firewall Rules)
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddRule(!showAddRule)}>
-              {showAddRule ? "取消添加" : <><Plus size={14} /> 新增规则界限</>}
+              {showAddRule ? "取消添加" : <><Plus size={14} /> 新增规则</>}
             </button>
           </div>
 
           <div style={{ marginBottom: 16, fontSize: 13, color: "var(--color-text-secondary)", borderLeft: "3px solid var(--color-primary)", paddingLeft: 12 }}>
-            当设定了<strong>白名单</strong>时，所有未记录的外部 IP 均会自动被默认拒载；黑名单具有全球最高裁决优先级。可以使用 * 作为 IP 后缀通配。
+            设置白名单后，未在列表中的 IP 将被自动拒绝；黑名单优先级最高。支持使用 * 作为 IP 后缀通配符。
           </div>
 
           {showAddRule && (
             <div style={{ background: "rgba(15, 23, 42, 0.05)", border: "1px solid var(--color-border)", borderRadius: 8, padding: 16, marginBottom: 24 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 2fr auto", gap: 12, alignItems: "end" }}>
                 <div>
-                   <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>策略判定 (Rule Type)</label>
+                   <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>规则类型</label>
                    <select className="form-select" style={{ width: "100%" }} value={newRuleType} onChange={(e) => setNewRuleType(e.target.value as any)}>
-                     <option value="blacklist">💀 数据黑洞 (Blacklist)</option>
-                     <option value="whitelist">🟢 绝对放行 (Whitelist)</option>
+                     <option value="blacklist">🚫 黑名单（拒绝访问）</option>
+                     <option value="whitelist">✅ 白名单（允许访问）</option>
                    </select>
                 </div>
                 <div>
@@ -211,11 +211,11 @@ export default function SecurityPage() {
                    <input type="text" className="form-input" placeholder="例如: 192.168.1.*" value={newRuleIp} onChange={e => setNewRuleIp(e.target.value)} style={{ width: "100%" }}/>
                 </div>
                 <div>
-                   <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>战术命名 (Notes)</label>
-                   <input type="text" className="form-input" placeholder="例如: 恶意爬虫群" value={newRuleNotes} onChange={e => setNewRuleNotes(e.target.value)} style={{ width: "100%" }}/>
+                   <label style={{ display: "block", fontSize: 12, marginBottom: 4 }}>备注说明</label>
+                   <input type="text" className="form-input" placeholder="例如: 例如：恶意爬虫" value={newRuleNotes} onChange={e => setNewRuleNotes(e.target.value)} style={{ width: "100%" }}/>
                 </div>
                 <div>
-                   <button className="btn btn-primary" onClick={handleAddRule} disabled={!newRuleIp.trim()}>强制下发</button>
+                   <button className="btn btn-primary" onClick={handleAddRule} disabled={!newRuleIp.trim()}>添加规则</button>
                 </div>
               </div>
             </div>

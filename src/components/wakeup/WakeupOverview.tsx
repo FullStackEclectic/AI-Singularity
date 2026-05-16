@@ -143,7 +143,7 @@ export function WakeupOverview({
               onStateChange({ ...state, enabled: event.target.checked })
             }
           />
-          <span>启用 Wakeup 总开关</span>
+          <span>启用定时任务</span>
         </label>
         <div className="wakeup-hint">
           已切换到 SQLite 持久化 + WakeupGateway 中枢：自动健康预检、Run 生命周期记录、与 IDE

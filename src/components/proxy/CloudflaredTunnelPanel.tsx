@@ -57,17 +57,17 @@ export default function CloudflaredTunnelPanel({ localPort }: { localPort: numbe
       <div className="proxy-card-header" style={{ marginBottom: 12, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {isActive ? <Globe size={18} className="text-primary" /> : <GlobeLock size={18} className="text-muted" />}
-          <span>公网隧道穿透 (Cloudflared Tunnel)</span>
+          <span>公网穿透（Cloudflared）</span>
         </div>
         <button 
           className={`btn btn-sm ${isActive ? 'btn-danger' : 'btn-primary'}`}
           onClick={() => toggleMut.mutate()}
           disabled={loading || toggleMut.isPending}
         >
-           {loading ? "握手中..." : (isActive ? "关闭连接" : "开启公网穿透")}
+           {loading ? "连接中..." : (isActive ? "关闭连接" : "开启公网穿透")}
         </button>
       </div>
-      <p style={{ margin: "0 0 16px 0", fontSize: 13, color: "var(--color-text-secondary)" }}>基于 Cloudflared Zero Trust，一键将本地网关跨网分享给公网设备使用。</p>
+      <p style={{ margin: "0 0 16px 0", fontSize: 13, color: "var(--color-text-secondary)" }}>基于 Cloudflare Zero Trust，将本地代理暴露到公网，方便远程设备访问。</p>
 
       {(isActive || loading) && (
         <div className="info-banner" style={{ margin: 0, padding: "12px 16px" }}>

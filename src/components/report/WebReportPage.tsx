@@ -84,10 +84,10 @@ function buildReportHtml(payload: {
       <h1>AI Singularity Web Report</h1>
       <div class="meta">生成时间：${escapeHtml(generatedAt)}</div>
       <div class="grid">
-        <div class="card"><div class="label">今日预估开销</div><div class="value">$${Number(metrics?.total_cost_today_usd ?? 0).toFixed(4)}</div></div>
-        <div class="card"><div class="label">活跃 IDE 账号</div><div class="value">${escapeHtml(metrics?.active_ide_accounts ?? 0)}</div></div>
+        <div class="card"><div class="label">今日预估费用</div><div class="value">$${Number(metrics?.total_cost_today_usd ?? 0).toFixed(4)}</div></div>
+        <div class="card"><div class="label">活跃账号数</div><div class="value">${escapeHtml(metrics?.active_ide_accounts ?? 0)}</div></div>
         <div class="card"><div class="label">今日 Token</div><div class="value">${escapeHtml(metrics?.today_total_tokens ?? 0)}</div></div>
-        <div class="card"><div class="label">风控异常率</div><div class="value">${(((metrics?.forbidden_accounts_ratio ?? 0) as number) * 100).toFixed(1)}%</div></div>
+        <div class="card"><div class="label">账号异常率</div><div class="value">${(((metrics?.forbidden_accounts_ratio ?? 0) as number) * 100).toFixed(1)}%</div></div>
       </div>
     </div>
     <div class="section">
@@ -232,13 +232,13 @@ export default function WebReportPage() {
 
       <div className="web-report-stats">
         <div className="card web-report-stat">
-          <div className="web-report-stat-label">今日预估开销</div>
+          <div className="web-report-stat-label">今日预估费用</div>
           <div className="web-report-stat-value">
             ${Number(metricsQuery.data?.total_cost_today_usd ?? 0).toFixed(4)}
           </div>
         </div>
         <div className="card web-report-stat">
-          <div className="web-report-stat-label">活跃 IDE 账号</div>
+          <div className="web-report-stat-label">活跃账号数</div>
           <div className="web-report-stat-value">{ideAccountsQuery.data?.filter((item: any) => item.status === "active").length ?? 0}</div>
         </div>
         <div className="card web-report-stat">

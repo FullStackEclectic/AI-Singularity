@@ -100,7 +100,7 @@ export function UnifiedAccountsDataView({
       {isLoading ? (
         <div className="empty-state">
           <RefreshCw size={24} className="spin" />
-          <span>核心数据网络拉取中...</span>
+          <span>核心数据网络同步中...</span>
         </div>
       ) : displayItemsLength === 0 ? (
         <div className="empty-state">

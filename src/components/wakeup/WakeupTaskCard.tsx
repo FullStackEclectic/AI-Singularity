@@ -229,7 +229,7 @@ export function WakeupTaskCard({
           />
         </label>
         <label>
-          <span>超时秒数</span>
+          <span>超时时间（秒）</span>
           <input
             className="form-input"
             type="number"

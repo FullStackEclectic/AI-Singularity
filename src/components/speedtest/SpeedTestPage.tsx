@@ -94,7 +94,7 @@ export default function SpeedTestPage() {
     <div className="speedtest-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">端点延迟测速</h1>
+          <h1 className="page-title">网络测速</h1>
           <p className="page-subtitle">
             实测各主流平台 API 端点的响应速度，选择当下最快节点
           </p>
@@ -118,7 +118,7 @@ export default function SpeedTestPage() {
           <div className="empty-state">
             <div className="empty-state-icon">⚡</div>
             <h3 style={{ color: "var(--color-text-secondary)" }}>点击「开始测速」</h3>
-            <p>将对 9 个主流平台端点并发发送探测请求，通常在 10 秒内完成</p>
+            <p>对主流平台端点并发测速，通常 10 秒内完成</p>
           </div>
         )}
 
@@ -126,7 +126,7 @@ export default function SpeedTestPage() {
           <div className="empty-state">
             <div className="speedtest-pulse">⚡</div>
             <h3 style={{ color: "var(--color-accent)" }}>正在测速...</h3>
-            <p>对各端点发送并发探测，请稍候</p>
+            <p>正在测速，请稍候...</p>
           </div>
         )}
 

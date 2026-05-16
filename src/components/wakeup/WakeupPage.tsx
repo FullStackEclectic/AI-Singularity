@@ -87,7 +87,7 @@ export default function WakeupPage() {
           {loading ? (
             <div className="wakeup-empty">加载中...</div>
           ) : state.tasks.length === 0 ? (
-            <div className="wakeup-empty">当前还没有 Wakeup 任务</div>
+            <div className="wakeup-empty">暂无定时任务</div>
           ) : (
             <div className="wakeup-task-list">
               {state.tasks.map((task) => (

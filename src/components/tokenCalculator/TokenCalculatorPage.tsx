@@ -894,7 +894,7 @@ export default function TokenCalculatorPage() {
                     onClick={() => void fetchSitePricing(singleSite, setSingleSite)}
                     disabled={singleSite.loading}
                   >
-                    {singleSite.loading ? "拉取中..." : "拉取模型与价格"}
+                    {singleSite.loading ? "同步中..." : "拉取模型与价格"}
                   </button>
                   {singleSite.result && (
                     <span className="token-source-text">
@@ -1515,7 +1515,7 @@ function CompareSiteCard({
       )}
       <div className="token-action-row">
         <button className="btn btn-ghost btn-sm" onClick={onFetch} disabled={site.loading}>
-          {site.loading ? "拉取中..." : `拉取 ${title}`}
+          {site.loading ? "同步中..." : `拉取 ${title}`}
         </button>
         {site.result && <span className="token-source-text">{site.result.source_endpoint}</span>}
       </div>

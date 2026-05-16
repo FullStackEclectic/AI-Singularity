@@ -140,7 +140,7 @@ export default function ProxyEngineSettingsPanel() {
                     onChange={(e) => updateConfig(c => ({...c, scheduling: {...c.scheduling, mode: e.target.value as any}}))}
                   >
                     <option value="Balance">均衡轮询 (Round Robin Balance)</option>
-                    <option value="Priority">资产权重优先 (Strict Priority)</option>
+                    <option value="Priority">权重优先（Strict Priority）</option>
                     <option value="Latency">最低延迟优先 (Low Latency First)</option>
                   </select>
                 </div>
@@ -187,7 +187,7 @@ export default function ProxyEngineSettingsPanel() {
           {expandedSection === "circuitBreaker" && (
             <div style={{ padding: 16, borderTop: "1px solid var(--color-border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>触发异常后的逐步冻结策略 (退避秒数)</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--color-text)" }}>触发异常后的退避冷却时间（秒）</span>
                 <div style={{ display: "flex", gap: 8 }}>
                   <button className="btn btn-secondary btn-sm" onClick={() => updateConfig(c => ({...c, circuitBreaker: {...c.circuitBreaker, enabled: !c.circuitBreaker.enabled}}))}>
                     {config.circuitBreaker.enabled ? "关闭熔断" : "开启熔断"}
@@ -252,16 +252,16 @@ export default function ProxyEngineSettingsPanel() {
           {expandedSection === "advancedThinking" && (
             <div style={{ padding: 16, borderTop: "1px solid var(--color-border)", opacity: config.advancedThinking.enabled ? 1 : 0.8 }}>
                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>智能压缩巨量会话历史，在保留意图的同时节约流转成本。</span>
+                <span style={{ fontSize: 13, color: "var(--color-text-secondary)" }}>自动压缩超长对话历史，在保留核心意图的同时降低 Token 消耗。</span>
                 <button className={`btn btn-sm ${config.advancedThinking.enabled ? "btn-secondary" : "btn-primary"}`} onClick={() => updateConfig(c => ({...c, advancedThinking: {...c.advancedThinking, enabled: !c.advancedThinking.enabled}}))}>
-                  {config.advancedThinking.enabled ? "停用压缩" : "激活压缩算法"}
+                  {config.advancedThinking.enabled ? "停用压缩" : "启用压缩"}
                 </button>
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, pointerEvents: config.advancedThinking.enabled ? "auto" : "none" }}>
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
-                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>触发压缩阙值 (Threshold)</label>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: "var(--color-text)" }}>触发压缩阈值</label>
                     <span style={{ fontSize: 12, color: "var(--color-primary)", fontWeight: 600 }}>{Math.round(config.advancedThinking.compressionThreshold * 100)}%</span>
                   </div>
                   <input 
@@ -271,7 +271,7 @@ export default function ProxyEngineSettingsPanel() {
                     value={config.advancedThinking.compressionThreshold}
                     onChange={(e) => updateConfig(c => ({...c, advancedThinking: {...c.advancedThinking, compressionThreshold: Number(e.target.value)}}))}
                   />
-                  <p style={{ margin: "4px 0 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>当历史消息长度超过目标池设定最大 Tokens 的百分比时引发拦截折叠。</p>
+                  <p style={{ margin: "4px 0 0 0", fontSize: 11, color: "var(--color-text-muted)" }}>当历史消息长度超过最大 Token 数的指定百分比时，自动触发压缩。</p>
                 </div>
                 <div>
                     <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text)", marginBottom: 8 }}>

@@ -109,7 +109,7 @@ export function SessionsSidebarContainer({
       onMoveProblemSessionsToTrash={() =>
         actions.handleMoveSpecificSessionsToTrash(
           derivedState.visibleProblemFilepaths,
-          "问题会话"
+          "异常会话"
         )
       }
       onCopyProblemDirs={() =>
