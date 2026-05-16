@@ -1,7 +1,9 @@
+/* 账号控制塔抽屉 — 浅色主题 */
 .cockpit-drawer-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(15, 23, 42, 0.2);
+  backdrop-filter: blur(4px);
   z-index: 1000;
   display: flex;
   justify-content: flex-end;
@@ -10,11 +12,12 @@
 .cockpit-drawer {
   width: min(900px, 100%);
   height: 100%;
-  background: var(--app-bg, #0e1116);
-  color: var(--app-fg, #e7e9ee);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
   display: flex;
   flex-direction: column;
-  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -8px 0 32px rgba(15, 23, 42, 0.08);
 }
 
 .cockpit-drawer-header {
@@ -22,33 +25,40 @@
   align-items: center;
   justify-content: space-between;
   padding: 16px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .cockpit-drawer-header h2 {
   font-size: 18px;
   font-weight: 600;
   margin: 0;
+  color: var(--color-text-primary);
 }
 
 .cockpit-close-btn {
   background: transparent;
-  border: none;
-  color: inherit;
+  border: 1px solid transparent;
+  color: var(--color-text-muted);
   cursor: pointer;
-  padding: 4px;
-  border-radius: 6px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  transition: all var(--transition-fast);
 }
 .cockpit-close-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border);
 }
 
 .cockpit-tabs {
   display: flex;
   gap: 4px;
   padding: 8px 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--color-border);
   flex-wrap: wrap;
+  background: var(--color-bg-secondary);
 }
 
 .cockpit-tab {
@@ -58,17 +68,21 @@
   background: transparent;
   border: 1px solid transparent;
   padding: 6px 12px;
-  border-radius: 8px;
-  color: inherit;
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 500;
+  transition: all var(--transition-fast);
 }
 .cockpit-tab:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
 }
 .cockpit-tab.active {
-  background: rgba(94, 132, 255, 0.18);
-  border-color: rgba(94, 132, 255, 0.4);
+  background: var(--color-accent-dim);
+  border-color: rgba(37, 99, 235, 0.2);
+  color: var(--color-accent);
 }
 
 .cockpit-content {
@@ -93,6 +107,7 @@
 .cockpit-section-header h3 {
   margin: 0;
   font-size: 16px;
+  color: var(--color-text-primary);
 }
 
 .cockpit-actions {
@@ -101,30 +116,50 @@
   align-items: center;
 }
 .cockpit-actions input {
-  padding: 4px 8px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+.cockpit-actions input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-dim);
 }
 .cockpit-actions button,
 .cockpit-form button,
 .cockpit-table button {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: inherit;
-  padding: 4px 10px;
-  border-radius: 6px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-secondary);
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   font-size: 13px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  transition: all var(--transition-fast);
+}
+.cockpit-actions button:hover,
+.cockpit-form button:hover,
+.cockpit-table button:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+  border-color: var(--color-border-active);
 }
 .cockpit-actions button.primary,
 .cockpit-form button.primary {
-  background: rgba(94, 132, 255, 0.4);
-  border-color: rgba(94, 132, 255, 0.6);
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}
+.cockpit-actions button.primary:hover,
+.cockpit-form button.primary:hover {
+  background: var(--color-accent-hover);
 }
 .cockpit-actions button:disabled,
 .cockpit-form button:disabled {
@@ -133,25 +168,26 @@
 }
 
 .cockpit-stats {
-  background: rgba(94, 132, 255, 0.08);
-  border: 1px solid rgba(94, 132, 255, 0.2);
-  border-radius: 8px;
+  background: var(--color-accent-dim);
+  border: 1px solid rgba(37, 99, 235, 0.15);
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   font-size: 13px;
+  color: var(--color-text-secondary);
 }
 
 .cockpit-empty {
-  color: rgba(255, 255, 255, 0.5);
+  color: var(--color-text-muted);
   font-size: 13px;
   padding: 16px 0;
 }
 
 .cockpit-mute {
-  color: rgba(255, 255, 255, 0.45);
+  color: var(--color-text-muted);
   font-size: 11px;
 }
 .cockpit-mono {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
 }
 .cockpit-reason {
@@ -168,54 +204,66 @@
 .cockpit-table td {
   text-align: left;
   padding: 8px 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--color-border);
 }
 .cockpit-table th {
-  font-weight: 500;
-  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-bg-secondary);
+}
+.cockpit-table tbody tr:hover td {
+  background: var(--color-bg-hover);
 }
 
 .cockpit-form {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
-  padding: 12px;
+  background: var(--color-bg-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 14px;
 }
 .cockpit-row {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   font-size: 13px;
+  color: var(--color-text-primary);
 }
 .cockpit-row input[type="number"] {
   width: 80px;
-  padding: 2px 6px;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: inherit;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  font-size: 13px;
 }
 
 .cockpit-fieldset {
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   padding: 8px 12px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 .cockpit-fieldset legend {
   padding: 0 6px;
   font-size: 12px;
-  color: rgba(255, 255, 255, 0.65);
+  font-weight: 600;
+  color: var(--color-text-muted);
 }
 
 .cockpit-subhead {
   margin: 16px 0 6px 0;
   font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
   display: inline-flex;
   align-items: center;
   gap: 6px;

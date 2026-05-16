@@ -5,6 +5,7 @@ import type { ActionMessage, IdeOverviewSummary } from "./unifiedAccountsTypes";
 import "./UnifiedAccountsControlPanel.css";
 import {
   CalendarCheck,
+  Compass,
   Edit2,
   Eye,
   EyeOff,
@@ -90,6 +91,7 @@ export function UnifiedAccountsControlPanel({
   searchQuery,
   onSearchQueryChange,
   onClearSearch,
+  onOpenCockpit,
 }: {
   activeChannelName: string;
   totalFilteredCount: number;
@@ -162,6 +164,7 @@ export function UnifiedAccountsControlPanel({
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
   onClearSearch: () => void;
+  onOpenCockpit: () => void;
 }) {
   const renderAttentionReasonButton = (
     reason: AttentionReasonFilter,
@@ -250,6 +253,10 @@ export function UnifiedAccountsControlPanel({
             <Plus size={15} />
             {" "}
             添加资产
+          </button>
+          <button className="btn btn-ghost btn-sm" onClick={onOpenCockpit} title="账号控制塔：失效检测 / 自动切号 / 配额告警 / 设备指纹 / 插件导入">
+            <Compass size={14} />
+            控制塔
           </button>
         </div>
       </div>
