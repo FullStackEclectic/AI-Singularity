@@ -140,8 +140,8 @@ export function UnifiedAccountsVirtualRow({
         {item.type === "api" ? (
           <>
             <button className="btn-row-action" onClick={() => onRefreshApiBalance(item.data.id)} title="刷新余额"><RefreshCw size={14} /></button>
-            <button className="btn-row-action" onClick={() => onCheckApiKey(item.data.id)} title="探测连通性"><MonitorPlay size={14} /></button>
-            <button className="btn-row-action danger" onClick={() => onDeleteApiKey(item.data)} title="彻底销毁"><X size={14} /></button>
+            <button className="btn-row-action" onClick={() => onCheckApiKey(item.data.id)} title="检测连通性"><MonitorPlay size={14} /></button>
+            <button className="btn-row-action danger" onClick={() => onDeleteApiKey(item.data)} title="删除"><X size={14} /></button>
           </>
         ) : (
           <>
@@ -181,7 +181,7 @@ export function UnifiedAccountsVirtualRow({
             <button className="btn-row-action" onClick={() => onOpenIdeLabel(item.data)} title="编辑备注名">
               <Edit2 size={14} />
             </button>
-            <button className="btn-row-action danger" onClick={() => onDeleteIdeAccount(item.data)} title="拔除资产">
+            <button className="btn-row-action danger" onClick={() => onDeleteIdeAccount(item.data)} title="删除账号">
               <X size={14} />
             </button>
           </>

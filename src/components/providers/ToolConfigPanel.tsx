@@ -1,5 +1,5 @@
 /**
- * ToolConfigPanel — 渠道专属配置面板
+ * ToolConfigPanel — 工具专属配置面板
  *
  * 当某个 ToolTarget 被选中时，动态展开对应渠道的配置输入项。
  * 每个渠道的配置字段各不相同（参考 cc-switch UniversalProviderFormModal 设计）。
@@ -203,7 +203,7 @@ export default function ToolConfigPanel({ tool, configs, onUpdate }: ToolConfigP
           <span className="tcp-name">{TOOL_TARGET_LABELS[tool]}</span>
           <span className="tcp-path">{TOOL_TARGET_CONFIG_PATH[tool]}</span>
         </div>
-        <span className="tcp-badge">渠道专属配置</span>
+        <span className="tcp-badge">工具专属配置</span>
       </div>
 
       <div className="tool-config-panel-body">

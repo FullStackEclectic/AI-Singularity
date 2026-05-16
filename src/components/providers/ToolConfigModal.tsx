@@ -100,7 +100,7 @@ function SortableProviderRow({
         
         {isActive && (
           <div style={{ display: "flex", flexDirection: "column", gap: 4, width: 180 }}>
-            <label style={{ fontSize: 10, color: "var(--color-text-tertiary)" }}>独立劫持模型定义 (留空使用默认)</label>
+            <label style={{ fontSize: 10, color: "var(--color-text-tertiary)" }}>单独指定模型（留空使用默认）</label>
             <input 
               className="form-input"
               style={{ padding: "4px 8px", fontSize: 12 }}
@@ -213,10 +213,10 @@ export default function ToolConfigModal({
         <div className="modal-header">
           <div>
             <h2 style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              配置注入: {TOOL_TARGET_LABELS[tool]}
+              配置目标：{TOOL_TARGET_LABELS[tool]}
             </h2>
             <div style={{ fontSize: 12, color: "var(--color-text-secondary)", fontFamily: "monospace", marginTop: 4 }}>
-              配置文件锚点: {TOOL_TARGET_CONFIG_PATH[tool]} 
+              配置文件路径：{TOOL_TARGET_CONFIG_PATH[tool]} 
               {proxyTakeover && <span style={{ color: "var(--color-primary)", marginLeft: 8 }}>🛡️ [全局代理接管开启 中]</span>}
             </div>
           </div>
@@ -229,9 +229,9 @@ export default function ToolConfigModal({
               {message}
             </div>
           )}
-          <div className="form-section-title">灾备队列与节点池 (支持拖拽排序)</div>
+          <div className="form-section-title">配置源列表（支持拖拽排序）</div>
           <p className="form-hint" style={{ marginTop: -8, marginBottom: 12 }}>
-            勾选你想绑定给该工具的节点。排在最前（P1）的节点将作为代理首发源。
+            勾选要绑定给该工具的配置源，排在最前的将优先使用。
           </p>
           
           <div style={{ border: "1px solid var(--color-border)", borderRadius: 8, overflow: "hidden", background: "var(--color-surface)" }}>
@@ -256,14 +256,14 @@ export default function ToolConfigModal({
             </DndContext>
             {localProviders.length === 0 && (
               <div style={{ padding: 24, textAlign: "center", color: "var(--color-text-tertiary)" }}>
-                系统内暂无可用网关节点，请先前往高级设置添加。
+                暂无可用配置源，请先添加。
               </div>
             )}
           </div>
 
           {activeProviders.length > 0 && (
             <div style={{ marginTop: 24 }}>
-              <div className="form-section-title">底层配置文件实时预览</div>
+              <div className="form-section-title">配置文件预览</div>
               <ConfigPreview
                 baseUrl={proxyTakeover ? "http://127.0.0.1:23333/v1" : (activeProviders[0].base_url || getToolDefaultBaseUrl(tool))}
                 apiKey={activeProviders[0].api_key_id ? "sk-ais-xxxxx" : ""}
@@ -280,7 +280,7 @@ export default function ToolConfigModal({
         <div className="modal-footer">
           <button className="btn btn-ghost" onClick={onClose}>取消</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? "应用中..." : "立刻下发覆盖"}
+            {isSaving ? "应用中..." : "保存并应用"}
           </button>
         </div>
       </div>

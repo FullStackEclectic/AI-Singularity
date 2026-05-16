@@ -100,7 +100,7 @@ export default function SecurityPage() {
         <div style={{ display: "flex", gap: 12 }}>
           <button className="btn btn-secondary" onClick={fetchData}>
             <RefreshCw size={14} className={loading && activeTab !== "logs" ? "animate-spin" : ""} /> 
-            刷新探测
+            刷新
           </button>
         </div>
       </header>
@@ -118,14 +118,14 @@ export default function SecurityPage() {
           onClick={() => setActiveTab("logs")}
           style={{ background: activeTab === "logs" ? "var(--color-primary-alpha)" : "transparent", border: "none" }}
         >
-          <FileText size={16} /> 流水探测 (Access Logs)
+          <FileText size={16} /> 访问日志
         </button>
         <button 
           className={`btn btn-sm ${activeTab === "rules" ? "btn-primary" : "btn-secondary"}`}
           onClick={() => setActiveTab("rules")}
           style={{ background: activeTab === "rules" ? "var(--color-primary-alpha)" : "transparent", border: "none" }}
         >
-          <Lock size={16} /> 极客黑白名单 (IP Rules Matrix)
+          <Lock size={16} /> IP 访问规则
         </button>
       </div>
 
@@ -134,14 +134,14 @@ export default function SecurityPage() {
           <div className="proxy-card-header" style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
                <Activity size={18} className="text-primary" style={{ marginRight: 8 }}/>
-               实时拦截流水 (Realtime Intercept Logs)
+               实时访问日志
             </div>
             <button className="btn btn-secondary btn-sm" onClick={() => setConfirmClearLogs(true)}><Trash2 size={14} /> 清空记录</button>
           </div>
 
           <div style={{ background: "var(--color-bg-primary)", borderRadius: 8, padding: 12, border: "1px solid var(--color-border)", minHeight: 300, maxHeight: 600, overflowY: "auto" }}>
             {logs.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>暂无访问记录 (No access logs)</div>
+              <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)" }}>暂无访问记录</div>
             ) : (
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
@@ -185,7 +185,7 @@ export default function SecurityPage() {
           <div className="proxy-card-header" style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}>
             <div>
                <Shield size={18} className="text-primary" style={{ marginRight: 8 }}/>
-               高维防御界限 (Firewall Rules)
+               防火墙规则
             </div>
             <button className="btn btn-primary btn-sm" onClick={() => setShowAddRule(!showAddRule)}>
               {showAddRule ? "取消添加" : <><Plus size={14} /> 新增规则</>}
@@ -223,7 +223,7 @@ export default function SecurityPage() {
 
           <div style={{ display: "grid", gap: 12 }}>
             {rules.length === 0 ? (
-               <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: 8 }}>暂无建立自定义界限 (No custom firewall rules)</div>
+               <div style={{ textAlign: "center", padding: "40px", color: "var(--color-text-muted)", border: "1px dashed var(--color-border)", borderRadius: 8 }}>暂无自定义规则</div>
             ) : rules.map((r) => (
               <div key={r.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: 16, borderRadius: 8, border: "1px solid var(--color-border)", background: "var(--color-bg-primary)" }}>
                 <div style={{ display: "flex", gap: 16, alignItems: "center" }}>

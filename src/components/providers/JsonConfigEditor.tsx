@@ -46,7 +46,7 @@ export function JsonConfigEditor({ value, onChange, height = 240 }: JsonConfigEd
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-        <label className="form-label">底层引擎配置 (JSON Core Options)</label>
+        <label className="form-label">高级配置（JSON）</label>
         <button type="button" onClick={handleFormat} className="btn-sm btn-ghost" style={{ fontSize: 11 }}>
           格式化 JSON
         </button>

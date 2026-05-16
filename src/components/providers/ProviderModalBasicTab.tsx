@@ -97,7 +97,7 @@ export function ProviderModalBasicTab({
           value={form.api_key_value}
           onChange={(event) => setForm((current) => ({ ...current, api_key_value: event.target.value }))}
         />
-        <p className="form-hint" style={{ marginTop: 4 }}>提交后将被加密保存至凭证中心</p>
+        <p className="form-hint" style={{ marginTop: 4 }}>提交后将加密保存</p>
       </div>
 
       <div className="form-row">
@@ -154,7 +154,7 @@ export function ProviderModalBasicTab({
         <textarea
           className="form-input"
           rows={2}
-          placeholder="备用、测试或者特定项目的专属账单节点？"
+          placeholder="例如：备用、测试或特定项目专用"
           value={form.notes}
           onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
           style={{ resize: "vertical" }}
@@ -165,7 +165,7 @@ export function ProviderModalBasicTab({
         <div style={{ marginTop: 24, marginBottom: 16 }}>
           <div className="form-section-title">同步到哪些工具 *</div>
           <p className="form-hint" style={{ marginTop: -8, marginBottom: 10 }}>
-            激活此 Provider 时，将自动写入以下工具的配置文件
+            激活后将自动同步到以下工具的配置文件
           </p>
           <div className="tool-targets-grid">
             {ALL_TOOLS.map((tool) => (

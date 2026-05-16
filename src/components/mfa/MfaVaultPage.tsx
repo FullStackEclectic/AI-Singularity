@@ -219,7 +219,7 @@ export default function MfaVaultPage() {
   const handleQuery = () => {
     const parsed = parseCredential(inputValue);
     if (!parsed) {
-      setInputError("请输入有效的 otpauth://totp/... URI 或 Base32 秘钥");
+      setInputError("请输入有效的 otpauth://totp/... URI 或 Base32 密钥");
       return;
     }
     setInputError("");
@@ -322,7 +322,7 @@ export default function MfaVaultPage() {
   const handleLoadRecord = (record: MfaRecord) => {
     const parsed = parseCredential(record.secret);
     if (!parsed) {
-      setMessage("该记录的秘钥无效");
+      setMessage("该记录的密钥无效");
       return;
     }
     setInputValue(record.secret);
@@ -337,8 +337,8 @@ export default function MfaVaultPage() {
     <div className="mfa-page">
       <div className="page-header">
         <div>
-          <h1 className="page-title"><ShieldCheck size={22} className="text-primary" /> 2FA / MFA 管理</h1>
-          <p className="page-subtitle">查询和保存 TOTP 动态码，支持 Base32 秘钥与 otpauth URI。</p>
+          <h1 className="page-title"><ShieldCheck size={22} className="text-primary" /> 两步验证（MFA）</h1>
+          <p className="page-subtitle">管理 TOTP 动态验证码，支持 Base32 密钥与 otpauth URI。</p>
         </div>
       </div>
 
@@ -352,10 +352,10 @@ export default function MfaVaultPage() {
             className="form-input mfa-input"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            placeholder="输入 otpauth://totp/... 或 Base32 秘钥"
+            placeholder="输入 otpauth://totp/... 或 Base32 密钥"
           />
           <div className="mfa-hint">
-            支持直接粘贴 `otpauth://totp/...` 或纯 Base32 秘钥，系统会自动规范化后生成动态码。
+            支持直接粘贴 `otpauth://totp/...` 或纯 Base32 密钥，系统会自动规范化后生成动态码。
           </div>
           {inputError && <div className="mfa-inline-error">{inputError}</div>}
 
@@ -434,9 +434,9 @@ export default function MfaVaultPage() {
                       <Copy size={14} />
                       {copiedId === `code-${record.id}` ? "已复制" : "复制动态码"}
                     </button>
-                    <button className="btn btn-ghost btn-sm" onClick={() => handleCopy(`secret-${record.id}`, record.secret, "秘钥已复制")}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => handleCopy(`secret-${record.id}`, record.secret, "密钥已复制")}>
                       <KeyRound size={14} />
-                      {copiedId === `secret-${record.id}` ? "已复制" : "复制秘钥"}
+                      {copiedId === `secret-${record.id}` ? "已复制" : "复制密钥"}
                     </button>
                     <button className="btn btn-danger-ghost btn-sm" onClick={() => handleDelete(record.id, activeTab)}>
                       <Trash2 size={14} /> 删除

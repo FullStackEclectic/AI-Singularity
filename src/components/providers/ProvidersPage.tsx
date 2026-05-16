@@ -152,7 +152,7 @@ function ProviderDetailPreview({
                   fontSize: 12,
                 }}
               >
-                当前激活节点
+                当前激活
               </span>
             )}
           </div>
@@ -211,7 +211,7 @@ function ProviderDetailPreview({
         </div>
 
         <div className="preview-section">
-          <div className="preview-section-title">节点底层负载配置快照 (extra_config)</div>
+          <div className="preview-section-title">高级配置（extra_config）</div>
           <pre className="preview-code-block">{formattedConfig}</pre>
         </div>
 
@@ -267,9 +267,9 @@ export default function ProvidersPage() {
     <div className="providers-page" style={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <div className="page-header" style={{ marginBottom: 24, flexShrink: 0 }}>
         <div>
-          <h1 className="page-title">AI 工具接入层</h1>
+          <h1 className="page-title">服务商配置</h1>
           <p className="page-subtitle">
-            一条配置，同时同步到多个 AI 编程工具（Claude Code / Codex / Gemini CLI 等）
+            管理 AI 工具的服务商配置，一键同步到 Claude Code、Codex、Gemini CLI 等
           </p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
@@ -296,7 +296,7 @@ export default function ProvidersPage() {
             <div className="empty-state" style={{ height: "100%", padding: 24 }}>
               <div className="empty-state-icon">⚡</div>
               <h3 style={{ color: "var(--color-text-secondary)" }}>暂无 Provider</h3>
-              <p style={{ fontSize: 13, marginBottom: 16 }}>点击右上角快速接入</p>
+              <p style={{ fontSize: 13, marginBottom: 16 }}>点击右上角添加配置</p>
             </div>
           ) : (
             <div className="list-group">
@@ -325,7 +325,7 @@ export default function ProvidersPage() {
             <div className="preview-empty-state">
               <div className="preview-empty-state-icon">💡</div>
               <h3>未选择任何配置</h3>
-              <p>请在左侧点击节点以查看预览详情</p>
+              <p>请在左侧选择一个配置查看详情</p>
             </div>
           )}
         </div>

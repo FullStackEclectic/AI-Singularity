@@ -310,7 +310,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
         <div className="sidebar-layout-modal-overlay" onClick={() => setShowLayoutManager(false)}>
           <div className="sidebar-layout-modal" onClick={(e) => e.stopPropagation()}>
             <div className="sidebar-layout-modal-header">
-              <strong>平台布局管理器</strong>
+              <strong>布局管理</strong>
               <button className="sidebar-layout-close-btn" onClick={() => setShowLayoutManager(false)}>
                 ✕
               </button>
@@ -373,7 +373,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
               ))}
             </div>
             <div className="sidebar-layout-groups">
-              <div className="sidebar-layout-groups-title">托盘显示范围（按平台）</div>
+              <div className="sidebar-layout-groups-title">托盘显示的平台</div>
               <div className="sidebar-layout-tray-actions">
                 <button
                   className="sidebar-layout-op-btn"
@@ -385,7 +385,7 @@ export default function Sidebar({ activePage, onNavigate }: SidebarProps) {
               </div>
               {!isTrayAllPlatforms && (
                 <div className="sidebar-layout-groups-title" style={{ marginTop: 4 }}>
-                  当前已限制 {activeLayout.tray_platforms?.length || 0} 个平台
+                  已选 {activeLayout.tray_platforms?.length || 0} 个平台
                 </div>
               )}
               {TRAY_PLATFORM_OPTIONS.map((platform) => {

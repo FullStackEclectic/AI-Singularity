@@ -40,7 +40,7 @@ export function ProviderAdvancedConfig({ value, onChange }: ProviderAdvancedConf
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600 }}>
           <span>🛠️</span>
-          <span>高阶网络与计费配置 (Advanced Config)</span>
+          <span>高级网络与计费配置</span>
         </div>
         <span style={{ transform: isOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }}>▼</span>
       </button>
@@ -72,18 +72,18 @@ export function ProviderAdvancedConfig({ value, onChange }: ProviderAdvancedConf
           <div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500, marginBottom: 12 }}>
               <input type="checkbox" checked={!!value.speedTestEnabled} onChange={e => update({ speedTestEnabled: e.target.checked })} />
-              启用重定向锚点测速 (Speed Test)
+              启用健康检测
             </label>
             {value.speedTestEnabled && (
               <div className="form-row" style={{ marginLeft: 24 }}>
-                <label className="form-label">锚点探测 URL</label>
+                <label className="form-label">健康检测地址</label>
                 <input
                   className="form-input font-mono"
                   placeholder="https://api.example.com/v1/models"
                   value={value.speedTestUrl || ""}
                   onChange={e => update({ speedTestUrl: e.target.value })}
                 />
-                <div className="form-hint">网关调度时将定时对此端点进行探活，若无响应将自动降级。</div>
+                <div className="form-hint">定时对此地址发送探测请求，无响应时自动降级。</div>
               </div>
             )}
           </div>
@@ -92,7 +92,7 @@ export function ProviderAdvancedConfig({ value, onChange }: ProviderAdvancedConf
           <div>
             <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 500, marginBottom: 12 }}>
               <input type="checkbox" checked={!!value.pricingOverride} onChange={e => update({ pricingOverride: e.target.checked })} />
-              覆写计费倍率 (Cost Multiplier Override)
+              自定义计费倍率
             </label>
             {value.pricingOverride && (
               <div className="form-row" style={{ marginLeft: 24 }}>
@@ -105,7 +105,7 @@ export function ProviderAdvancedConfig({ value, onChange }: ProviderAdvancedConf
                   value={value.costMultiplier || ""}
                   onChange={e => update({ costMultiplier: parseFloat(e.target.value) || undefined })}
                 />
-                <div className="form-hint">用于在 Dashboard 中强制重算此上游的财务消耗。</div>
+                <div className="form-hint">用于在看板中重新计算此服务商的费用。</div>
               </div>
             )}
           </div>

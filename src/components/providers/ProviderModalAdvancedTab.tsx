@@ -83,7 +83,7 @@ function ProviderPlatformOverrides({
     return (
       <div style={wrapperStyle}>
         <div className="form-section-title" style={{ fontSize: 13, marginBottom: 12 }}>
-          底层配置重写 (Advanced)
+          高级配置
         </div>
         <JsonConfigEditor
           value={form.extra_config}
@@ -160,7 +160,7 @@ export function ProviderModalAdvancedTab({
           }}
         >
           <div className="form-section-title" style={{ fontSize: 13, marginBottom: 12 }}>
-            Claude 大小杯模型映射 (Overrides)
+            Claude 模型映射
           </div>
 
           <div className="form-grid-2">
@@ -205,7 +205,7 @@ export function ProviderModalAdvancedTab({
             </div>
           </div>
           <div className="form-hint" style={{ marginTop: 2 }}>
-            当对应场景触发时，终端将使用以上设定替代官方硬编码来向本节点发送请求。
+            触发对应场景时，工具将使用以上设定替代默认值发送请求。
           </div>
         </div>
       )}

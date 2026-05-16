@@ -91,7 +91,7 @@ function ProviderRow({
         {isActive && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, width: 220, marginRight: 16 }} onClick={e => e.stopPropagation()}>
             <label style={{ fontSize: 11, color: "var(--color-text-secondary)", fontWeight: 500 }}>
-              独立模型劫持定义 (仅作用于当前终端)
+              单独指定模型（仅作用于当前工具）
             </label>
             <input 
               className="premium-input form-input"
@@ -239,10 +239,10 @@ export default function ToolSyncPage() {
             <div>
               <div className="banner-title">
                 <span style={{ fontSize: "1.2rem" }}>{TOOL_ICONS[activeTab]}</span>
-                当前终端：{TOOL_TARGET_LABELS[activeTab]}
+                当前工具：{TOOL_TARGET_LABELS[activeTab]}
               </div>
               <div style={{ fontSize: 13, color: "var(--color-text-secondary)", fontFamily: "monospace", display: "flex", alignItems: "center", gap: 8, marginTop: 8 }}>
-                注入锚点:
+                配置路径：
                 <span style={{ background: "rgba(15, 23, 42, 0.04)", padding: "2px 8px", borderRadius: 6, border: "1px solid rgba(15, 23, 42, 0.08)", color: "var(--color-text)" }}>
                   {TOOL_TARGET_CONFIG_PATH[activeTab]}
                 </span>
@@ -263,7 +263,7 @@ export default function ToolSyncPage() {
                 <div className="empty-state">
                   <div className="empty-icon">🔌</div>
                   <h3>配置列表为空</h3>
-                  <p>您需要为该终端添加一个配置源，例如官方直连或您的聚合网关。</p>
+                  <p>请为该工具添加一个配置源，例如官方直连或中转服务。</p>
                   <button className="btn btn-primary" onClick={() => setShowProviderModal(true)}>
                     + 新增配置源
                   </button>
@@ -300,10 +300,10 @@ export default function ToolSyncPage() {
               }}>
                 <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--color-border)", background: "rgba(15, 23, 42, 0.01)" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, fontWeight: 600, color: "var(--color-text)", letterSpacing: "0.2px" }}>
-                    📝 注入配置预览
+                    📝 配置文件预览
                   </div>
                   <div style={{ fontSize: 12, color: "var(--color-text-tertiary)", marginTop: 4 }}>
-                    切换左侧 Provider 实时预览即将写入本地的内容
+                    选择左侧配置源，实时预览将写入的内容
                   </div>
                 </div>
                 {activeProvider ? (
@@ -320,7 +320,7 @@ export default function ToolSyncPage() {
                   <div style={{ padding: "40px 20px", textAlign: "center", color: "var(--color-text-tertiary)" }}>
                     <div style={{ fontSize: 32, marginBottom: 12, opacity: 0.5 }}>⚡</div>
                     <div style={{ fontSize: 13 }}>未激活任何配置</div>
-                    <div style={{ fontSize: 12, marginTop: 4 }}>请在左侧添加并激活配置源</div>
+                    <div style={{ fontSize: 12, marginTop: 4 }}>请先在左侧添加并激活一个配置源</div>
                   </div>
                 )}
               </div>

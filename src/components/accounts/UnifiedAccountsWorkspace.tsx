@@ -32,7 +32,7 @@ function getItemTimeSummary(item: UnifiedAccountItem) {
   if (item.type === "api") {
     return item.data.created_at ? new Date(item.data.created_at).toLocaleString() : "未知";
   }
-  return item.data.last_used ? new Date(item.data.last_used).toLocaleString() : "从未调用";
+  return item.data.last_used ? new Date(item.data.last_used).toLocaleString() : "从未使用";
 }
 
 export function UnifiedAccountsWorkspace({

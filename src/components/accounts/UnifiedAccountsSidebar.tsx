@@ -19,7 +19,7 @@ export function UnifiedAccountsSidebar({
     <div className="unified-sidebar">
       <div className="sidebar-brand">
         <Database size={20} color="var(--accent-primary, #2563eb)" />
-        <span>资产仓库</span>
+        <span>账号总览</span>
       </div>
 
       <div className="sidebar-section">
@@ -58,7 +58,7 @@ export function UnifiedAccountsSidebar({
 
       {channels.ideChs.length > 0 && (
         <div className="sidebar-section">
-          <div className="sidebar-section-title">IDE 沙盒池</div>
+          <div className="sidebar-section-title">IDE 账号</div>
           {channels.ideChs.map((channel) => (
             <div
               key={channel.id}
