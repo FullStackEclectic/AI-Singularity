@@ -83,7 +83,7 @@ export function WakeupVerificationPanel({
     <section className="card wakeup-history-panel">
       <div className="wakeup-history-header">
         <div className="wakeup-section-title">
-          <Play size={16} /> 批次验证
+          <Play size={16} /> 批量验证
         </div>
         <div className="wakeup-header-actions">
           <button className="btn btn-primary btn-sm" onClick={onRunVerification} disabled={verificationRunning}>
@@ -94,7 +94,7 @@ export function WakeupVerificationPanel({
             onClick={onCancelVerification}
             disabled={!verificationRunning || !activeVerificationRunId}
           >
-            取消当前批次
+            取消验证
           </button>
         </div>
       </div>
@@ -192,7 +192,7 @@ export function WakeupVerificationPanel({
         </div>
 
         {accounts.length === 0 ? (
-          <div className="wakeup-empty">当前没有可验证的 IDE 账号</div>
+          <div className="wakeup-empty">暂无可验证的账号</div>
         ) : visibleAccounts.length === 0 ? (
           <div className="wakeup-empty">当前分组下没有可验证账号</div>
         ) : (
@@ -239,7 +239,7 @@ export function WakeupVerificationPanel({
                 className="btn btn-secondary btn-sm"
                 onClick={() => onVerificationShowFailedOnlyChange(!verificationShowFailedOnly)}
               >
-                {verificationShowFailedOnly ? "显示全部" : "仅看失败"}
+                {verificationShowFailedOnly ? "显示全部" : "只看失败"}
               </button>
               <button
                 className="btn btn-primary btn-sm"

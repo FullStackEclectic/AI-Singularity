@@ -103,12 +103,12 @@ export function SessionsFiltersPanel({
         </div>
         <div className="sessions-overview-stat">
           <span className="sessions-overview-value">{sessionOverview.noTranscript}</span>
-          <span className="sessions-overview-label">无转录</span>
+          <span className="sessions-overview-label">无记录</span>
         </div>
       </div>
       <div className="sessions-view-bar">
         <span className="sessions-view-chip">当前视图：{currentSessionViewLabel}</span>
-        <span className="sessions-view-chip warning">可见问题会话：{sessionOverview.visibleProblem}</span>
+        <span className="sessions-view-chip warning">可见异常会话：{sessionOverview.visibleProblem}</span>
         <span className="sessions-view-chip">已选：{selectedFilepathsCount}</span>
       </div>
       <div className="sessions-search-box">
@@ -164,7 +164,7 @@ export function SessionsFiltersPanel({
           className={`sessions-tool-chip ${sourceFilter === "no_transcript" ? "active" : ""}`}
           onClick={() => onSourceFilterChange("no_transcript")}
         >
-          无转录
+          无记录
         </button>
       </div>
       <div className="sessions-tool-filters">
@@ -172,25 +172,25 @@ export function SessionsFiltersPanel({
           className={`sessions-tool-chip ${sessionSignalFilter === "all" ? "active" : ""}`}
           onClick={() => onSessionSignalFilterChange("all")}
         >
-          全部信号
+          全部类型
         </button>
         <button
           className={`sessions-tool-chip ${sessionSignalFilter === "tool" ? "active" : ""}`}
           onClick={() => onSessionSignalFilterChange("tool")}
         >
-          含工具调用
+          含工具使用
         </button>
         <button
           className={`sessions-tool-chip ${sessionSignalFilter === "log" ? "active" : ""}`}
           onClick={() => onSessionSignalFilterChange("log")}
         >
-          含日志事件
+          含日志
         </button>
         <button
           className={`sessions-tool-chip ${sessionSignalFilter === "failed_tool" ? "active" : ""}`}
           onClick={() => onSessionSignalFilterChange("failed_tool")}
         >
-          最近工具失败
+          工具执行失败
         </button>
       </div>
       <div className="sessions-tool-filters">
@@ -231,7 +231,7 @@ export function SessionsFiltersPanel({
           onClick={onExpandProblemGroups}
           disabled={problemGroupCount === 0}
         >
-          只展开问题工作区
+          只展开异常工作区
         </button>
         <button
           className="sessions-tool-chip"
@@ -252,7 +252,7 @@ export function SessionsFiltersPanel({
           onClick={onSelectProblemSessions}
           disabled={visibleProblemFilepaths.length === 0}
         >
-          只选问题会话
+          只选异常会话
         </button>
         <button
           className="sessions-tool-chip"
@@ -266,35 +266,35 @@ export function SessionsFiltersPanel({
           onClick={onSelectNoTranscript}
           disabled={noTranscriptFilepaths.length === 0}
         >
-          只选无转录
+          只选无记录
         </button>
         <button
           className="sessions-tool-chip danger"
           onClick={onMoveProblemSessionsToTrash}
           disabled={visibleProblemFilepaths.length === 0}
         >
-          当前问题会话移到废纸篓
+          当前异常会话移到回收站
         </button>
         <button
           className="sessions-tool-chip"
           onClick={onCopyProblemDirs}
           disabled={visibleProblemDirs.length === 0}
         >
-          复制问题会话目录
+          复制异常会话目录
         </button>
         <button
           className="sessions-tool-chip"
           onClick={onCopyProblemCommands}
           disabled={visibleProblemResumeCommands.length === 0}
         >
-          复制问题会话命令
+          复制异常会话命令
         </button>
         <button
           className="sessions-tool-chip"
           onClick={onLaunchProblemSessions}
           disabled={visibleProblemFilepaths.length === 0}
         >
-          拉起问题会话终端(前3)
+          打开异常会话终端(前3)
         </button>
         {(sourceFilter !== "all" ||
           sessionSignalFilter !== "all" ||
@@ -308,10 +308,10 @@ export function SessionsFiltersPanel({
       </div>
       <div className="sessions-filter-hint">
         {sourceFilter === "workspace_history" && "当前视图更适合批量排查工作区索引来源，不代表完整聊天转录。"}
-        {sourceFilter === "no_transcript" && "当前视图适合优先检查无转录会话，再决定是否移到废纸篓或保留索引。"}
+        {sourceFilter === "no_transcript" && "当前视图适合优先检查无记录会话，再决定是否移到回收站或保留索引。"}
         {sourceFilter === "transcript" && "当前视图只保留有实际转录内容的会话。"}
         {sourceFilter === "all" && "可以先按来源或工具筛一轮，再用批量栏统一处理。"}
-        {visibleProblemFilepaths.length > 3 && " 批量拉起终端默认限制前 3 条，避免一次打开过多窗口。"}
+        {visibleProblemFilepaths.length > 3 && " 批量打开终端默认限制前 3 条，避免一次打开过多窗口。"}
       </div>
     </div>
   );

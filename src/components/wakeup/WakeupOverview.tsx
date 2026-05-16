@@ -74,10 +74,10 @@ export function WakeupOverview({
       <div className="page-header">
         <div>
           <h1 className="page-title">
-            <Clock3 size={22} className="text-primary" /> Wakeup / Verification
+            <Clock3 size={22} className="text-primary" /> 定时任务
           </h1>
           <p className="page-subtitle">
-            统一网关派发、Run 聚合、设备健康联动；任务、历史、cron 调度、即时执行和批次验证一站接入。
+            管理定时任务、批量验证和执行历史，支持即时运行与 cron 调度。
           </p>
         </div>
         <div className="wakeup-header-actions">
@@ -111,7 +111,7 @@ export function WakeupOverview({
         </div>
         <div className="card wakeup-stat">
           <div className="wakeup-stat-label">
-            <Activity size={12} /> 网关并发
+            <Activity size={12} /> 并发数
           </div>
           <div className="wakeup-stat-value">
             {runtime
@@ -128,7 +128,7 @@ export function WakeupOverview({
       {summary && summary.categories.length > 0 && (
         <div className="card wakeup-distribution-card">
           <div className="wakeup-section-title">
-            近 24h 触发分布（共 {summary.totalCount} 次：成功 {summary.successCount}，失败 {summary.failureCount}）
+            近 24 小时执行情况（共 {summary.totalCount} 次：成功 {summary.successCount}，失败 {summary.failureCount}）
           </div>
           <CategoryBars summary={summary} />
         </div>

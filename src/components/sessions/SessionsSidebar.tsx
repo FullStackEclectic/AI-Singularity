@@ -188,7 +188,7 @@ export function SessionsSidebar(props: SessionsSidebarProps) {
             className="sessions-icon-btn danger"
             onClick={onMoveToTrash}
             disabled={selectedFilepaths.length === 0}
-            title="将选中会话移到废纸篓"
+            title="将选中会话移到回收站"
           >
             <Skull size={14} />
           </button>
@@ -244,19 +244,19 @@ export function SessionsSidebar(props: SessionsSidebarProps) {
 
       {selectedFilepaths.length > 0 && (
         <div className="session-batch-bar">
-          <div className="session-batch-title">批量处理队列</div>
+          <div className="session-batch-title">批量操作</div>
           <div className="session-batch-meta">
             已选 {selectedSessionsCount} 条会话，覆盖 {selectedGroupsCount} 个工作区
           </div>
           <div className="session-batch-actions">
             <button className="btn btn-ghost btn-xs" onClick={onToggleAllSessionsSelected}>
-              {selectedFilepaths.length === sessionsCount ? "取消全选" : "全选全部"}
+              {selectedFilepaths.length === sessionsCount ? "取消全选" : "全选"}
             </button>
             <button className="btn btn-ghost btn-xs" onClick={onClearSelectedFilepaths}>
-              清空选择
+              取消选择
             </button>
             <button className="btn btn-danger-ghost btn-xs" onClick={onMoveToTrash}>
-              移到废纸篓
+              移到回收站
             </button>
           </div>
         </div>
@@ -297,7 +297,7 @@ export function SessionsSidebar(props: SessionsSidebarProps) {
                   })
                 }
               >
-                <Skull size={10} /> 注入代理
+                <Skull size={10} /> 切换代理
               </button>
             </div>
           </div>

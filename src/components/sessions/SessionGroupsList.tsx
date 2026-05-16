@@ -60,7 +60,7 @@ export function SessionGroupsList({
           {sourceFilter === "workspace_history"
             ? "当前没有匹配的工作区历史会话"
             : sourceFilter === "no_transcript"
-              ? "当前没有匹配的无转录会话"
+              ? "当前没有匹配的无记录会话"
               : sourceFilter === "transcript"
                 ? "当前没有匹配的有转录会话"
                 : "当前没有匹配的会话"}

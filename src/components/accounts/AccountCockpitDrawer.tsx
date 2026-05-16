@@ -28,10 +28,10 @@ import "./AccountCockpitDrawer.css";
 type TabKey = "health" | "auto" | "alert" | "fingerprint" | "extension";
 
 const TABS: { key: TabKey; label: string; icon: typeof Zap }[] = [
-  { key: "health", label: "账号健康", icon: ShieldAlert },
-  { key: "auto", label: "自动切号", icon: Zap },
-  { key: "alert", label: "配额告警", icon: AlertCircle },
-  { key: "fingerprint", label: "设备指纹", icon: FingerprintIcon },
+  { key: "health", label: "账号状态", icon: ShieldAlert },
+  { key: "auto", label: "自动切换", icon: Zap },
+  { key: "alert", label: "用量告警", icon: AlertCircle },
+  { key: "fingerprint", label: "设备标识", icon: FingerprintIcon },
   { key: "extension", label: "插件导入", icon: Plug },
 ];
 
@@ -57,7 +57,7 @@ export function AccountCockpitDrawer({
         role="dialog"
       >
         <header className="cockpit-drawer-header">
-          <h2>账号控制塔</h2>
+          <h2>账号管理中心</h2>
           <button onClick={onClose} aria-label="关闭" className="cockpit-close-btn">
             <X size={18} />
           </button>
@@ -131,7 +131,7 @@ function HealthPanel() {
   return (
     <section className="cockpit-section">
       <header className="cockpit-section-header">
-        <h3>账号健康</h3>
+        <h3>账号状态</h3>
         <div className="cockpit-actions">
           <button onClick={() => void load()} disabled={loading}>
             <RefreshCw size={14} /> 刷新列表
@@ -172,7 +172,7 @@ function HealthPanel() {
                 <td className="cockpit-reason">{a.disabled_reason || "未知"}</td>
                 <td>{a.disabled_at ? new Date(a.disabled_at).toLocaleString() : "—"}</td>
                 <td>
-                  <button onClick={() => void handleClear(a.id)}>解除禁用</button>
+                  <button onClick={() => void handleClear(a.id)}>恢复启用</button>
                 </td>
               </tr>
             ))}
@@ -243,7 +243,7 @@ function AutoSwitchPanel({
   return (
     <section className="cockpit-section">
       <header className="cockpit-section-header">
-        <h3>自动切号</h3>
+        <h3>自动切换账号</h3>
         <div className="cockpit-actions">
           <button onClick={() => void runNow()} disabled={running} className="primary">
             <Zap size={14} /> {running ? "运行中..." : "立即执行一次"}
@@ -261,7 +261,7 @@ function AutoSwitchPanel({
               setSettings({ ...settings, enabled: e.target.checked })
             }
           />
-          启用自动切号
+          启用自动切换账号
         </label>
         <label className="cockpit-row">
           阈值（≤ 该百分比触发）
@@ -290,7 +290,7 @@ function AutoSwitchPanel({
               })
             }
           />
-          硬切号（关闭并重启 IDE）
+          强制切换（关闭并重启）
         </label>
         <fieldset className="cockpit-fieldset">
           <legend>监控分组（不选 = 全部）</legend>
@@ -355,10 +355,10 @@ function AutoSwitchPanel({
         </button>
       </div>
       <h4 className="cockpit-subhead">
-        <History size={14} /> 切号历史 (最近 20)
+        <History size={14} /> 切换历史 (最近 20)
       </h4>
       {history.length === 0 ? (
-        <p className="cockpit-empty">暂无切号历史</p>
+        <p className="cockpit-empty">暂无切换历史</p>
       ) : (
         <table className="cockpit-table">
           <thead>
@@ -418,7 +418,7 @@ function QuotaAlertPanel() {
   return (
     <section className="cockpit-section">
       <header className="cockpit-section-header">
-        <h3>配额告警</h3>
+        <h3>用量告警</h3>
         <div className="cockpit-actions">
           <button onClick={() => void runPreview()} disabled={previewing}>
             <AlertCircle size={14} /> {previewing ? "预览中..." : "立即检查"}
@@ -434,7 +434,7 @@ function QuotaAlertPanel() {
               setSettings({ ...settings, enabled: e.target.checked })
             }
           />
-          启用配额告警
+          启用用量告警
         </label>
         <label className="cockpit-row">
           阈值
@@ -453,7 +453,7 @@ function QuotaAlertPanel() {
           %
         </label>
         <label className="cockpit-row">
-          冷却窗口
+          告警冷却时间
           <input
             type="number"
             min={30}
@@ -541,10 +541,10 @@ function FingerprintPanel({
   return (
     <section className="cockpit-section">
       <header className="cockpit-section-header">
-        <h3>设备指纹</h3>
+        <h3>设备标识</h3>
         <div className="cockpit-actions">
           <input
-            placeholder="新指纹名称"
+            placeholder="标识名称"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
           />

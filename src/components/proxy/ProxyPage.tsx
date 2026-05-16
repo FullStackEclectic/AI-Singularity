@@ -48,19 +48,19 @@ export default function ProxyPage() {
 
   return (
     <div className="proxy-page">
-      <div className="info-banner" style={{ background: "var(--color-surface)", marginBottom: 32 }}>
+      <div className="info-banner" style={{ background: "var(--color-bg-secondary)", marginBottom: 32 }}>
         <div className="proxy-header-info">
           <h1 className="proxy-title">
-            <Server size={24} className="text-primary" />
-            Proxy Gateway 总控制台引擎
+            <Server size={24} className="text-accent" />
+            本地代理网关
           </h1>
           <p style={{ margin: 0, fontSize: 13, color: "var(--color-text-secondary)" }}>
-            承载协议转录拦截、流级劫持与本地端口投射的核心组件。
+            负责本地请求转发与协议适配，支持 OpenAI / Anthropic / Gemini 三种格式互转。
           </p>
         </div>
         <div className="proxy-action-panel">
           <div className="port-config" style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--color-text-secondary)", marginRight: 16 }}>
-            <span>端口:</span>
+            <span>监听端口</span>
             <input
               type="number"
               className="form-input"
@@ -71,16 +71,16 @@ export default function ProxyPage() {
             />
           </div>
           <button
-            className={`btn ${isRunning ? "btn-secondary" : "btn-primary"}`}
+            className={`btn ${isRunning ? "btn-ghost" : "btn-primary"}`}
             onClick={() => startMut.mutate()}
             disabled={startMut.isPending || isRunning}
-            style={{ minWidth: 140 }}
+            style={{ minWidth: 120 }}
           >
-            {isRunning ? <><Check size={16}/> 引擎运转中</> : startMut.isPending ? "启动中..." : <><Zap size={16}/> 启动本地代理</>}
+            {isRunning ? <><Check size={16}/> 运行中</> : startMut.isPending ? "启动中..." : <><Zap size={16}/> 启动代理</>}
           </button>
           <div className={`proxy-status-pill ${isRunning ? "online" : "offline"}`}>
             <span className="status-dot" />
-            {isRunning ? "ONLINE" : "OFFLINE"}
+            {isRunning ? "运行中" : "已停止"}
           </div>
         </div>
       </div>
@@ -88,61 +88,63 @@ export default function ProxyPage() {
       <CloudflaredTunnelPanel localPort={port} />
 
       <div className="proxy-grid">
-        {/* Core Settings / Dashboard */}
+        {/* 连接状态 */}
         <div className="proxy-card">
           <div className="proxy-card-header">
             <Activity size={18} className="proxy-card-header-icon" />
-            会话雷达监控 (Session Radar)
+            连接状态
           </div>
           
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div className="info-banner" style={{ margin: 0, padding: "12px 16px", background: "rgba(16, 185, 129, 0.04)" }}>
+            <div className="info-banner" style={{ margin: 0, padding: "12px 16px", background: "var(--color-success-dim)" }}>
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 12, color: "var(--color-text-tertiary)" }}>本地服务入口</div>
-                <div style={{ fontSize: 14, fontFamily: "monospace", color: "var(--color-text)", fontWeight: 600, marginTop: 4 }}>
+                <div style={{ fontSize: 12, color: "var(--color-text-muted)" }}>本地服务地址</div>
+                <div style={{ fontSize: 14, fontFamily: "monospace", color: "var(--color-text-primary)", fontWeight: 600, marginTop: 4 }}>
                   {endpoint}
                 </div>
               </div>
-              <button className="btn btn-secondary btn-sm" onClick={handleCopy}>
+              <button className="btn btn-ghost btn-sm" onClick={handleCopy}>
                 {copied ? "已复制" : "复制"}
               </button>
             </div>
 
             <div>
               <div className="proxy-stat-row">
-                <span className="proxy-stat-label">可用池化凭据源</span>
-                <span className="proxy-stat-value">{validNodes} 活跃指纹</span>
+                <span className="proxy-stat-label">可用账号数</span>
+                <span className="proxy-stat-value">{validNodes} 个活跃</span>
               </div>
               <div className="proxy-stat-row">
-                <span className="proxy-stat-label">流体劫持模式 (Intercept)</span>
-                <span className="proxy-stat-value">Deep Stream / SSE</span>
+                <span className="proxy-stat-label">请求拦截模式</span>
+                <span className="proxy-stat-value">流式 SSE</span>
               </div>
               <div className="proxy-stat-row">
-                <span className="proxy-stat-label">跨模态支持</span>
-                <span className="proxy-stat-value" style={{ color: "#10B981" }}>启用中 (Imagen-3)</span>
+                <span className="proxy-stat-label">多模态支持</span>
+                <span className="proxy-stat-value" style={{ color: "var(--color-success)" }}>已启用（Imagen-3）</span>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Protocols */}
+        {/* 协议转换 */}
         <div className="proxy-card">
           <div className="proxy-card-header">
             <Network size={18} className="proxy-card-header-icon" />
-            运行时协议栈 (Transmutation)
+            协议转换
           </div>
           <div className="protocol-list">
             {[
-              { flow: "OpenAI ↔ Anthropic", status: "ONLINE", type: "SSE_HIJACK" },
-              { flow: "OpenAI ↔ Gemini", status: "ONLINE", type: "NATIVE_MAP" },
-              { flow: "OpenAI ↔ DeepSeek", status: "ONLINE", type: "PASSTHROUGH" },
-              { flow: "Auth0IDE ↔ ClaudeCode", status: "STANDBY", type: "FORGE_ID" }
+              { flow: "OpenAI ↔ Anthropic", status: "ONLINE", type: "流式转换" },
+              { flow: "OpenAI ↔ Gemini", status: "ONLINE", type: "原生映射" },
+              { flow: "OpenAI ↔ DeepSeek", status: "ONLINE", type: "直通" },
+              { flow: "Auth0IDE ↔ ClaudeCode", status: "STANDBY", type: "账号注入" }
             ].map((p, i) => (
               <div key={i} className="protocol-item">
                 <div className="protocol-flow">{p.flow}</div>
                 <div className="protocol-meta">
                   <span className="protocol-tag">{p.type}</span>
-                  <span className={`protocol-status ${p.status === 'ONLINE' ? 'online' : 'standby'}`}>{p.status}</span>
+                  <span className={`protocol-status ${p.status === 'ONLINE' ? 'online' : 'standby'}`}>
+                    {p.status === 'ONLINE' ? '运行中' : '待机'}
+                  </span>
                 </div>
               </div>
             ))}
@@ -155,10 +157,10 @@ export default function ProxyPage() {
       <div className="proxy-card" style={{ marginTop: 24 }}>
         <div className="proxy-card-header">
           <Settings size={18} className="proxy-card-header-icon" />
-          全量自动模型重写 (Model Mapping Rules)
+          模型映射规则
         </div>
         <p style={{ margin: "0 0 16px 0", fontSize: 13, color: "var(--color-text-secondary)" }}>
-          设定模型降维与路由映射规则：当客户端使用来源模型请求网关时，透明转写至目标大模型提供商。
+          设置模型映射规则：当客户端请求某个模型时，自动转发至目标模型提供商。
         </p>
         <ModelMappingPanel />
       </div>
@@ -166,7 +168,7 @@ export default function ProxyPage() {
       <div className="proxy-card" style={{ marginTop: 24 }}>
         <div className="proxy-card-header">
           <ShieldCheck size={18} className="proxy-card-header-icon" />
-          沙盒内侧连通性验证 (Sandbox)
+          连通性测试
         </div>
         <div style={{ height: 380 }}>
           <PlaygroundPanel />

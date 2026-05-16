@@ -191,7 +191,7 @@ export function UnifiedAccountsControlPanel({
         <div className="main-title-area">
           <h1 className="main-title">{activeChannelName}</h1>
           <p className="main-subtitle">
-            已筛选 {totalFilteredCount} 条可用账单记录
+            共 {totalFilteredCount} 条账号
             {currentProblemViewLabel ? ` · ${currentProblemViewLabel}` : ""}
             {currentGroupViewLabel ? ` · ${currentGroupViewLabel}` : ""}
           </p>
@@ -247,16 +247,16 @@ export function UnifiedAccountsControlPanel({
           </button>
           <button className="btn-outline" onClick={onCheckAllKeys} disabled={isCheckAllKeysPending}>
             <RefreshCw size={15} className={isCheckAllKeysPending ? "spin" : ""} />
-            {isCheckAllKeysPending ? "全量探测中" : "一键探测筛选键"}
+            {isCheckAllKeysPending ? "检测中..." : "批量检测 Key"}
           </button>
           <button className="btn-primary" onClick={onOpenAddWizard}>
             <Plus size={15} />
             {" "}
-            添加资产
+            添加账号
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={onOpenCockpit} title="账号控制塔：失效检测 / 自动切号 / 配额告警 / 设备指纹 / 插件导入">
+          <button className="btn btn-ghost btn-sm" onClick={onOpenCockpit} title="账号管理中心：失效检测 / 自动切换 / 用量告警 / 设备标识 / 插件导入">
             <Compass size={14} />
-            控制塔
+            管理中心
           </button>
         </div>
       </div>
@@ -278,7 +278,7 @@ export function UnifiedAccountsControlPanel({
               <div className="accounts-overview-value">{ideOverview.currentCount}</div>
             </div>
             <div className="accounts-overview-card">
-              <div className="accounts-overview-label">健康账号</div>
+              <div className="accounts-overview-label">正常账号</div>
               <div className="accounts-overview-value">{ideOverview.activeCount}</div>
             </div>
             <div className="accounts-overview-card warning">

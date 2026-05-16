@@ -72,8 +72,8 @@ export function SessionDetailPane({
             <span className="session-location-chip">工具：{selectedSession.tool_type || "Unknown"}</span>
             <span className="session-location-chip">消息：{selectedSession.messages_count}</span>
             <span className="session-location-chip">当前显示：{visibleMessages.length}</span>
-            {selectedSession.has_tool_calls ? <span className="session-location-chip">含工具调用</span> : null}
-            {selectedSession.has_log_events ? <span className="session-location-chip">含日志事件</span> : null}
+            {selectedSession.has_tool_calls ? <span className="session-location-chip">含工具使用</span> : null}
+            {selectedSession.has_log_events ? <span className="session-location-chip">含日志</span> : null}
             {selectedSession.source_kind === "workspace_history" ? (
               <span className="session-location-chip warning">来源：工作区历史索引</span>
             ) : null}
@@ -122,8 +122,8 @@ export function SessionDetailPane({
               <Folder size={14} style={{ marginRight: 4 }} /> 工具输出
             </button>
           ) : null}
-          <button className="btn btn-primary btn-sm" onClick={() => onLaunchTerminal(selectedSession)} title="在新终端以当前目录直接拉起">
-            <Terminal size={14} style={{ marginRight: 4 }} /> 外置终端拉起
+          <button className="btn btn-primary btn-sm" onClick={() => onLaunchTerminal(selectedSession)} title="在新终端以当前目录直接打开">
+            <Terminal size={14} style={{ marginRight: 4 }} /> 外置终端打开
           </button>
         </div>
       </div>
