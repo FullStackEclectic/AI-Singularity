@@ -15,7 +15,7 @@ export default function AccountsContainerPage() {
           className={activeTab === "managed" ? "active" : ""} 
           onClick={() => setActiveTab("managed")}
         >
-           渠道资产 (Channels)
+           账号渠道
         </button>
         <button 
           className={activeTab === "shared" ? "active" : ""} 

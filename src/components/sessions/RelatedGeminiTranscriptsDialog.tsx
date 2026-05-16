@@ -39,13 +39,13 @@ export function RelatedGeminiTranscriptsDialog({
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal session-message-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>关联 Gemini 转录</h2>
+          <h2>关联 Gemini 记录</h2>
           <button className="btn btn-icon" onClick={onClose}>✕</button>
         </div>
         <div className="modal-body" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <div className="session-instance-meta">
             <span>工作区：{getSessionCwd(selectedSession) || "未识别"}</span>
-            <span>关联转录：{relatedGeminiTranscripts.length}</span>
+            <span>关联记录：{relatedGeminiTranscripts.length}</span>
           </div>
           <div className="session-related-panel">
             <div className="sessions-search-box">
@@ -90,7 +90,7 @@ export function RelatedGeminiTranscriptsDialog({
           </div>
           <div className="session-instance-list">
             {filteredRelatedGeminiTranscripts.length === 0 ? (
-              <div className="empty-text">当前筛选条件下没有匹配的关联转录</div>
+              <div className="empty-text">当前筛选条件下没有匹配的关联记录</div>
             ) : (
               filteredRelatedGeminiTranscripts.map((item) => (
                 <button

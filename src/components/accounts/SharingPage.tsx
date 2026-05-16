@@ -188,7 +188,7 @@ export default function SharingPage() {
           
           {/* ========== 新增：四维管辖域配置板块 ========== */}
           <div className="scope-config-zone">
-            <h4>1. 定义算力暴露范围 (Scope)</h4>
+            <h4>1. 定义分发范围</h4>
             <div className="scope-selection-pills">
               <button className={`scope-pill ${scopeType === 'global' ? 'active' : ''}`} onClick={() => setScopeType('global')}>
                 <Globe size={14}/> 全局无差别共享

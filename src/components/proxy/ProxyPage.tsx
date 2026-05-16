@@ -136,7 +136,7 @@ export default function ProxyPage() {
               { flow: "OpenAI ↔ Anthropic", status: "ONLINE", type: "流式转换" },
               { flow: "OpenAI ↔ Gemini", status: "ONLINE", type: "原生映射" },
               { flow: "OpenAI ↔ DeepSeek", status: "ONLINE", type: "直通" },
-              { flow: "Auth0IDE ↔ ClaudeCode", status: "STANDBY", type: "账号注入" }
+              { flow: "Auth0IDE ↔ ClaudeCode", status: "STANDBY", type: "账号切换" }
             ].map((p, i) => (
               <div key={i} className="protocol-item">
                 <div className="protocol-flow">{p.flow}</div>

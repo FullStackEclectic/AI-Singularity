@@ -583,7 +583,7 @@ function FingerprintPanel({
           <tr>
             <th>账号</th>
             <th>平台</th>
-            <th>当前指纹</th>
+            <th>当前标识</th>
             <th>操作</th>
           </tr>
         </thead>

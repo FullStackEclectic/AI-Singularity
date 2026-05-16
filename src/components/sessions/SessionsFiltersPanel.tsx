@@ -152,7 +152,7 @@ export function SessionsFiltersPanel({
           className={`sessions-tool-chip ${sourceFilter === "transcript" ? "active" : ""}`}
           onClick={() => onSourceFilterChange("transcript")}
         >
-          有转录
+          有记录
         </button>
         <button
           className={`sessions-tool-chip ${sourceFilter === "workspace_history" ? "active" : ""}`}
@@ -307,9 +307,9 @@ export function SessionsFiltersPanel({
         )}
       </div>
       <div className="sessions-filter-hint">
-        {sourceFilter === "workspace_history" && "当前视图更适合批量排查工作区索引来源，不代表完整聊天转录。"}
+        {sourceFilter === "workspace_history" && "此视图适合批量排查工作区来源，不包含完整对话内容。"}
         {sourceFilter === "no_transcript" && "当前视图适合优先检查无记录会话，再决定是否移到回收站或保留索引。"}
-        {sourceFilter === "transcript" && "当前视图只保留有实际转录内容的会话。"}
+        {sourceFilter === "transcript" && "此视图只显示有实际对话内容的会话。"}
         {sourceFilter === "all" && "可以先按来源或工具筛一轮，再用批量栏统一处理。"}
         {visibleProblemFilepaths.length > 3 && " 批量打开终端默认限制前 3 条，避免一次打开过多窗口。"}
       </div>

@@ -131,7 +131,7 @@ export default function ProxyEngineSettingsPanel() {
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
                 <div>
                   <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--color-text-secondary)", marginBottom: 8 }}>
-                    节点分发算法 (Algorithm)
+                    分发算法
                   </label>
                   <select 
                     className="form-select" 
@@ -223,7 +223,7 @@ export default function ProxyEngineSettingsPanel() {
                 ))}
               </div>
               <p style={{ marginTop: 12, fontSize: 12, color: "var(--color-text-secondary)", marginBottom: 0 }}>
-                注：当渠道接口连续遇到 429 或 502 时，将依此阶梯时间冻结对该渠道的心跳探测，防止并发雪崩。
+                当接口连续遇到 429 或 502 时，按此阶梯时间暂停对该渠道的请求，防止并发雪崩。
               </p>
             </div>
           )}
@@ -240,7 +240,7 @@ export default function ProxyEngineSettingsPanel() {
           >
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontWeight: 600, fontSize: 14 }}>
               <Cpu size={16} className={config.advancedThinking.enabled ? "text-primary" : "text-muted"} />
-              思维层与记忆降维压缩 (Cognitive Scaling)
+              对话历史压缩
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={{ fontSize: 12, color: config.advancedThinking.enabled ? "var(--color-primary)" : "var(--color-text-muted)", fontWeight: 600 }}>

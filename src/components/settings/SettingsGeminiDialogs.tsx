@@ -117,7 +117,7 @@ export function SettingsGeminiDialogs({
               geminiEditDialog.followLocalAccount &&
               !currentGeminiAccountId ? (
                 <div className="alert alert-info" style={{ fontSize: 13 }}>
-                  当前没有解析到本地 Gemini 账号。若继续保持跟随模式，默认实例启动时不会有可注入的账号。
+                  当前未检测到本地 Gemini 账号。若保持跟随模式，启动时将无法自动切换账号。
                 </div>
               ) : null}
               {!geminiEditDialog.instance.is_default ||

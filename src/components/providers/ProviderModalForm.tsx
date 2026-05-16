@@ -204,10 +204,10 @@ export function ProviderModal({
         <div className="modal-header">
           <h2>
             {isEditing
-              ? `编辑 ${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : ""}节点配置`
+              ? `编辑 ${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : ""}配置`
               : step === "preset"
                 ? `${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : "全局"}通道快速模板`
-                : `新增 ${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : ""}节点`}
+                : `新增 ${fixedTool ? TOOL_TARGET_LABELS[fixedTool] : ""}配置`}
           </h2>
           <button className="btn btn-icon" onClick={onClose}>✕</button>
         </div>

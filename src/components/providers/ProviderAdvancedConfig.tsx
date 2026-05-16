@@ -83,7 +83,7 @@ export function ProviderAdvancedConfig({ value, onChange }: ProviderAdvancedConf
                   value={value.speedTestUrl || ""}
                   onChange={e => update({ speedTestUrl: e.target.value })}
                 />
-                <div className="form-hint">定时对此地址发送探测请求，无响应时自动降级。</div>
+                <div className="form-hint">定时对此地址发送检测请求，无响应时自动降级。</div>
               </div>
             )}
           </div>

@@ -96,7 +96,7 @@ export default function SpeedTestPage() {
         <div>
           <h1 className="page-title">网络测速</h1>
           <p className="page-subtitle">
-            实测各主流平台 API 端点的响应速度，选择当下最快节点
+            测试各主流平台 API 的响应速度，找到最快的接入点
           </p>
         </div>
         <button

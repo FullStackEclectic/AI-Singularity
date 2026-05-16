@@ -80,10 +80,10 @@ export function SessionDetailPane({
           </div>
           {selectedSession.tool_type === "GeminiCLI" && selectedSession.messages_count === 0 ? (
             <div className="session-source-note">
-              当前这条 Gemini 记录来自工作区历史索引；完整聊天转录会优先从 `~/.gemini/tmp/*/chats/session-*.json` 读取。
+              此记录来自工作区历史索引，完整对话内容将从 Gemini 本地文件读取。
               {relatedGeminiTranscripts.length > 0 ? (
                 <>
-                  {" "}当前同工作区已找到 {relatedGeminiTranscripts.length} 条真实转录，可直接跳转。
+                  {" "}同工作区找到 {relatedGeminiTranscripts.length} 条关联记录，可直接跳转。
                 </>
               ) : null}
             </div>
@@ -96,10 +96,10 @@ export function SessionDetailPane({
           {selectedSession.source_kind === "workspace_history" && relatedGeminiTranscripts.length > 0 ? (
             <div className="session-related-actions">
               <button className="session-instance-chip clickable" onClick={onJumpToRelatedGeminiTranscript}>
-                跳到最新转录 · {relatedGeminiTranscripts[0]?.title}
+                跳转最新记录 · {relatedGeminiTranscripts[0]?.title}
               </button>
               <button className="session-instance-chip clickable" onClick={onShowRelatedGeminiDialog}>
-                查看全部关联转录 · {relatedGeminiTranscripts.length}
+                查看全部关联记录 · {relatedGeminiTranscripts.length}
               </button>
             </div>
           ) : null}

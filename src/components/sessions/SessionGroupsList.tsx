@@ -62,7 +62,7 @@ export function SessionGroupsList({
             : sourceFilter === "no_transcript"
               ? "当前没有匹配的无记录会话"
               : sourceFilter === "transcript"
-                ? "当前没有匹配的有转录会话"
+                ? "当前没有匹配的会话"
                 : "当前没有匹配的会话"}
           {(sourceFilter !== "all" || sessionSignalFilter !== "all" || searchQuery.trim() || toolFilter !== "all") && (
             <>

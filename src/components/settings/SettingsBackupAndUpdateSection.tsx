@@ -128,7 +128,7 @@ export function SettingsBackupAndUpdateSection({
 
       <h3 style={{ marginBottom: "var(--space-2)" }}>多端 WebDAV 备份同步</h3>
       <p className="text-muted" style={{ fontSize: "12px", marginBottom: "var(--space-4)" }}>
-        保障您的配置、Prompt、工具与资产跨端实时同步，数据安全不丢失（原生只支持基于 HTTP 基本认证的 WebDAV）。
+        将配置、Prompt 和工具设置同步到多端，防止数据丢失（支持 WebDAV 协议）。
       </p>
       <div
         style={{
@@ -429,7 +429,7 @@ export function SettingsBackupAndUpdateSection({
                 }}
               >
                 <div>
-                  <div style={{ fontWeight: 600 }}>Linux 发行包资产</div>
+                  <div style={{ fontWeight: 600 }}>Linux 安装包</div>
                   <div className="text-muted" style={{ fontSize: 12 }}>
                     {linuxReleaseInfo.version}
                     {linuxReleaseInfo.published_at

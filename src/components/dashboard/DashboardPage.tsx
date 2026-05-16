@@ -228,7 +228,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* 模型重金开销排行榜 */}
+            {/* 模型费用排行 */}
             <div className="card chart-panel">
               <h3 className="chart-title">模型费用排行</h3>
               <div style={{ width: '100%', height: 220 }}>
